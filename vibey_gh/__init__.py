@@ -20,4 +20,4 @@ from vibey_gh.config import GhConfig, load_config
 
 __version__ = "1.0.0"
 
-__all__ = ["GhConfig", "load_config", "__version__"]
+__all__ = ["GhConfig", "__version__", "load_config"]
