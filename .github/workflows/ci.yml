@@ -62,15 +62,25 @@ jobs:
       # The templates are the product as much as the code is: a wheel that ships without
       # them installs a CLI that cannot install anything.
       - name: Assert the templates are in the wheel
+        # Everything the shell runs stays INDENTED inside this block scalar. YAML strips
+        # the common indent, so the shell still sees a column-0 heredoc — but a line
+        # actually written at column 0 here would end the scalar and break the parse.
         run: |
           set -euo pipefail
-          for f in githooks/pre-push githooks/commit-msg workflows/provenance.yml workflows/merge-train.yml; do
-            python -c "
-import sys, zipfile, glob
-whl = glob.glob('dist/*.whl')[0]
-names = zipfile.ZipFile(whl).namelist()
-want = 'vibey_gh/templates/$f'
-sys.exit(0 if want in names else f'MISSING from the wheel: {want}')
-"
-          done
-          echo "all templates present"
+          python - <<'PY'
+          import glob
+          import sys
+          import zipfile
+
+          want = [
+              "vibey_gh/templates/githooks/pre-push",
+              "vibey_gh/templates/githooks/commit-msg",
+              "vibey_gh/templates/workflows/provenance.yml",
+              "vibey_gh/templates/workflows/merge-train.yml",
+          ]
+          names = set(zipfile.ZipFile(glob.glob("dist/*.whl")[0]).namelist())
+          missing = [w for w in want if w not in names]
+          if missing:
+              sys.exit("missing from the wheel: " + ", ".join(missing))
+          print("all templates present")
+          PY

@@ -30,7 +30,11 @@ classifiers = [
 dependencies = []
 
 [project.optional-dependencies]
-dev = ["pytest>=7.4", "pytest-cov>=4.1", "ruff>=0.5", "black>=24.0", "isort>=5.12", "mypy>=1.8"]
+dev = [
+    "pytest>=7.4", "pytest-cov>=4.1",
+    "ruff>=0.5", "black>=24.0", "isort>=5.12", "mypy>=1.8",
+    "pyyaml>=6.0",   # test/test_templates.py parses the shipped workflow templates
+]
 
 [project.scripts]
 vibey-gh = "vibey_gh.cli:main"
