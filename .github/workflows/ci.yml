@@ -1,0 +1,76 @@
+# Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger.
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  test:
+    name: Test (${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      # The full supported range. The 3.11 floor is tomllib; the coverage gate is 100%,
+      # and a branch that only one version can reach is a branch the others cannot test —
+      # which is exactly how a version-dependent gap hides.
+      matrix:
+        python: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0        # the tests drive real git history
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install
+        run: python -m pip install --quiet -e ".[dev]"
+
+      - name: Test
+        run: python -m pytest -q
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --quiet -e ".[dev]"
+      - run: python -m black --check vibey_gh test
+      - run: python -m isort --check-only vibey_gh test
+      - run: python -m ruff check vibey_gh test
+      - run: python -m mypy vibey_gh
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --quiet build twine
+      - run: python -m build
+      - run: python -m twine check dist/*
+
+      # The templates are the product as much as the code is: a wheel that ships without
+      # them installs a CLI that cannot install anything.
+      - name: Assert the templates are in the wheel
+        run: |
+          set -euo pipefail
+          for f in githooks/pre-push githooks/commit-msg workflows/provenance.yml workflows/merge-train.yml; do
+            python -c "
+import sys, zipfile, glob
+whl = glob.glob('dist/*.whl')[0]
+names = zipfile.ZipFile(whl).namelist()
+want = 'vibey_gh/templates/$f'
+sys.exit(0 if want in names else f'MISSING from the wheel: {want}')
+"
+          done
+          echo "all templates present"

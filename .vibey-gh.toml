@@ -1,0 +1,21 @@
+# vibey-gh configuring itself. Dogfooding is not decoration: the tool is only
+# trustworthy if the project shipping it is held to the same rule.
+
+[fingerprint]
+sources = [
+  "vibey_gh/*.py",
+  ".github/workflows/*.yml",
+]
+
+[version]
+files         = ["pyproject.toml"]
+content_paths = ["vibey_gh/"]
+code_paths    = ["vibey_gh/"]
+
+[branches]
+integration = "develop"
+release     = "main"
+
+[merge_train]
+owner           = "adammatthewsteinberger"
+trusted_authors = ["adammatthewsteinberger", "claude[bot]", "github-actions[bot]", "vibey[bot]"]
