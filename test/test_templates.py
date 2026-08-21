@@ -25,7 +25,7 @@ REPO_WORKFLOWS = sorted(
 def test_every_shipped_workflow_template_parses(path):
     parsed = yaml.safe_load(path.read_text(encoding="utf-8"))
     assert isinstance(parsed, dict)
-    assert "jobs" in parsed and parsed["jobs"]
+    assert parsed.get("jobs")
 
 
 @pytest.mark.parametrize("path", REPO_WORKFLOWS, ids=lambda p: p.name)
@@ -33,7 +33,7 @@ def test_this_repository_s_own_workflows_parse(path):
     """Dogfooding: the tool's own CI is subject to the rule it enforces elsewhere."""
     parsed = yaml.safe_load(path.read_text(encoding="utf-8"))
     assert isinstance(parsed, dict)
-    assert "jobs" in parsed and parsed["jobs"]
+    assert parsed.get("jobs")
 
 
 @pytest.mark.parametrize("name", ["pre-push", "commit-msg"])
