@@ -1,9 +1,9 @@
 # Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger.
 """GitHub automation and provenance fingerprints, installable into any repository.
 
-This subpackage carries the release automation that vibey projects share — the merge
-train, the promotion train, branch-driven publishing, derived version bumps — and the
-fingerprint rule that says every code change is attributable.
+This package carries the release automation that vibey projects share — the merge train,
+the promotion train, branch-driven publishing, derived version bumps — and the fingerprint
+rule that says every code change is attributable.
 
 It is deliberately CONFIG-DRIVEN rather than hard-coded. What counts as packaged content,
 which files hold the version, which branches are integration and release, and the
@@ -18,4 +18,6 @@ verifies an artifact against a single index.
 
 from vibey_gh.config import GhConfig, load_config
 
-__all__ = ["GhConfig", "load_config"]
+__version__ = "1.0.0"
+
+__all__ = ["GhConfig", "load_config", "__version__"]
