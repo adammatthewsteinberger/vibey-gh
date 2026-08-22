@@ -433,3 +433,158 @@ def test_a_project_table_carrying_no_version_cannot_be_bumped(tmp_path):
     cfg = cfg_with_versions(tmp_path, "pyproject.toml")
     with pytest.raises(RuntimeError, match="expected one \\[project\\] version"):
         versioning.apply_version(cfg, "1.3.0")
+
+
+# ---------------------------------------------------------------- managed workflows
+
+
+def test_by_default_every_bundled_workflow_is_managed(repo):
+    cfg = GhConfig(root=repo)
+    names = {a.hook for a in install.install(cfg)}
+    assert ".github/workflows/provenance.yml" in names
+    assert ".github/workflows/merge-train.yml" in names
+    assert install.installed(cfg) == (True, [])
+
+
+def test_a_repository_can_take_the_hooks_without_the_workflows(repo):
+    """The case that matters: a repo whose own workflows already do more.
+
+    Without this, `check` fails forever on workflows the repository deliberately does not
+    want — and a check that cannot pass is a check people route around.
+    """
+    cfg = GhConfig(root=repo, managed_workflows=())
+    actions = install.install(cfg)
+
+    assert {a.hook for a in actions} == {"commit-msg", "pre-push"}
+    assert not (repo / ".github/workflows/provenance.yml").exists()
+    assert install.installed(cfg) == (True, [])
+
+
+def test_a_repository_can_take_just_one_of_them(repo):
+    cfg = GhConfig(root=repo, managed_workflows=("provenance.yml",))
+    install.install(cfg)
+
+    assert (repo / ".github/workflows/provenance.yml").exists()
+    assert not (repo / ".github/workflows/merge-train.yml").exists()
+    assert install.installed(cfg) == (True, [])
+
+
+def test_an_unmanaged_workflow_that_drifts_is_not_reported(repo):
+    """It is the repository's file, not ours; saying otherwise would be noise."""
+    full = GhConfig(root=repo)
+    install.install(full)
+    (repo / ".github/workflows/merge-train.yml").write_text("name: mine now\n")
+
+    assert install.installed(full)[0] is False  # managed: drift is reported
+    hooks_only = GhConfig(root=repo, managed_workflows=("provenance.yml",))
+    assert install.installed(hooks_only) == (True, [])
+
+
+def test_the_workflow_list_is_read_from_the_config_file(tmp_path):
+    from vibey_gh.config import load_config
+
+    (tmp_path / ".git").mkdir()
+    (tmp_path / ".vibey-gh.toml").write_text('[install]\nworkflows = ["provenance.yml"]\n')
+    assert load_config(tmp_path).managed_workflows == ("provenance.yml",)
+
+    (tmp_path / ".vibey-gh.toml").write_text("[install]\nworkflows = []\n")
+    assert load_config(tmp_path).managed_workflows == ()
+
+
+def test_omitting_the_section_means_all_of_them(tmp_path):
+    from vibey_gh.config import load_config
+
+    (tmp_path / ".git").mkdir()
+    (tmp_path / ".vibey-gh.toml").write_text("[branches]\nintegration = 'dev'\n")
+    assert load_config(tmp_path).managed_workflows is None
+
+
+# ---------------------------------------------------------------- holding for review
+
+
+def a_held_verdict(number: int = 7) -> merge_train.Verdict:
+    return merge_train.Verdict(
+        number, "their work", "outsider", "needs review", held_for_review=True
+    )
+
+
+def test_holding_labels_the_pull_request_and_mentions_the_owner(fake_gh):
+    cfg = GhConfig(root=Path.cwd(), owner="theowner")
+    script(
+        fake_gh,
+        {
+            "pr edit 7 --add-label needs-human-review": {},
+            "pr view 7 --json comments -q .comments[].body": {"out": "some unrelated comment\n"},
+            # the comment body is long; the fake matches on the exact argv, so allow anything
+        },
+    )
+    merge_train.hold_for_review(a_held_verdict(), cfg)
+
+    joined = "\n".join(calls(fake_gh))
+    assert "pr edit 7 --add-label needs-human-review" in joined
+    assert "@theowner" in joined and "@outsider" in joined
+    assert "awaiting your review" in joined
+
+
+def test_a_missing_label_is_created_then_applied(fake_gh):
+    cfg = GhConfig(root=Path.cwd(), owner="theowner")
+    # No scripted answer for `pr edit`, so it fails — as it does when the label does not
+    # exist in the repository yet.
+    script(fake_gh, {"pr view 7 --json comments -q .comments[].body": {"out": ""}})
+    merge_train.hold_for_review(a_held_verdict(), cfg)
+
+    made = [c for c in calls(fake_gh) if c.startswith("label create")]
+    assert made and "needs-human-review" in made[0] and "D93F0B" in made[0]
+    # and it retries the edit afterwards
+    assert len([c for c in calls(fake_gh) if c.startswith("pr edit 7")]) == 2
+
+
+def test_the_owner_is_mentioned_only_once(fake_gh):
+    """Repeating it every week would train the owner to ignore it."""
+    cfg = GhConfig(root=Path.cwd(), owner="theowner")
+    script(
+        fake_gh,
+        {
+            "pr edit 7 --add-label needs-human-review": {},
+            "pr view 7 --json comments -q .comments[].body": {
+                "out": "@theowner ... it is **awaiting your review** rather than merging\n"
+            },
+        },
+    )
+    merge_train.hold_for_review(a_held_verdict(), cfg)
+    assert not [c for c in calls(fake_gh) if c.startswith("pr comment")]
+
+
+def test_without_a_configured_owner_nobody_is_mentioned(fake_gh):
+    cfg = GhConfig(root=Path.cwd(), owner="")
+    script(fake_gh, {"pr edit 7 --add-label needs-human-review": {}})
+    merge_train.hold_for_review(a_held_verdict(), cfg)
+    assert not [c for c in calls(fake_gh) if c.startswith("pr comment")]
+
+
+def test_an_empty_label_skips_labelling_but_still_notifies(fake_gh):
+    cfg = GhConfig(root=Path.cwd(), owner="theowner")
+    script(fake_gh, {"pr view 7 --json comments -q .comments[].body": {"out": ""}})
+    merge_train.hold_for_review(a_held_verdict(), cfg, label="")
+
+    assert not [c for c in calls(fake_gh) if c.startswith("pr edit")]
+    assert [c for c in calls(fake_gh) if c.startswith("pr comment")]
+
+
+def test_a_gh_that_cannot_read_the_comments_still_notifies(fake_gh):
+    """Better a duplicate mention than a silent hold."""
+    cfg = GhConfig(root=Path.cwd(), owner="theowner")
+    script(fake_gh, {"pr edit 7 --add-label needs-human-review": {}})
+    merge_train.hold_for_review(a_held_verdict(), cfg)
+    assert [c for c in calls(fake_gh) if c.startswith("pr comment")]
+
+
+def test_the_trust_gate_marks_the_verdict_as_held():
+    cfg = GhConfig(root=Path.cwd(), owner="theowner", trusted_authors=("theowner",))
+    outside = merge_train.judge({"number": 7, "title": "t", "author": {"login": "outsider"}}, cfg)
+    assert outside.held_for_review is True
+
+    draft = merge_train.judge(
+        {"number": 8, "title": "t", "isDraft": True, "author": {"login": "outsider"}}, cfg
+    )
+    assert draft.held_for_review is False  # a draft is the contributor's to fix

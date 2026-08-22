@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 
 from vibey_gh import fingerprints, install, merge_train, realign, versioning
@@ -71,32 +72,71 @@ def _version(args) -> int:
     return 0
 
 
+def _summary_rows(rows: list[tuple[int, str, str]], merged: int, skipped: int) -> str:
+    """A markdown table for the job summary. A run that merged nothing still has to say
+    what it looked at, or the only way to find out is to read the log."""
+    lines = ["| PR | Title | Outcome |", "|---|---|---|"]
+    lines += [f"| #{n} | {t} | {outcome} |" for n, t, outcome in rows]
+    lines += ["", f"Merged {merged}, skipped {skipped}."]
+    return "\n".join(lines) + "\n"
+
+
 def _merge_train(args) -> int:
     cfg = load_config()
     prs = merge_train.open_pull_requests(cfg)
     if not prs:
         print(f"vibey-gh: no open pull requests into {cfg.integration_branch}")
+        _write_summary(args, "No open pull requests.\n")
         return 0
+
     merged = skipped = 0
+    rows: list[tuple[int, str, str]] = []
     for pr in prs:
         v = merge_train.judge(pr, cfg)
+
         if not v.ready:
+            # Only a pull request held on the owner's approval gets labelled and
+            # announced. A draft or a red build is the contributor's to fix and needs no
+            # notification; this one is waiting on somebody who does not know yet.
+            if v.held_for_review and not args.dry_run and args.label != "":
+                merge_train.hold_for_review(v, cfg, label=args.label)
             print(f"  #{v.number} skipped — {v.reason}")
+            rows.append((v.number, v.title, f"skipped — {v.reason}"))
             skipped += 1
             continue
+
         if args.dry_run:
             print(f"  #{v.number} would merge ({args.method})")
+            rows.append((v.number, v.title, f"would {args.method}-merge"))
             continue
+
         ok, bypassed = merge_train.merge(v.number, args.method)
         if ok:
             note = " (review requirement bypassed)" if bypassed else ""
             print(f"  #{v.number} {args.method}-merged{note}")
+            rows.append((v.number, v.title, f"{args.method}-merged{note}"))
             merged += 1
         else:
             print(f"  #{v.number} could not be merged — the ruleset refused it")
+            rows.append((v.number, v.title, "blocked by the ruleset"))
             skipped += 1
+
     print(f"vibey-gh: merged {merged}, skipped {skipped}")
+    _write_summary(args, _summary_rows(rows, merged, skipped))
     return 0
+
+
+def _write_summary(args, text: str) -> None:
+    """Append to the job summary when running in Actions. Best-effort: a summary that
+    cannot be written is not a reason to fail a train that merged correctly."""
+    path = args.summary or os.environ.get("GITHUB_STEP_SUMMARY")
+    if not path:
+        return
+    try:
+        with open(path, "a", encoding="utf-8") as fh:
+            fh.write(text)
+    except OSError as exc:
+        print(f"vibey-gh: could not write the summary: {exc}", file=sys.stderr)
 
 
 def _realign(args) -> int:
@@ -141,6 +181,17 @@ def main(argv: list[str] | None = None) -> int:
     m = sub.add_parser("merge-train", help="merge every ready pull request")
     m.add_argument("--method", default="squash", choices=("squash", "rebase", "merge"))
     m.add_argument("--dry-run", action="store_true")
+    m.add_argument(
+        "--label",
+        default=merge_train.NEEDS_REVIEW_LABEL,
+        help="label applied to a pull request held for the owner's review; "
+        "pass an empty string to apply none",
+    )
+    m.add_argument(
+        "--summary",
+        metavar="FILE",
+        help="write a markdown table here (default: $GITHUB_STEP_SUMMARY)",
+    )
     m.set_defaults(func=_merge_train)
 
     r = sub.add_parser("realign", help="realign the integration branch with the release branch")
