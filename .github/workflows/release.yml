@@ -114,6 +114,11 @@ jobs:
     needs: [build, pypi]
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    # The workflow default is contents: read, which is right for the publishing jobs and
+    # wrong for this one — it pushes. Without this the push is a 403 that reads like a
+    # ruleset refusal and is not one.
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -131,9 +136,26 @@ jobs:
       # develop can never be fast-forwarded onto it. `realign` converges them only when
       # the two TREES are identical, so it cannot discard work — if develop has anything
       # main does not, it says so and stops.
+      # Needs a token with the admin role. develop's ruleset has a non_fast_forward rule
+      # and GitHub Actions is not one of its bypass actors, so the default GITHUB_TOKEN
+      # cannot force-push there no matter what `permissions` says. Skipping is honest
+      # when the secret is absent; failing every release for a missing optional secret
+      # trains people to ignore a red release.
+      #
+      # Nothing downstream depends on this. Promotion compares the branches by CONTENT,
+      # and neither ruleset uses a strict up-to-date policy, so a divergent develop does
+      # not block the next release — it is tidiness, not a gate.
       - name: Realign
+        env:
+          HAS_TOKEN: ${{ secrets.AUTOMERGE_TOKEN != '' }}
         run: |
           set -euo pipefail
+          if [ "${HAS_TOKEN}" != "true" ]; then
+            echo "::notice::AUTOMERGE_TOKEN is not set, so develop cannot be realigned \
+          from here. Harmless: promotion compares by content, so a divergent develop does \
+          not block a release. To realign by hand: git push --force-with-lease origin main:develop"
+            exit 0
+          fi
           git config user.name "vibey[bot]"
           git config user.email "adam@matthewsteinberger.com"
           vibey-gh realign
