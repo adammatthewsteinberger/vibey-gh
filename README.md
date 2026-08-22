@@ -77,6 +77,24 @@ Who may merge unattended is the other half. A pull request from the owner or one
 own bots merges on a green build; from anyone else it additionally needs an approving
 review, because "CI passed" is not a review.
 
+### The promotion
+
+```bash
+vibey-gh promote --dry-run
+vibey-gh promote
+```
+
+Moves the integration branch to the release branch, which is what publishes. Three things
+it gets right that a hand-written workflow usually does not:
+
+- **It compares by content, not by commit count.** The release branch is rebase-merged, so
+  its commits are rewritten copies with different SHAs; the integration branch always looks
+  "ahead" even when the trees are identical. A diff is the only honest test.
+- **It derives the version before opening anything.** An upload with `skip-existing` turns
+  an unbumped promotion into a green run that publishes nothing, silently.
+- **It waits for the checks.** A pull request opened seconds ago has no results yet, and
+  merging blind is how a red build reaches the release branch.
+
 ### Realignment
 
 ```bash

@@ -108,3 +108,32 @@ jobs:
       - uses: pypa/gh-action-pypi-publish@release/v1
         with:
           skip-existing: true
+
+  realign:
+    name: Realign develop with main
+    needs: [build, pypi]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          # Same reason as the promotion: checkout's extraheader beats a remote URL, so
+          # the force-with-lease push needs the token here.
+          token: ${{ secrets.AUTOMERGE_TOKEN || github.token }}
+
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+
+      - run: python -m pip install --quiet -e .
+
+      # main is rebase-merged, so its commits are rewritten copies with new SHAs and
+      # develop can never be fast-forwarded onto it. `realign` converges them only when
+      # the two TREES are identical, so it cannot discard work — if develop has anything
+      # main does not, it says so and stops.
+      - name: Realign
+        run: |
+          set -euo pipefail
+          git config user.name "vibey[bot]"
+          git config user.email "adam@matthewsteinberger.com"
+          vibey-gh realign
