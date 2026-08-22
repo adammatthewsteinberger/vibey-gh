@@ -72,5 +72,7 @@ jobs:
           GH_TOKEN: ${{ secrets.AUTOMERGE_TOKEN || github.token }}
         run: |
           set -euo pipefail
-          vibey-gh merge-train ${{ inputs.dry_run && '--dry-run' || '' }} \
-            | tee -a "$GITHUB_STEP_SUMMARY"
+          # No `tee` into the job summary: the command writes its own markdown table
+          # there. Piping stdout in as well would append the plain log lines too, which
+          # are not markdown and render as one run-on paragraph above the table.
+          vibey-gh merge-train ${{ inputs.dry_run && '--dry-run' || '' }}
