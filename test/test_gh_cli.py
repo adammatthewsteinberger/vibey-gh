@@ -267,3 +267,51 @@ def test_a_summary_that_cannot_be_written_does_not_fail_the_train(
     monkeypatch.setattr(merge_train, "open_pull_requests", lambda cfg: [])
     assert main(["merge-train", "--summary", str(tmp_path / "no-such-dir" / "s.md")]) == 0
     assert "could not write the summary" in capsys.readouterr().err
+
+
+def test_promote_reports_what_happened(repo, monkeypatch, capsys, tmp_path):
+    from vibey_gh import promote as promote_mod
+
+    result = promote_mod.Promotion(
+        changed_files=4, version="1.1.0", bumped="1.1.0", pull_request=42, merged=True
+    )
+    result.say("bumped to 1.1.0 and pushed to develop")
+    result.say("#42 rebase-merged into main")
+    monkeypatch.setattr(promote_mod, "promote", lambda cfg, **kw: result)
+
+    out_file = tmp_path / "summary.md"
+    assert main(["promote", "--summary", str(out_file)]) == 0
+
+    out = capsys.readouterr().out
+    assert "bumped to 1.1.0 and pushed to develop" in out
+    assert "4 file(s) differ; version 1.1.0" in out
+
+    body = out_file.read_text()
+    assert body.startswith("## Promotion")
+    assert "- #42 rebase-merged into main" in body
+    assert "Version: `1.1.0`" in body
+
+
+def test_promote_passes_its_flags_through(repo, monkeypatch):
+    from vibey_gh import promote as promote_mod
+
+    seen: dict = {}
+
+    def fake(cfg, **kw):
+        seen.update(kw)
+        return promote_mod.Promotion()
+
+    monkeypatch.setattr(promote_mod, "promote", fake)
+    assert main(["promote", "--dry-run", "--no-wait", "--method", "squash"]) == 0
+    assert seen == {"dry_run": True, "wait": False, "method": "squash"}
+
+
+def test_a_promotion_that_cannot_proceed_is_an_error(repo, monkeypatch, capsys):
+    from vibey_gh import promote as promote_mod
+
+    def boom(cfg, **kw):
+        raise RuntimeError("could not push the version bump to develop")
+
+    monkeypatch.setattr(promote_mod, "promote", boom)
+    assert main(["promote"]) == 1
+    assert "could not push the version bump" in capsys.readouterr().err
