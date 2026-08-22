@@ -9,6 +9,15 @@ name: Merge train
 # approving review. The logic lives in the library, where it is unit-tested, rather than
 # in this file where it would not be.
 #
+# A pull request held ONLY on that approval is labelled `needs-human-review` and the owner
+# is mentioned on it, once — because otherwise the contribution just sits there and nobody
+# finds out. Repeating the mention weekly would train the owner to ignore it, so an
+# existing notification is detected before another is posted. A draft or a red build gets
+# neither: that is the contributor's to fix, and paging anyone about it is noise.
+#
+# The run also writes a markdown table to the job summary, so a week that merged nothing
+# still says what it looked at.
+#
 # PERMISSIONS. A branch ruleset that requires an approving review cannot be satisfied by
 # the default GITHUB_TOKEN, and GitHub Actions is usually not a bypass actor. Supply a
 # repository secret `AUTOMERGE_TOKEN` belonging to someone with the admin role. Without
