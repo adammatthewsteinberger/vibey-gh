@@ -7,7 +7,7 @@ import argparse
 import os
 import sys
 
-from vibey_gh import fingerprints, install, merge_train, realign, versioning
+from vibey_gh import fingerprints, install, merge_train, promote, realign, versioning
 from vibey_gh.config import load_config
 
 
@@ -139,6 +139,28 @@ def _write_summary(args, text: str) -> None:
         print(f"vibey-gh: could not write the summary: {exc}", file=sys.stderr)
 
 
+def _promote(args) -> int:
+    try:
+        result = promote.promote(
+            load_config(), dry_run=args.dry_run, method=args.method, wait=not args.no_wait
+        )
+    except RuntimeError as exc:
+        print(f"vibey-gh: {exc}", file=sys.stderr)
+        return 1
+    for note in result.notes:
+        print(f"  {note}")
+    print(f"vibey-gh: {result.changed_files} file(s) differ; version {result.version}")
+    _write_summary(args, _promotion_summary(result))
+    return 0
+
+
+def _promotion_summary(result) -> str:
+    lines = ["## Promotion", ""]
+    lines += [f"- {note}" for note in result.notes]
+    lines += ["", f"Files differing: {result.changed_files}", f"Version: `{result.version}`"]
+    return "\n".join(lines) + "\n"
+
+
 def _realign(args) -> int:
     try:
         _changed, message = realign.realign(load_config())
@@ -193,6 +215,21 @@ def main(argv: list[str] | None = None) -> int:
         help="write a markdown table here (default: $GITHUB_STEP_SUMMARY)",
     )
     m.set_defaults(func=_merge_train)
+
+    p = sub.add_parser("promote", help="promote the integration branch to the release branch")
+    p.add_argument(
+        "--method", default=promote.DEFAULT_METHOD, choices=("rebase", "squash", "merge")
+    )
+    p.add_argument("--dry-run", action="store_true")
+    p.add_argument(
+        "--no-wait",
+        action="store_true",
+        help="do not wait for the pull request's checks before merging",
+    )
+    p.add_argument(
+        "--summary", metavar="FILE", help="write markdown here (default: $GITHUB_STEP_SUMMARY)"
+    )
+    p.set_defaults(func=_promote)
 
     r = sub.add_parser("realign", help="realign the integration branch with the release branch")
     r.set_defaults(func=_realign)
