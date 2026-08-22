@@ -33,6 +33,21 @@ def _executable(path: Path) -> None:
     path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
 
+def _managed_workflows(cfg: GhConfig) -> list[Path]:
+    """The workflow templates this repository has asked to be responsible for.
+
+    A repository that already has its own richer workflows sets `install.workflows = []`
+    and takes only the hooks and the CLI. Without this, `check` would fail forever on
+    workflows it never wanted — and a check that cannot pass is a check people route
+    around.
+    """
+    every = sorted(WORKFLOWS.glob("*.yml"))
+    if cfg.managed_workflows is None:
+        return every
+    wanted = set(cfg.managed_workflows)
+    return [p for p in every if p.name in wanted]
+
+
 def install(cfg: GhConfig | None = None, hooks_path: bool = True) -> list[Action]:
     cfg = cfg or load_config()
     target = cfg.root / HOOKS_DIR
@@ -72,7 +87,7 @@ def install(cfg: GhConfig | None = None, hooks_path: bool = True) -> list[Action
     # is worse than none, so an out-of-date one is replaced outright.
     wf_target = cfg.root / WORKFLOWS_DIR
     wf_target.mkdir(parents=True, exist_ok=True)
-    for source in sorted(WORKFLOWS.glob("*.yml")):
+    for source in _managed_workflows(cfg):
         dest = wf_target / source.name
         wanted = source.read_text(encoding="utf-8")
         if dest.exists() and dest.read_text(encoding="utf-8") == wanted:
@@ -113,7 +128,7 @@ def installed(cfg: GhConfig | None = None, local: bool = True) -> tuple[bool, li
         elif dest.read_text(encoding="utf-8") != (TEMPLATES / hook).read_text(encoding="utf-8"):
             problems.append(f"{HOOKS_DIR}/{hook} is out of date")
 
-    for source in sorted(WORKFLOWS.glob("*.yml")):
+    for source in _managed_workflows(cfg):
         dest = cfg.root / WORKFLOWS_DIR / source.name
         if not dest.exists():
             problems.append(f"{WORKFLOWS_DIR}/{source.name} is missing")

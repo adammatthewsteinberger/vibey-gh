@@ -21,6 +21,11 @@ from typing import Any
 
 from vibey_gh.config import GhConfig, normalise_actor
 
+NEEDS_REVIEW_LABEL = "needs-human-review"
+# The phrase the owner-notification comment is recognised by. Matching on our own text is
+# what keeps the mention to once per pull request; see hold_for_review().
+_NOTIFIED_MARKER = "awaiting your review"
+
 
 @dataclass
 class Verdict:
@@ -28,6 +33,11 @@ class Verdict:
     title: str
     author: str
     reason: str | None  # None means ready to merge
+    # True when the ONLY thing standing in the way is the owner's approval. A draft or a
+    # failing build is the contributor's to fix and needs no notification; an outside
+    # contribution that is green and simply unapproved is waiting on the owner, and
+    # nobody finds out unless someone says so.
+    held_for_review: bool = False
 
     @property
     def ready(self) -> bool:
@@ -43,6 +53,54 @@ def _gh_json(*args: str) -> Any:
     return json.loads(r.stdout or "null")
 
 
+def _gh(*args: str) -> tuple[bool, str]:
+    """Run `gh` and report whether it worked. Never raises: these are courtesy actions
+    around a merge decision that has already been made, and failing to apply a label is
+    not a reason to abandon the train."""
+    r = subprocess.run(["gh", *args], capture_output=True, text=True, check=False)
+    return r.returncode == 0, (r.stdout or "") + (r.stderr or "")
+
+
+def hold_for_review(verdict: Verdict, cfg: GhConfig, label: str = NEEDS_REVIEW_LABEL) -> None:
+    """Label a held pull request and mention the owner, once.
+
+    Once is the important part. Repeating the mention every week would train the owner to
+    ignore it, which is the opposite of the point, so an existing notification is detected
+    before another is posted.
+    """
+    number = str(verdict.number)
+    if label:
+        ok, _ = _gh("pr", "edit", number, "--add-label", label)
+        if not ok:
+            # The usual reason is that the label does not exist yet in this repository.
+            _gh(
+                "label",
+                "create",
+                label,
+                "--color",
+                "D93F0B",
+                "--description",
+                "Outside contribution awaiting the code owner",
+            )
+            _gh("pr", "edit", number, "--add-label", label)
+
+    owner = cfg.owner
+    if not owner:
+        return
+    ok, existing = _gh("pr", "view", number, "--json", "comments", "-q", ".comments[].body")
+    if ok and _NOTIFIED_MARKER in existing:
+        return
+    _gh(
+        "pr",
+        "comment",
+        number,
+        "--body",
+        f"@{owner} this pull request is green but comes from @{verdict.author}, who is not "
+        f"on the merge train's trusted list, so it is **{_NOTIFIED_MARKER}** rather than "
+        f"merging automatically. Approve it and the next train will take it.",
+    )
+
+
 def judge(pr: dict, cfg: GhConfig) -> Verdict:
     author = (pr.get("author") or {}).get("login", "")
     rollup = pr.get("statusCheckRollup") or []
@@ -54,6 +112,7 @@ def judge(pr: dict, cfg: GhConfig) -> Verdict:
     ]
 
     reason = None
+    held = False
     if pr.get("isDraft"):
         reason = "draft"
     elif pr.get("mergeable") == "CONFLICTING":
@@ -69,8 +128,9 @@ def judge(pr: dict, cfg: GhConfig) -> Verdict:
         if normalise_actor(author) not in trusted and review != "APPROVED":
             owner = cfg.owner or "the code owner"
             reason = f"from @{author} and not approved — needs {owner}'s review"
+            held = True
 
-    return Verdict(pr["number"], pr.get("title", ""), author, reason)
+    return Verdict(pr["number"], pr.get("title", ""), author, reason, held_for_review=held)
 
 
 def open_pull_requests(cfg: GhConfig) -> list[dict]:

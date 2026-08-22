@@ -118,6 +118,24 @@ owner           = "your-login"
 trusted_authors = ["your-login", "dependabot[bot]"]
 ```
 
+
+
+### Taking the hooks without the workflows
+
+`install` writes two workflows alongside the hooks. A repository that already has richer
+ones of its own can decline them:
+
+```toml
+[install]
+workflows = []          # hooks and the CLI only
+# workflows = ["provenance.yml"]   # or just the ones you want
+```
+
+This is not cosmetic. `check` verifies that everything it manages is present and current,
+so without it a repository that deliberately keeps its own workflows would fail the check
+forever — and a check that cannot pass is a check people route around.
+
+
 `trusted_authors` is matched after normalising `app/name` and `name[bot]` to the same
 thing. `gh` reports a bot author with the `app/` prefix while the rest of GitHub writes
 `[bot]`; a literal allow-list matches whichever spelling it happens to contain and

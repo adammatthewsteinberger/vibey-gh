@@ -17,6 +17,9 @@ Every project-specific decision lives here so the logic beside it can stay gener
     integration = "develop"
     release     = "main"
 
+    [install]
+    workflows = []          # omit for all of them; [] for hooks and the CLI only
+
 Absent keys fall back to the defaults below, so a repository that agrees with them needs
 no file at all. `tomllib` is stdlib from 3.11, which this package already requires.
 """
@@ -50,6 +53,12 @@ class GhConfig:
     release_branch: str = "main"
     owner: str = ""
     trusted_authors: tuple[str, ...] = ()
+    # Which bundled workflow templates this repository wants installed and kept current.
+    # None means all of them, which is the right default for a repository adopting the
+    # whole thing. A repository with its own richer workflows sets `workflows = []` and
+    # keeps only the hooks and the CLI — otherwise `check` reports a permanent failure
+    # for workflows it deliberately does not want.
+    managed_workflows: tuple[str, ...] | None = None
 
     @property
     def header(self) -> str:
@@ -81,6 +90,7 @@ def load_config(root: Path | None = None) -> GhConfig:
     ver = data.get("version", {})
     br = data.get("branches", {})
     tr = data.get("merge_train", {})
+    inst = data.get("install", {})
     return GhConfig(
         root=root,
         text=fp.get("text", DEFAULT_TEXT),
@@ -89,6 +99,7 @@ def load_config(root: Path | None = None) -> GhConfig:
         version_files=tuple(ver.get("files", ())),
         content_paths=tuple(ver.get("content_paths", ())),
         code_paths=tuple(ver.get("code_paths", ("src/",))),
+        managed_workflows=(tuple(inst["workflows"]) if "workflows" in inst else None),
         integration_branch=br.get("integration", "develop"),
         release_branch=br.get("release", "main"),
         owner=tr.get("owner", ""),

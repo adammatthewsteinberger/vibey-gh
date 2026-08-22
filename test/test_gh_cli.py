@@ -173,3 +173,97 @@ def test_check_names_the_commit_range_it_cleared(repo, capsys):
 
     assert main(["check", "--ci", "--commits", "HEAD~1..HEAD"]) == 0
     assert "every commit in HEAD~1..HEAD" in capsys.readouterr().out
+
+
+def held(number: int = 7, author: str = "outsider") -> Verdict:
+    return Verdict(
+        number,
+        "their work",
+        author,
+        "from @outsider and not approved — needs owner's review",
+        held_for_review=True,
+    )
+
+
+def test_a_pull_request_held_on_the_owner_is_labelled_and_announced(repo, monkeypatch, capsys):
+    monkeypatch.setattr(merge_train, "open_pull_requests", lambda cfg: [{"number": 7}])
+    monkeypatch.setattr(merge_train, "judge", lambda pr, cfg: held())
+    calls: list[tuple] = []
+    monkeypatch.setattr(
+        merge_train, "hold_for_review", lambda v, cfg, label: calls.append((v.number, label))
+    )
+
+    assert main(["merge-train"]) == 0
+    assert calls == [(7, "needs-human-review")]
+    assert "#7 skipped" in capsys.readouterr().out
+
+
+def test_a_dry_run_labels_nothing_and_announces_nothing(repo, monkeypatch):
+    monkeypatch.setattr(merge_train, "open_pull_requests", lambda cfg: [{"number": 7}])
+    monkeypatch.setattr(merge_train, "judge", lambda pr, cfg: held())
+    monkeypatch.setattr(
+        merge_train,
+        "hold_for_review",
+        lambda *a, **k: pytest.fail("a dry run must not touch the PR"),
+    )
+    assert main(["merge-train", "--dry-run"]) == 0
+
+
+def test_labelling_can_be_turned_off(repo, monkeypatch):
+    monkeypatch.setattr(merge_train, "open_pull_requests", lambda cfg: [{"number": 7}])
+    monkeypatch.setattr(merge_train, "judge", lambda pr, cfg: held())
+    monkeypatch.setattr(
+        merge_train, "hold_for_review", lambda *a, **k: pytest.fail("--label '' means do nothing")
+    )
+    assert main(["merge-train", "--label", ""]) == 0
+
+
+def test_an_ordinary_skip_is_not_announced(repo, monkeypatch):
+    """A draft is the contributor's to fix; nobody needs paging about it."""
+    monkeypatch.setattr(merge_train, "open_pull_requests", lambda cfg: [{"number": 7}])
+    monkeypatch.setattr(merge_train, "judge", lambda pr, cfg: Verdict(7, "t", "someone", "draft"))
+    monkeypatch.setattr(
+        merge_train,
+        "hold_for_review",
+        lambda *a, **k: pytest.fail("a draft is not held for review"),
+    )
+    assert main(["merge-train"]) == 0
+
+
+def test_the_run_writes_a_markdown_summary(repo, monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        merge_train, "open_pull_requests", lambda cfg: [{"number": 1}, {"number": 2}]
+    )
+    monkeypatch.setattr(
+        merge_train,
+        "judge",
+        lambda pr, cfg: Verdict(
+            pr["number"], f"pr {pr['number']}", "owner", None if pr["number"] == 1 else "draft"
+        ),
+    )
+    monkeypatch.setattr(merge_train, "merge", lambda n, m: (True, False))
+
+    out = tmp_path / "summary.md"
+    assert main(["merge-train", "--summary", str(out)]) == 0
+
+    body = out.read_text()
+    assert "| PR | Title | Outcome |" in body
+    assert "| #1 | pr 1 | squash-merged |" in body
+    assert "| #2 | pr 2 | skipped — draft |" in body
+    assert "Merged 1, skipped 1." in body
+
+
+def test_the_summary_defaults_to_the_actions_job_summary(repo, monkeypatch, tmp_path):
+    out = tmp_path / "gh-summary.md"
+    monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(out))
+    monkeypatch.setattr(merge_train, "open_pull_requests", lambda cfg: [])
+    assert main(["merge-train"]) == 0
+    assert "No open pull requests." in out.read_text()
+
+
+def test_a_summary_that_cannot_be_written_does_not_fail_the_train(
+    repo, monkeypatch, capsys, tmp_path
+):
+    monkeypatch.setattr(merge_train, "open_pull_requests", lambda cfg: [])
+    assert main(["merge-train", "--summary", str(tmp_path / "no-such-dir" / "s.md")]) == 0
+    assert "could not write the summary" in capsys.readouterr().err
