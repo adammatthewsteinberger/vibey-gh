@@ -35,3 +35,8 @@ retain_schedule_backstop = true
 enabled = true
 tag_prefix = "v"
 generate_notes = true
+
+[repository_profile]
+enabled = true
+description = "Event-driven GitHub automation for reviews, repairs, releases, provenance, and beautiful dual-channel documentation."
+topics = ["automation", "continuous-delivery", "documentation", "github-actions", "release-automation"]

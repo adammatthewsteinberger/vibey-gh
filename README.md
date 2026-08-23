@@ -175,6 +175,11 @@ retain_schedule_backstop = true
 enabled = true
 tag_prefix = "v"
 generate_notes = true
+
+[repository_profile]
+enabled = true
+description = "A configurable repository description"
+topics = ["automation", "documentation", "github-actions"]
 ```
 
 After the configured `Release` workflow succeeds on `main`, the managed
@@ -196,6 +201,13 @@ at `ghcr.io/<owner>/<repository>/python`. Every artifact receives its immutable 
 and `sha-<commit>` tags, plus `develop` for test releases or `main` and `latest` for
 production releases. The normal TestPyPI and PyPI uploads remain authoritative and are
 unchanged.
+
+After release surfaces succeed, `repository-profile.yml` reconciles the repository's
+description, topics, and homepage with this configuration. An empty description derives
+a repository-specific description from the consuming repository name. It verifies that
+Pages, a GitHub Release, a deployment, and the OCI package really exist—the public API
+does not expose fictional “show Releases/Deployments/Packages” switches. Profile updates
+use `AUTOMERGE_TOKEN` when available and never create, update, push, or delete a branch.
 
 If a trusted post-merge workflow fails on `develop` or `main`, `release-repair.yml`
 reviews its logs with the same constrained agent used for PR repair. A fixable problem is
