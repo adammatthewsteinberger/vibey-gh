@@ -86,6 +86,7 @@ def test_privileged_agent_cannot_mutate_git_or_execute_pr_code():
     assert "--allowedTools Read,Glob,Grep,Edit" in text
     assert 'git -C target push origin "HEAD:refs/heads/${HEAD_REF}"' in text
     assert "resolver edited non-conflict path" in text
+    assert text.count("secrets.AUTOMERGE_TOKEN || github.token") >= 3
 
 
 def test_cancelled_or_pending_evaluations_cannot_publish_a_gate():

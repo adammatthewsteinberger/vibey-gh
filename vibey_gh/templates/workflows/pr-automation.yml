@@ -127,7 +127,7 @@ jobs:
         if: steps.resolve.outputs.pr != ''
         id: evaluate
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.AUTOMERGE_TOKEN || github.token }}
           PR: ${{ steps.resolve.outputs.pr }}
           HEAD_SHA: ${{ steps.resolve.outputs.head_sha }}
         run: |
