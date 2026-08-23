@@ -11,7 +11,7 @@
   if (brand) {
     const badge = document.createElement("span");
     badge.className = "release-badge";
-    badge.innerHTML = `<span aria-hidden="true"></span>${channel === "main" ? "Production" : "Preview"}`;
+    badge.innerHTML = `<span aria-hidden="true"></span>${channel === "main" ? "__PRODUCTION_LABEL__" : "__PREVIEW_LABEL__"}`;
     brand.insertAdjacentElement("afterend", badge);
   }
 
@@ -21,7 +21,7 @@
       if (link.textContent.trim() !== "Home") link.closest("li")?.remove();
     });
     const pagesRoot = "__PAGES_ROOT__";
-    for (const [label, target] of [["Production", "main"], ["Preview", "develop"]]) {
+    for (const [label, target] of [["__PRODUCTION_LABEL__", "main"], ["__PREVIEW_LABEL__", "develop"]]) {
       const item = document.createElement("li");
       item.className = "nav-item";
       const link = document.createElement("a");

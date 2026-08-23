@@ -47,3 +47,4 @@ auditable, and independently testable.
 
 [Production](#){ .primary-action data-release-target="main" }
 [Preview](#){ .secondary-action data-release-target="develop" }
+<!-- Made with ❤️ by Vibey, Developed by Adam Matthew Steinberger. -->

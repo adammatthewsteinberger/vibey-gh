@@ -37,6 +37,7 @@ def repo(tmp_path: Path, monkeypatch) -> Path:
         '[version]\nfiles = ["src/__init__.py", "manifest.json"]\n'
         'content_paths = ["content/"]\ncode_paths = ["src/"]\n'
         '[merge_train]\nowner = "owner"\ntrusted_authors = ["owner"]\n'
+        "[documentation]\nenabled = false\n"
     )
     git("add", "-A")
     git("commit", "-qm", "base")
@@ -54,6 +55,19 @@ def test_install_then_check_passes(repo, capsys):
 def test_check_quiet_is_exit_status_only(repo, capsys):
     assert main(["check", "--ci", "--quiet"]) == 1
     assert capsys.readouterr().out == ""
+
+
+def test_check_quiet_succeeds_after_install(repo, capsys):
+    main(["install"])
+    main(["check", "--ci", "--apply"])
+    assert main(["check", "--ci", "--quiet"]) == 0
+
+
+def test_check_reports_missing_documentation(repo, capsys):
+    config = repo / ".vibey-gh.toml"
+    config.write_text(config.read_text().replace("enabled = false", "enabled = true"))
+    assert main(["check", "--ci"]) == 1
+    assert "documentation:" in capsys.readouterr().err
 
 
 def test_check_reports_a_missing_commit_trailer(repo, capsys):

@@ -679,8 +679,8 @@ def test_event_driven_merge_guards_and_single_pr_lookup(monkeypatch):
     )
     assert outsider.ready
     monkeypatch.setattr(merge_train, "_gh_json", lambda *a: {"number": 9})
-    assert merge_train.pull_request(9) == {"number": 9}
-    assert merge_train.open_pull_requests(cfg, 9) == [{"number": 9}]
+    assert merge_train.pull_request(9) == {"number": 9, "statusCheckRollup": []}
+    assert merge_train.open_pull_requests(cfg, 9) == [{"number": 9, "statusCheckRollup": []}]
     assert merge_train.method_for({"baseRefName": "main"}, cfg, "squash") == "rebase"
     assert merge_train.method_for({"baseRefName": "develop"}, cfg, "merge") == "merge"
 

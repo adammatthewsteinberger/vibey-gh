@@ -1,0 +1,129 @@
+# Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger.
+name: Docs
+
+on:
+  pull_request:
+  push:
+    branches: [__VIBEY_GH_INTEGRATION_BRANCH__, __VIBEY_GH_RELEASE_BRANCH__]
+  workflow_dispatch:
+    inputs:
+      repair:
+        description: Create or update a documentation repair PR
+        type: boolean
+        default: true
+  schedule:
+    - cron: "23 7 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    name: Documentation contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+      - name: Verify every required documentation surface
+        run: |
+          python -m pip install --quiet -e .
+          vibey-gh check --ci
+
+  maintain:
+    name: AI documentation maintenance
+    if: >-
+      __VIBEY_GH_DOCUMENTATION_AI__ &&
+      (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      pull-requests: write
+    steps:
+      - name: Check out the trusted integration branch
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: __VIBEY_GH_INTEGRATION_BRANCH__
+          fetch-depth: 0
+          token: ${{ secrets.AUTOMERGE_TOKEN || github.token }}
+      - name: Create a guarded maintenance branch
+        id: branch
+        env:
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          branch="vibey-gh/docs/refresh-${RUN_ID}"
+          git switch -c "$branch"
+          echo "name=$branch" >> "$GITHUB_OUTPUT"
+      - name: Comprehensively author and repair project documentation
+        id: claude
+        uses: anthropics/claude-code-action@8569a83495a3f6f0c50a90e46351d3816fed1a75 # v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          plugin_marketplaces: |
+            https://github.com/adammatthewsteinberger/vibey-skills.git
+          plugins: |
+            engineering-process@vibey-skills
+            software-architecture@vibey-skills
+            security-principles@vibey-skills
+            quality-engineering@vibey-skills
+          claude_args: |
+            --model __VIBEY_GH_DOCUMENTATION_MODEL__
+            --max-turns 180
+            --allowedTools Read,Glob,Grep,Edit,Write
+            --json-schema {"type":"object","properties":{"complete":{"type":"boolean"},"files_changed":{"type":"array","items":{"type":"string"}},"gaps_remaining":{"type":"array","items":{"type":"string"}},"summary":{"type":"string"}},"required":["complete","files_changed","gaps_remaining","summary"]}
+          prompt: |
+            Act as the repository's comprehensive FOSS documentation maintainer. Inspect
+            all source, configuration, tests, workflows, public interfaces, packaging,
+            release behavior, security boundaries, and existing documentation. Create
+            missing documentation and update every stale statement. This is an authoring
+            and repair task, not a read-only review.
+
+            The required contract is: __VIBEY_GH_DOCUMENTATION_FILES__.
+            Also maintain architecture, CLI/API reference, configuration, installation,
+            operations, troubleshooting, testing, release, provenance, threat model,
+            dependency policy, accessibility, governance, roadmap, and decision records
+            under docs/. Maintain accurate cross-agent guidance and reusable skills for
+            Claude, Cursor, Codex/Agents, Gemini, and generic agents without contradicting
+            repository policy. Maintain robots.txt, sitemap discovery, llms.txt,
+            llms-full.txt, canonical metadata, JSON-LD, social metadata, and provenance.
+
+            Never change application behavior, tests, coverage floors, security policy,
+            release policy, or branch protections merely to make documentation agree.
+            Never execute repository code, package managers, tests, builds, scripts, or
+            binaries in this privileged job. Do not commit, push, merge, force-push,
+            rename, or delete branches. Edit documentation and documentation configuration
+            only. Do not invent capabilities: mark unknowns explicitly and derive claims
+            from code and tests. Return complete=false if any material gap remains.
+      - name: Publish one guarded documentation commit and PR
+        if: steps.claude.outputs.structured_output != ''
+        env:
+          BRANCH: ${{ steps.branch.outputs.name }}
+          GH_TOKEN: ${{ secrets.AUTOMERGE_TOKEN || github.token }}
+          STRUCTURED: ${{ steps.claude.outputs.structured_output }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if git diff --quiet && git diff --cached --quiet; then
+            echo "Documentation is already current"
+            exit 0
+          fi
+          git config user.name 'vibey[bot]'
+          git config user.email 'adam@matthewsteinberger.com'
+          git add -- . ':!vibey_gh/**' ':!test/**'
+          git commit -m 'Refresh comprehensive project documentation' \
+            -m 'Made-With: Vibey, the auto-vibecoding machine by Adam Matthew Steinberger'
+          git push origin "HEAD:refs/heads/${BRANCH}"
+          body=$(jq -r '.summary + "\n\nRemaining gaps:\n" + ((.gaps_remaining // []) | map("- " + .) | join("\n"))' <<<"$STRUCTURED")
+          gh pr create --repo "$REPO" --base __VIBEY_GH_INTEGRATION_BRANCH__ \
+            --head "$BRANCH" --title 'docs: comprehensive automated refresh' \
+            --body "$body" || true
+      - name: Archive the documentation-maintenance record
+        if: always() && steps.claude.outputs.execution_file != ''
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: documentation-maintenance-${{ github.run_id }}
+          path: ${{ steps.claude.outputs.execution_file }}
+          retention-days: 90
