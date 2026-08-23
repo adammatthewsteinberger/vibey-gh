@@ -242,7 +242,9 @@ def test_automation_bootstrap_scope_check_rejects_files_outside_automation_core(
     assert match, "expected a fail-closed scope check in automation-bootstrap.yml"
     pattern = match.group(1)
 
-    in_scope_only = "vibey_gh/templates/workflows/automation-bootstrap.yml\ntest/test_templates.py\n"
+    in_scope_only = (
+        "vibey_gh/templates/workflows/automation-bootstrap.yml\ntest/test_templates.py\n"
+    )
     mixed_scope = in_scope_only + "vibey_gh/versioning.py\n"
 
     def confinement_check_passes(changed_files: str) -> bool:
@@ -250,9 +252,7 @@ def test_automation_bootstrap_scope_check_rejects_files_outside_automation_core(
         # step when grep finds an out-of-scope line (exit 0), and passes when grep finds
         # none (exit 1, no matches).
         script = f"grep -Ev '{pattern}' <<'EOF'\n{changed_files}EOF\n"
-        result = subprocess.run(
-            ["sh", "-c", script], capture_output=True, text=True, check=False
-        )
+        result = subprocess.run(["sh", "-c", script], capture_output=True, text=True, check=False)
         return result.returncode != 0
 
     assert confinement_check_passes(in_scope_only)
