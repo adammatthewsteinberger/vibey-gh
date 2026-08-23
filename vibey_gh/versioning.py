@@ -66,9 +66,9 @@ def read_version(cfg: GhConfig) -> str:
         if path.suffix == ".json":
             data = json.loads(path.read_text(encoding="utf-8"))
             meta = data.get("metadata", data)
-            for key in JSON_VERSION_KEYS:
-                if key in meta:
-                    return str(meta[key])
+            key = JSON_VERSION_KEYS[0]
+            if key in meta:
+                return str(meta[key])
         elif path.suffix == ".toml":
             version = _toml_version(path.read_text(encoding="utf-8"))
             if version is not None:
@@ -97,9 +97,9 @@ def read_version_at(cfg: GhConfig, ref: str) -> str | None:
             except json.JSONDecodeError:
                 continue
             meta = data.get("metadata", data)
-            for key in JSON_VERSION_KEYS:
-                if key in meta:
-                    return str(meta[key])
+            key = JSON_VERSION_KEYS[0]
+            if key in meta:
+                return str(meta[key])
         elif rel.endswith(".toml"):
             version = _toml_version(r.stdout)
             if version is not None:

@@ -682,7 +682,7 @@ the workflow URL, exact SHA, and redacted failing-step output when asking for he
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), and
 [AGENTS.md](AGENTS.md). Changes must preserve the dependency-free runtime, Python 3.11,
-100% line coverage, immutable action pins, provenance, and permanent-branch
+100% line and branch coverage, immutable action pins, provenance, and permanent-branch
 non-deletion guarantee. Report vulnerabilities through [SECURITY.md](SECURITY.md), not a
 public issue.
 

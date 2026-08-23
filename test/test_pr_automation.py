@@ -308,6 +308,7 @@ def test_github_helpers_and_state_persistence(monkeypatch, tmp_path):
     assert pa._gh_json("repo", "view") == {"nameWithOwner": "o/r"}
     state = pa.AutomationState("a", "a")
     pa.upsert_state(1, state, "new", [])
+    pa.upsert_state(1, state, "new after ordinary comment", [{"body": "hello"}])
     pa.upsert_state(1, state, "edit", [{"body": pa.state_body(state, "x"), "databaseId": 9}])
     pa.upsert_state(
         1,
@@ -318,7 +319,6 @@ def test_github_helpers_and_state_persistence(monkeypatch, tmp_path):
     assert any(command[:3] == ["gh", "pr", "comment"] for command in calls)
     assert any("issues/comments/9" in " ".join(command) for command in calls)
     assert any(command[:3] == ["gh", "api", "graphql"] for command in calls)
-
     with pytest.raises(RuntimeError, match="comment has no ID"):
         pa.upsert_state(1, state, "bad", [{"body": pa.state_body(state, "x")}])
 
@@ -332,6 +332,11 @@ def test_github_helpers_and_state_persistence(monkeypatch, tmp_path):
         pa._gh_json("api", "x")
     with pytest.raises(RuntimeError, match="persist"):
         pa.upsert_state(1, state, "x", [])
+
+
+def test_trust_without_an_owner(tmp_path):
+    config = GhConfig(root=tmp_path, owner="", trusted_authors=("trusted",))
+    assert pa._trusted(pr(author={"login": "trusted"}), config)
 
 
 def test_fetch_evaluate_record_and_labels(monkeypatch, tmp_path):

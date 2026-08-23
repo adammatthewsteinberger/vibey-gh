@@ -253,6 +253,7 @@ def test_properdocs_theme_is_channel_aware_and_accessible():
     assert "https://hire.adam.matthewsteinberger.com" in script
     assert "https://github.com/adammatthewsteinberger/" in script
     assert "__PAGES_ROOT__" in script
+    assert "link.href = pagesRoot" in script
     assert '["__PRODUCTION_LABEL__", "main"]' in script
     assert '["__PREVIEW_LABEL__", "develop"]' in script
     assert "Release channels: release-channels.md" not in config

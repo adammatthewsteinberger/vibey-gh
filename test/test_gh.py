@@ -54,6 +54,13 @@ def cfg_for(root: Path, **kw) -> GhConfig:
     return GhConfig(**base)
 
 
+def test_sources_deduplicate_overlapping_patterns(tmp_path):
+    source = tmp_path / "module.py"
+    source.write_text("pass\n")
+    cfg = cfg_for(tmp_path, sources=("*.py", "module.py"))
+    assert fingerprints.sources(cfg) == [source]
+
+
 # --------------------------------------------------------------------------- config
 
 

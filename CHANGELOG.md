@@ -5,6 +5,8 @@ This file follows Keep a Changelog and semantic versioning conventions.
 
 ## Unreleased
 
+- Enforce genuine 100% line and branch coverage with pytest-cov and align all contributor
+  and testing documentation with the executable gate.
 - Fix a duplicated provenance header in the packaged source modules and make the
   fingerprint check detect and repair a header repeated within a file, not just a header
   that is missing.

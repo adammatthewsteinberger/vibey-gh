@@ -86,6 +86,19 @@ def test_a_foreign_hook_is_preserved_and_chained(repo):
     assert local.stat().st_mode & stat.S_IXUSR
 
 
+def test_a_foreign_hook_with_an_existing_local_chain_is_replaced(repo):
+    hooks = repo / install.HOOKS_DIR
+    hooks.mkdir()
+    (hooks / "pre-push").write_text("#!/bin/sh\necho foreign\n")
+    local = hooks / "pre-push.local"
+    local.write_text("#!/bin/sh\necho preserved\n")
+
+    install.install(GhConfig(root=repo))
+
+    assert "vibey-gh" in (hooks / "pre-push").read_text()
+    assert "preserved" in local.read_text()
+
+
 def test_missing_hooks_and_workflows_are_both_reported(repo):
     ok, problems = install.installed(GhConfig(root=repo), local=True)
     assert not ok
@@ -147,6 +160,12 @@ def test_read_version_accepts_a_flat_json_version(tmp_path):
     assert versioning.read_version(cfg_with_versions(tmp_path, "m.json")) == "9.0.1"
 
 
+def test_json_without_version_falls_through_to_next_file(tmp_path):
+    (tmp_path / "empty.json").write_text("{}")
+    (tmp_path / "v.py").write_text('__version__ = "4.5.6"\n')
+    assert versioning.read_version(cfg_with_versions(tmp_path, "empty.json", "v.py")) == "4.5.6"
+
+
 def test_read_version_raises_when_no_file_carries_one(tmp_path):
     (tmp_path / "v.py").write_text("# nothing here\n")
     with pytest.raises(RuntimeError, match="no version found"):
@@ -177,6 +196,16 @@ def test_read_version_at_walks_past_junk_to_the_file_that_has_one(repo):
     cfg = cfg_with_versions(repo, "absent.json", "broken.json", "empty.py", "m.json")
     assert versioning.read_version_at(cfg, "HEAD") == "2.0.0"
     assert versioning.read_version_at(cfg_with_versions(repo, "empty.py"), "HEAD") is None
+
+
+def test_read_version_at_walks_past_json_without_version(repo):
+    (repo / "empty.json").write_text("{}")
+    (repo / "v.py").write_text('__version__ = "5.6.7"\n')
+    git(repo, "add", "-A")
+    git(repo, "commit", "-qm", "base")
+    assert (
+        versioning.read_version_at(cfg_with_versions(repo, "empty.json", "v.py"), "HEAD") == "5.6.7"
+    )
 
 
 def test_apply_version_skips_absent_files_and_rejects_a_file_without_a_version(tmp_path):
@@ -644,6 +673,12 @@ def test_the_trust_gate_marks_the_verdict_as_held():
     )
     outside = merge_train.judge({"number": 7, "title": "t", "author": {"login": "outsider"}}, cfg)
     assert outside.held_for_review is True
+
+
+def test_merge_train_trust_without_an_owner():
+    cfg = GhConfig(root=Path.cwd(), owner="", trusted_authors=("trusted",))
+    verdict = merge_train.judge({"number": 7, "title": "t", "author": {"login": "trusted"}}, cfg)
+    assert "PR automation gate" in verdict.reason
 
 
 def test_event_driven_merge_guards_and_single_pr_lookup(monkeypatch):
