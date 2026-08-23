@@ -47,8 +47,12 @@ Issues = "https://github.com/adammatthewsteinberger/vibey-gh/issues"
 [tool.hatch.build.targets.wheel]
 packages = ["vibey_gh"]
 
+[tool.hatch.build.targets.wheel.force-include]
+"docs/stylesheets/vibey.css" = "vibey_gh/templates/release/vibey.css"
+"docs/javascripts/channel.js" = "vibey_gh/templates/release/channel.js"
+
 [tool.hatch.build.targets.sdist]
-include = ["vibey_gh", "test", "README.md", "LICENSE", "pyproject.toml"]
+include = ["vibey_gh", "docs", "test", "README.md", "LICENSE", "pyproject.toml"]
 
 [tool.pytest.ini_options]
 testpaths = ["test"]
