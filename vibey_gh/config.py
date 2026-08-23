@@ -59,6 +59,7 @@ DEFAULT_DOCUMENTATION_FILES = (
     ".githooks/README.md",
     ".github/README.md",
     "docs/index.md",
+    "docs/project.mmd",
     "AGENTS.md",
     "CHANGELOG.md",
     "CLAUDE.md",

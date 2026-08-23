@@ -1,5 +1,10 @@
 # Architecture
 
+The canonical, whole-project machine-readable architecture is
+[`project.mmd`](project.mmd). It is a required Mermaid artifact enforced by deterministic
+and semantic review gates; changes to modules, interfaces, workflows, security boundaries,
+or release paths must update it in the same pull request.
+
 `vibey-gh` is a dependency-free Python CLI whose configuration model feeds pure policy
 decisions, GitHub CLI adapters, installation code, and immutable workflow templates.
 Configuration lives in `.vibey-gh.toml`; templates are rendered during installation and

@@ -1,0 +1,92 @@
+%% Made with ❤️ by Vibey; developed by Adam Matthew Steinberger.
+%% Canonical whole-project architecture. The deterministic and semantic documentation
+%% gates require this file to remain synchronized with every public and operational path.
+flowchart TB
+  subgraph People["People and repository events"]
+    Maintainer[Maintainer]
+    Contributor[Contributor]
+    Push[Branch push]
+    PullRequest[Pull request]
+  end
+
+  subgraph Interfaces["Complete public interface parity"]
+    CLI[CLI]
+    SDK[SDK]
+    API[API]
+    MCP[MCP]
+    Webhook[Webhook]
+  end
+
+  subgraph Core["Dependency-free vibey-gh core"]
+    Config[Configuration and policy]
+    Install[Installer and rendered templates]
+    Fingerprints[Conventional Commits and Provenance]
+    Documentation[Documentation contract]
+    PRAutomation[PR Automation]
+    MergeTrain[Merge train]
+    Promotion[Promotion]
+    Versioning[Versioning]
+    Release[GitHub releases]
+    Surfaces[Release surfaces]
+  end
+
+  subgraph Security["Security Boundary"]
+    Trusted[Trusted base-branch automation]
+    Untrusted[Untrusted PR source and model output]
+    Sandbox[Constrained read/edit tools]
+    Guard[Exact SHA, branch, lease, and policy guards]
+  end
+
+  subgraph Delivery["Event-driven delivery"]
+    CI[CI, tests, lint, build]
+    Docs[Documentation and Mermaid review]
+    Review[Claude exact-head review]
+    Repair[Bounded self-healing repair]
+    Develop[develop]
+    Main[main]
+    TestPyPI[TestPyPI]
+    PyPI[PyPI]
+    Packages[GitHub Packages]
+    Pages[GitHub Pages]
+  end
+
+  Maintainer --> CLI
+  Contributor --> Push
+  Push --> PullRequest
+  CLI --> Config
+  SDK --> Core
+  API --> Core
+  MCP --> Core
+  Webhook --> Core
+  Config --> Install
+  Install --> PRAutomation
+  Install --> MergeTrain
+  PullRequest --> CI
+  PullRequest --> Docs
+  CI --> PRAutomation
+  Docs --> PRAutomation
+  PRAutomation --> Trusted
+  Untrusted --> Sandbox
+  Trusted --> Sandbox
+  Sandbox --> Review
+  Review --> Repair
+  Repair --> Guard
+  Guard --> PullRequest
+  Review --> MergeTrain
+  MergeTrain --> Develop
+  Develop --> Promotion
+  Promotion --> PullRequest
+  MergeTrain --> Main
+  Develop --> TestPyPI
+  Main --> PyPI
+  Develop --> Packages
+  Main --> Packages
+  Develop --> Pages
+  Main --> Pages
+  Versioning --> Promotion
+  Release --> PyPI
+  Surfaces --> Packages
+  Surfaces --> Pages
+  Fingerprints --> CI
+  Documentation --> Docs
+  Guard --> Fingerprints

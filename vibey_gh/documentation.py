@@ -28,6 +28,22 @@ README_SECTIONS = (
     "## Contributing",
     "## Licence",
 )
+MERMAID_REQUIRED_TERMS = (
+    "flowchart",
+    "CLI",
+    "SDK",
+    "API",
+    "MCP",
+    "Webhook",
+    "PR Automation",
+    "develop",
+    "main",
+    "TestPyPI",
+    "PyPI",
+    "GitHub Pages",
+    "Provenance",
+    "Security Boundary",
+)
 
 
 @dataclass(frozen=True)
@@ -88,4 +104,14 @@ def check(cfg: GhConfig) -> DocumentationReport:
                 problems.append(f"README.md is missing human documentation section: {heading}")
         if not text.rstrip().endswith(README_PROVENANCE):
             problems.append("README.md must end with the exact Vibey provenance sentence")
+    diagram = cfg.root / "docs/project.mmd"
+    if diagram.is_file():
+        text = diagram.read_text(encoding="utf-8")
+        for term in MERMAID_REQUIRED_TERMS:
+            if term not in text:
+                problems.append(f"docs/project.mmd is missing required project surface: {term}")
+        if text.count("-->") < 20:
+            problems.append(
+                "docs/project.mmd is not comprehensive enough: expected at least 20 edges"
+            )
     return DocumentationReport(tuple(problems))

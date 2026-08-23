@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from vibey_gh.config import DocumentationConfig, GhConfig, load_config
-from vibey_gh.documentation import README_PROVENANCE, README_SECTIONS, check
+from vibey_gh.documentation import MERMAID_REQUIRED_TERMS, README_PROVENANCE, README_SECTIONS, check
 
 
 def test_documentation_can_be_disabled(tmp_path: Path):
@@ -37,6 +37,20 @@ def test_documentation_reports_missing_empty_invalid_and_provenance(tmp_path: Pa
             GhConfig(root=tmp_path, documentation=DocumentationConfig(required_files=required))
         ).problems
     )
+
+
+def test_documentation_rejects_incomplete_mermaid_project_map(tmp_path: Path):
+    diagram = tmp_path / "docs/project.mmd"
+    diagram.parent.mkdir()
+    diagram.write_text("flowchart TB\n  CLI --> API\n")
+    report = check(
+        GhConfig(
+            root=tmp_path,
+            documentation=DocumentationConfig(required_files=("docs/project.mmd",)),
+        )
+    )
+    assert any("missing required project surface" in problem for problem in report.problems)
+    assert any("not comprehensive enough" in problem for problem in report.problems)
 
 
 def test_documentation_validates_and_loads_configuration(tmp_path: Path):
@@ -104,3 +118,6 @@ def test_this_repository_documentation_contract_is_complete():
     readme = (root / "README.md").read_text()
     assert readme.rstrip().endswith(README_PROVENANCE)
     assert all(section in readme for section in README_SECTIONS)
+    diagram = (root / "docs/project.mmd").read_text()
+    assert all(term in diagram for term in MERMAID_REQUIRED_TERMS)
+    assert diagram.count("-->") >= 20

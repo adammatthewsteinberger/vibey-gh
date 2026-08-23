@@ -79,6 +79,9 @@ jobs:
             all source, configuration, tests, workflows, public interfaces, packaging,
             release behavior, security boundaries, and existing documentation. Create
             missing documentation and update every stale statement. This is an authoring
+            task that MUST create and maintain docs/project.mmd as a comprehensive Mermaid
+            diagram of every module, API, SDK, CLI, MCP, webhook, workflow, data flow,
+            security boundary, branch, package, documentation, and release channel.
             and repair task, not a read-only review.
 
             The required contract is: __VIBEY_GH_DOCUMENTATION_FILES__.

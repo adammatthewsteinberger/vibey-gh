@@ -191,6 +191,7 @@ itself the head of production promotion PRs. See [SECURITY.md](SECURITY.md).
 | `vibey-gh install` | Render configured workflows, install/chains hooks, and install release-site assets. |
 | `vibey-gh version [--since REF] [--dev BUILD] [--apply] [--explain]` | Derive, explain, print, or apply the next release version. |
 | `vibey-gh trailer` / `trailer-key` | Print the configured provenance trailer or its key for scripts and workflows. |
+| `vibey-gh conventional-message` / `conventional-check` | Normalize one commit message or audit every subject in a revision range against Conventional Commits. |
 | `vibey-gh merge-train [--pr N] [--method METHOD] [--dry-run]` | Judge one or all PRs and merge only policy-ready exact heads. |
 | `vibey-gh pr-automation evaluate --pr N --head-sha SHA` | Return the stable structured decision for one exact PR head. |
 | `vibey-gh pr-automation ready-draft --pr N --head-sha SHA` | Mark a stable exact draft head ready without racing newer commits. |

@@ -142,6 +142,7 @@ def test_pr_gate_requires_exact_head_semantic_documentation_review_for_every_aut
         "complete",
         "accurate",
         "human_readable",
+        "architecture_diagram_complete",
         "all_capabilities_documented",
         "all_commands_documented",
         "all_configuration_documented",
@@ -273,6 +274,20 @@ def test_managed_automation_can_update_but_never_delete_develop_or_main():
     assert "git push --delete" not in text
     assert "git branch -D" not in text
     assert "DELETE /git/refs" not in text
+
+
+def test_conventional_commits_self_heal_only_guarded_topic_history():
+    text = (WORKFLOWS / "conventional-commits.yml").read_text(encoding="utf-8")
+    assert "pull_request_target:" in text
+    assert "vibey-gh conventional-check" in text
+    assert "vibey-gh conventional-message" in text
+    assert '--force-with-lease="refs/heads/${HEAD_REF}:${HEAD_SHA}"' in text
+    assert '"$INTEGRATION_BRANCH"|"$RELEASE_BRANCH"|develop|main' in text
+    assert "permanent branch history is never rewritten" in text
+    assert "Refusing automatic rewrite of merge commits" in text
+    assert "./target" not in text
+    assert "git push --delete" not in text
+    assert "--delete-branch" not in text
 
 
 def test_every_managed_third_party_action_is_immutably_pinned():

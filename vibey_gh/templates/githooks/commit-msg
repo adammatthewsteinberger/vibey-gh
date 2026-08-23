@@ -36,6 +36,15 @@ trailer=$(vibey_gh trailer 2>/dev/null || echo "Made-With: Made with ❤️ by [
 # A pre-existing project hook runs first and may do its own thing.
 [ -x "$(dirname "$0")/commit-msg.local" ] && "$(dirname "$0")/commit-msg.local" "$@"
 
+# Normalize the subject without assuming the Python package is importable in the hook's
+# process. The body and existing trailers remain unchanged.
+subject=$(sed -n '1p' "$msg_file")
+if [ -n "$subject" ] && ! printf '%s\n' "$subject" | grep -Eq '^[a-z][a-z0-9-]*(\([a-z0-9][a-z0-9._/-]*\))?!?: [^[:space:]].*$'; then
+  tmp="${msg_file}.vibey-gh.tmp"
+  { printf 'chore: %s\n' "$subject"; sed '1d' "$msg_file"; } > "$tmp"
+  mv "$tmp" "$msg_file"
+fi
+
 # Already present in any case — nothing to do.
 if grep -qiE "^${key}:[[:space:]]*[^[:space:]]" "$msg_file"; then
   exit 0
