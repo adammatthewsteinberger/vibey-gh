@@ -118,7 +118,7 @@ flowchart TB
   PRAutomation -->|fork PR needs repair| MirrorFork
   MirrorFork --> Guard
   PRAutomation -->|same-repository merge conflict| Conflict
-  Conflict --> Sandbox
+  Sandbox --> Conflict
   Conflict --> Guard
   Maintainer -->|explicit admin authorization| Bootstrap
   CI --> Bootstrap
