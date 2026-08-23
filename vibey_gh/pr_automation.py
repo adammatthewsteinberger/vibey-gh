@@ -153,8 +153,22 @@ def evaluate(
         return result("blocked", "pull request is not open")
     if pr.get("isDraft"):
         return result("blocked", "pull request is a draft")
+    state = stored
+    if state is None or state.current_sha != head:
+        state = AutomationState(lineage_sha=head, current_sha=head)
     if pr.get("mergeable") == "CONFLICTING":
-        return result("blocked", f"conflicts with {base}")
+        if state.attempts >= cfg.pr_automation.max_repair_attempts:
+            return result(
+                "blocked",
+                "conflict resolution budget is exhausted",
+                repair_attempt=state.attempts,
+            )
+        return result(
+            "conflict",
+            f"conflicts with {base}",
+            failed_checks=(f"Merge conflict with {base}",),
+            repair_attempt=state.attempts + 1,
+        )
     if pr.get("reviewDecision") == "CHANGES_REQUESTED":
         return result("blocked", "a human requested changes")
 
@@ -163,10 +177,6 @@ def evaluate(
         return result("blocked", "automation is blocked pending operator action")
     if EXHAUSTED_LABEL in labels:
         return result("blocked", "repair budget is exhausted")
-
-    state = stored
-    if state is None or state.current_sha != head:
-        state = AutomationState(lineage_sha=head, current_sha=head)
 
     ignored = set(cfg.pr_automation.ignored_checks) | {
         "PR automation / gate",
@@ -243,7 +253,7 @@ def fetch_pr(number: int) -> dict[str, Any]:
             "--json",
             "number,title,state,isDraft,mergeable,mergeStateStatus,reviewDecision,"
             "statusCheckRollup,author,labels,comments,headRefOid,headRefName,headRepository,"
-            "headRepositoryOwner,baseRefName,body",
+            "headRepositoryOwner,isCrossRepository,baseRefName,body",
         ),
     )
 
@@ -251,6 +261,35 @@ def fetch_pr(number: int) -> dict[str, Any]:
 def evaluate_pr(number: int, head_sha: str, cfg: GhConfig) -> Evaluation:
     pr = fetch_pr(number)
     return evaluate(pr, cfg, expected_sha=head_sha, stored=parse_state(pr.get("comments") or []))
+
+
+def ready_draft(number: int, head_sha: str, cfg: GhConfig) -> dict[str, Any]:
+    """Promote one exact, green draft head; every unstable condition is a no-op."""
+    pr = fetch_pr(number)
+    if str(pr.get("headRefOid") or "") != head_sha:
+        return {"promoted": False, "reason": "stale head"}
+    if pr.get("state", "OPEN") != "OPEN" or not pr.get("isDraft"):
+        return {"promoted": False, "reason": "not an open draft"}
+    if pr.get("isCrossRepository"):
+        return {"promoted": False, "reason": "fork drafts are not mutated"}
+
+    candidate = dict(pr)
+    candidate["isDraft"] = False
+    decision = evaluate(
+        candidate,
+        cfg,
+        expected_sha=head_sha,
+        stored=parse_state(pr.get("comments") or []),
+    )
+    if decision.state not in {"ready", "review"}:
+        return {"promoted": False, "reason": decision.reason}
+
+    run = subprocess.run(
+        ["gh", "pr", "ready", str(number)], capture_output=True, text=True, check=False
+    )
+    if run.returncode:
+        raise RuntimeError(f"could not mark PR ready: {run.stderr.strip()}")
+    return {"promoted": True, "reason": "current head is stable"}
 
 
 def updated_state(

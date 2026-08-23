@@ -81,11 +81,25 @@ repository-owned replacement PR.
 
 ### PR review and repair automation
 
+`branch-intake.yml` opens exactly one draft PR when a new same-repository topic branch is
+first pushed. It ignores the integration branch, release branch, and automation-owned fork
+repair branches. Later pushes reuse the existing PR. Once the configured scans for the
+exact draft head are complete and green, PR automation marks it ready and immediately
+continues through review, repair, gating, and the merge train. Pending, failing, stale,
+conflicting, closed, and fork draft heads are no-ops; they are never promoted prematurely.
+
 `pr-automation.yml` reacts to configured scan-workflow completions, re-reads the entire
 current-head check rollup, and publishes an explicit check run on that exact SHA. It waits
 for pending scans, separates cancelled infrastructure from actionable failures, and allows
 at most three repair commits per contributor lineage. A new contributor commit starts a
 new lineage; bot repair pushes do not reset the counter.
+
+Conflicting same-repository PRs enter a bounded conflict-resolution job instead of failing
+permanently. The job materializes Git's exact unresolved path set without executing
+repository code, gives the constrained agent read/search/edit access only, rejects edits
+outside that set, rechecks the head SHA, and publishes one ordinary non-force resolution
+commit. Fork conflicts continue through the repository-owned replacement-PR path. Conflict
+attempts share the three-attempt repair budget, so an ambiguous merge cannot loop forever.
 
 Review and repair use the immutable-pinned Claude Code Action with selected `vibey-skills`.
 The privileged jobs may inspect source and CI logs but may not execute contributor package
@@ -102,6 +116,7 @@ does not create either secret.
 
 ```bash
 vibey-gh pr-automation evaluate --pr 123 --head-sha HEAD_SHA
+vibey-gh pr-automation ready-draft --pr 123 --head-sha HEAD_SHA
 vibey-gh pr-automation mirror-fork --pr 123
 vibey-gh merge-train --pr 123
 ```
@@ -194,7 +209,7 @@ trusted_authors = ["your-login", "dependabot[bot]"]
 
 ### Taking the hooks without the workflows
 
-`install` writes two workflows alongside the hooks. A repository that already has richer
+`install` writes the managed workflows alongside the hooks. A repository that already has richer
 ones of its own can decline them:
 
 ```toml

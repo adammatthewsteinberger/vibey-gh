@@ -339,6 +339,14 @@ def test_pr_automation_cli_surfaces(repo, monkeypatch, tmp_path, capsys):
     assert main(["pr-automation", "evaluate", "--pr", "7", "--head-sha", "abc"]) == 0
     assert json.loads(capsys.readouterr().out)["state"] == "ready"
 
+    monkeypatch.setattr(
+        pr_automation,
+        "ready_draft",
+        lambda *a: {"promoted": True, "reason": "current head is stable"},
+    )
+    assert main(["pr-automation", "ready-draft", "--pr", "7", "--head-sha", "abc"]) == 0
+    assert json.loads(capsys.readouterr().out)["promoted"] is True
+
     state = pr_automation.AutomationState("abc", "abc")
     calls = []
     monkeypatch.setattr(
