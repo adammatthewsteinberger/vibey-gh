@@ -73,6 +73,9 @@ def test_cancelled_or_pending_evaluations_cannot_publish_a_gate():
     assert "needs.evaluate.result == 'success'" in text
     assert "needs.evaluate.outputs.state != 'pending'" in text
     assert "needs.evaluate.outputs.state != ''" in text
+    assert "needs.evaluate.outputs.evaluated_head_sha == needs.evaluate.outputs.head_sha" in text
+    assert "reason=${REASON}" in text
+    assert 'select(.state == "open")' in text
 
 
 @pytest.mark.parametrize("name", ["pre-push", "commit-msg"])
