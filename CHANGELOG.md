@@ -11,6 +11,10 @@ This file follows Keep a Changelog and semantic versioning conventions.
 - Enforce and safely self-heal Conventional Commit subjects on guarded topic branches.
 - Require a comprehensive, current Mermaid architecture map at `docs/project.mmd`.
 - Use the native GitHub workflow credential when persisting AI review and repair state.
+- Run Claude Code Action from a disposable, credential-free Git context while keeping
+  untrusted pull-request checkouts isolated from repository credentials.
+- Require a successful exact-head semantic code and documentation review for every
+  pull request author, including trusted authors, before the automation gate passes.
 
 ## Historical releases
 

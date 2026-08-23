@@ -142,8 +142,9 @@ def test_pr_gate_requires_exact_head_semantic_documentation_review_for_every_aut
     assert text.count("Remove credential-free Claude git context") == 3
     assert text.count("persist-credentials: false") >= 3
     assert "gitdir: $GITHUB_WORKSPACE/target/.git" not in text
-    assert "TRUSTED: ${{ needs.evaluate.outputs.trusted }}" in text
-    assert '[ "$TRUSTED" = true ] || [ "$REVIEW_PASSED" = true ]' in text
+    assert "TRUSTED: ${{ needs.evaluate.outputs.trusted }}" not in text
+    assert '[ "$STATE" = ready ] || [ "$STATE" = review ]' in text
+    assert '[ "$REVIEW_PASSED" = true ]' in text
     for field in (
         "complete",
         "accurate",
