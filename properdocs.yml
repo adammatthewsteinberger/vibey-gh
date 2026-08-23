@@ -2,8 +2,17 @@ site_name: vibey-gh
 site_description: Event-driven GitHub release automation
 site_url: https://adammatthewsteinberger.github.io/vibey-gh/
 repo_url: https://github.com/adammatthewsteinberger/vibey-gh
+repo_name: adammatthewsteinberger/vibey-gh
+edit_uri: edit/main/docs/
 docs_dir: docs
 theme: mkdocs
+extra_css:
+  - stylesheets/vibey.css
+extra_javascript:
+  - javascripts/channel.js
+markdown_extensions:
+  - attr_list
+  - md_in_html
 nav:
   - Home: index.md
   - Release channels: release-channels.md

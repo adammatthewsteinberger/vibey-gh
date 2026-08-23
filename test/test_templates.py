@@ -77,6 +77,30 @@ def test_release_surfaces_preserve_both_docs_channels_and_publish_oci_packages()
     assert "prefers-reduced-motion" in text
     assert "Documentation channels" in text
     assert "color-scheme: dark" in text
+    assert "__REPOSITORY_NAME__" in text
+    assert "__REPOSITORY_URL__" in text
+    assert "__RELEASE_SHA__" in text
+    assert "vibey-gh:repository" in text
+    assert "managed release theme is missing" in text
+
+
+def test_properdocs_theme_is_channel_aware_and_accessible():
+    root = Path(__file__).resolve().parent.parent
+    config = (root / "properdocs.yml").read_text(encoding="utf-8")
+    css = (root / "docs/stylesheets/vibey.css").read_text(encoding="utf-8")
+    script = (root / "docs/javascripts/channel.js").read_text(encoding="utf-8")
+    assert "stylesheets/vibey.css" in config
+    assert "javascripts/channel.js" in config
+    assert "md_in_html" in config and "attr_list" in config
+    assert 'body[data-release-channel="main"]' in css
+    assert 'body[data-release-channel="develop"]' in css
+    assert "prefers-reduced-motion" in css
+    assert 'dataset.bsTheme = "dark"' in script
+    assert 'segments.includes("develop")' in script
+    assert "/edit/${channel}/" in script
+    assert "__REPOSITORY__@__SHORT_SHA__" in script
+    assert "__RELEASE_BRANCH__" in script
+    assert "__RELEASE_CHANNEL__" in script
 
 
 def test_failed_permanent_branch_scans_use_a_guarded_repair_pr():

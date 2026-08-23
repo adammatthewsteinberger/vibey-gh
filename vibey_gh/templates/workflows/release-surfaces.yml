@@ -179,6 +179,8 @@ jobs:
       - name: Build the channel site with ProperDocs
         env:
           CHANNEL: ${{ needs.context.outputs.channel }}
+          RELEASE_BRANCH: ${{ needs.context.outputs.branch }}
+          RELEASE_SHA: ${{ needs.context.outputs.sha }}
         run: |
           set -euo pipefail
           python -m pip install --quiet \
@@ -195,7 +197,60 @@ jobs:
           else
             config=properdocs.yml
           fi
-          properdocs build --strict --config-file "$config" --site-dir "channel-site"
+          python - "$config" <<'PY'
+          import os
+          import pathlib
+          import shutil
+          import sys
+
+          import yaml
+
+          config_path = pathlib.Path(sys.argv[1])
+          data = yaml.safe_load(config_path.read_text()) or {}
+          docs_dir = (config_path.parent / data.get("docs_dir", "docs")).resolve()
+          docs_dir.mkdir(parents=True, exist_ok=True)
+          assets = pathlib.Path(".github/vibey-gh/release")
+          if not assets.is_dir():
+              raise SystemExit("managed release theme is missing; run `vibey-gh install`")
+          css_dir = docs_dir / "stylesheets"
+          js_dir = docs_dir / "javascripts"
+          css_dir.mkdir(exist_ok=True)
+          js_dir.mkdir(exist_ok=True)
+          shutil.copyfile(assets / "vibey.css", css_dir / "vibey.css")
+          script = (assets / "channel.js").read_text()
+          repository = os.environ["GITHUB_REPOSITORY"]
+          owner, name = repository.split("/", 1)
+          sha = os.environ["RELEASE_SHA"]
+          replacements = {
+              "__REPOSITORY__": repository,
+              "__REPOSITORY_URL__": f"{os.environ['GITHUB_SERVER_URL']}/{repository}",
+              "__RELEASE_SHA__": sha,
+              "__SHORT_SHA__": sha[:12],
+              "__RELEASE_BRANCH__": os.environ["RELEASE_BRANCH"],
+              "__RELEASE_CHANNEL__": os.environ["CHANNEL"],
+          }
+          for old, new in replacements.items():
+              script = script.replace(old, new)
+          (js_dir / "channel.js").write_text(script)
+          data.setdefault("site_name", name)
+          data.setdefault("site_description", f"Release documentation for {repository}")
+          data["site_url"] = f"https://{owner}.github.io/{name}/{os.environ['CHANNEL']}/"
+          data.setdefault("repo_name", repository)
+          data.setdefault("repo_url", replacements["__REPOSITORY_URL__"])
+          data["edit_uri"] = f"edit/{os.environ['RELEASE_BRANCH']}/docs/"
+          data["docs_dir"] = str(docs_dir)
+          data.setdefault("theme", "mkdocs")
+          for key, asset in (
+              ("extra_css", "stylesheets/vibey.css"),
+              ("extra_javascript", "javascripts/channel.js"),
+          ):
+              values = list(data.get(key, []))
+              if asset not in values:
+                  values.append(asset)
+              data[key] = values
+          pathlib.Path(".properdocs-channel.yml").write_text(yaml.safe_dump(data, sort_keys=False))
+          PY
+          properdocs build --strict --config-file .properdocs-channel.yml --site-dir channel-site
           printf '%s\n' "$CHANNEL" > channel-site/release-channel.txt
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -231,8 +286,10 @@ jobs:
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width,initial-scale=1">
             <meta name="theme-color" content="#080b14">
-            <meta name="description" content="Choose the production or preview vibey-gh documentation channel.">
-            <title>vibey-gh · Release documentation</title>
+            <meta name="description" content="Choose the production or preview documentation channel for __REPOSITORY__.">
+            <meta name="vibey-gh:repository" content="__REPOSITORY__">
+            <meta name="vibey-gh:revision" content="__RELEASE_SHA__">
+            <title>__REPOSITORY_NAME__ · Release documentation</title>
             <style>
               :root {
                 color-scheme: dark;
@@ -468,9 +525,9 @@ jobs:
                   <span class="mark" aria-hidden="true">
                     <svg viewBox="0 0 24 24" fill="none"><path d="M5 6.5 12 3l7 3.5v7L12 21l-7-7.5v-7Z" stroke="currentColor" stroke-width="1.6"/><path d="m8.2 10 3.8 2.1 3.8-2.1M12 12.1v4.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
                   </span>
-                  vibey-gh
+                  __REPOSITORY_NAME__
                 </a>
-                <a class="github" href="https://github.com/adammatthewsteinberger/vibey-gh">View on GitHub ↗</a>
+                <a class="github" href="__REPOSITORY_URL__">View on GitHub ↗</a>
               </nav>
               <section class="hero">
                 <p class="eyebrow">Documentation portal</p>
@@ -498,13 +555,37 @@ jobs:
                 </a>
               </section>
               <footer>
-                <span>Documentation that moves with the release.</span>
-                <span>Made with <strong>Vibey</strong></span>
+                <span>Provenance · <strong>__REPOSITORY__@__SHORT_SHA__</strong> · branch / __RELEASE_BRANCH__ · channel / __RELEASE_CHANNEL__</span>
+                <span>Generated by <strong>vibey-gh</strong></span>
               </footer>
             </main>
           </body>
           </html>
           HTML
+          REPOSITORY_NAME=${GITHUB_REPOSITORY#*/} \
+          REPOSITORY_URL=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY} \
+          RELEASE_BRANCH=${{ needs.context.outputs.branch }} \
+          RELEASE_CHANNEL=${{ needs.context.outputs.channel }} \
+          RELEASE_SHA=${{ needs.context.outputs.sha }} \
+          python - <<'PY'
+          import os
+          import pathlib
+
+          path = pathlib.Path("pages/index.html")
+          text = path.read_text()
+          values = {
+              "__REPOSITORY_NAME__": os.environ["REPOSITORY_NAME"],
+              "__REPOSITORY__": os.environ["GITHUB_REPOSITORY"],
+              "__REPOSITORY_URL__": os.environ["REPOSITORY_URL"],
+              "__RELEASE_BRANCH__": os.environ["RELEASE_BRANCH"],
+              "__RELEASE_CHANNEL__": os.environ["RELEASE_CHANNEL"],
+              "__RELEASE_SHA__": os.environ["RELEASE_SHA"],
+              "__SHORT_SHA__": os.environ["RELEASE_SHA"][:12],
+          }
+          for old, new in values.items():
+              text = text.replace(old, new)
+          path.write_text(text)
+          PY
       - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
       - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
         with:
