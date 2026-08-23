@@ -260,6 +260,10 @@ def test_failed_permanent_branch_scans_use_a_guarded_repair_pr():
     assert "mcp__github_ci__download_job_log" in text
     assert "Never execute package managers" in text
     assert "Never lower coverage" in text
+    assert "Create credential-free Claude git context" in text
+    assert "Remove credential-free Claude git context" in text
+    assert "persist-credentials: false" in text
+    assert "gitdir: $GITHUB_WORKSPACE/target/.git" not in text
     assert 'repair_branch="vibey-gh/repair/release-' in text
     assert 'git -C target push origin "HEAD:refs/heads/${REPAIR_BRANCH}"' in text
     assert 'gh pr create --repo "$REPO" --base "$BASE_BRANCH"' in text

@@ -13,8 +13,6 @@ This file follows Keep a Changelog and semantic versioning conventions.
 - Use the native GitHub workflow credential when persisting AI review and repair state.
 - Run Claude Code Action from a disposable, credential-free Git context while keeping
   untrusted pull-request checkouts isolated from repository credentials.
-- Require a successful exact-head semantic code and documentation review for every
-  pull request author, including trusted authors, before the automation gate passes.
 
 ## Historical releases
 
