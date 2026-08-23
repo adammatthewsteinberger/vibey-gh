@@ -98,6 +98,9 @@ def test_properdocs_theme_is_channel_aware_and_accessible():
     assert 'body[data-release-channel="main"]' in css
     assert 'body[data-release-channel="develop"]' in css
     assert "prefers-reduced-motion" in css
+    assert "padding-top: 0" in css
+    assert "position: sticky" in css
+    assert "top: 0" in css
     assert 'dataset.bsTheme = "dark"' in script
     assert 'segments.includes("develop")' in script
     assert "/edit/${channel}/" in script
