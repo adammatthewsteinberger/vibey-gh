@@ -182,6 +182,21 @@ After the configured `Release` workflow succeeds on `main`, the managed
 Release. It is safe to rerun: an existing matching tag/release is reused, while an
 existing tag at a different SHA is never moved and fails loudly.
 
+The managed `release-surfaces.yml` workflow follows every successful release on either
+branch. It builds two persistent ProperDocs sites under the repository's GitHub Pages
+domain: `/develop/` is the test documentation released with TestPyPI, while `/main/` is
+the production documentation released with PyPI. A small root page links both channels.
+Because GitHub Pages has one deployment per repository, each run restores the latest
+successful artifact for the other channel before deploying; one branch never erases the
+other branch's site.
+
+GitHub Packages does not provide a PyPI registry. The workflow therefore publishes the
+exact wheel and source distribution from the successful `Release` run as an OCI artifact
+at `ghcr.io/<owner>/<repository>/python`. Every artifact receives its immutable version
+and `sha-<commit>` tags, plus `develop` for test releases or `main` and `latest` for
+production releases. The normal TestPyPI and PyPI uploads remain authoritative and are
+unchanged.
+
 Everything project-specific lives in `.vibey-gh.toml`, so the logic beside it stays
 general. Every key has a default; a repository that agrees with them needs no file at all.
 

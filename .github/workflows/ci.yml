@@ -101,6 +101,7 @@ jobs:
               "vibey_gh/templates/workflows/merge-train.yml",
               "vibey_gh/templates/workflows/pr-automation.yml",
               "vibey_gh/templates/workflows/github-release.yml",
+              "vibey_gh/templates/workflows/release-surfaces.yml",
           ]
           names = set(zipfile.ZipFile(glob.glob("dist/*.whl")[0]).namelist())
           missing = [w for w in want if w not in names]
