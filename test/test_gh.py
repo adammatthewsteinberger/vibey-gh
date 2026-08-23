@@ -121,6 +121,34 @@ def test_missing_commit_trailer_is_reported(repo):
     assert fingerprints.commits_missing_trailer("HEAD~1..HEAD", cfg) == []
 
 
+def test_conventional_commit_subject_validation_and_normalization():
+    assert fingerprints.conventional_subject("feat(cli): add repair command")
+    assert fingerprints.conventional_subject("fix!: reject unsafe branch deletion")
+    assert not fingerprints.conventional_subject("Add repair command")
+    message = "Add repair command\n\nDetails\n\nMade-With: Vibey\n"
+    assert fingerprints.normalize_commit_message(message) == (
+        "chore: Add repair command\n\nDetails\n\nMade-With: Vibey\n"
+    )
+    assert fingerprints.normalize_commit_message("") == ""
+    crlf = "Bad subject\r\nBody\r\nMade-With: Vibey\r\n"
+    assert fingerprints.normalize_commit_message(crlf) == (
+        "chore: Bad subject\r\nBody\r\nMade-With: Vibey\r\n"
+    )
+    unicode_body = "Bad subject\nBody\u2028still body\n"
+    assert fingerprints.normalize_commit_message(unicode_body) == (
+        "chore: Bad subject\nBody\u2028still body\n"
+    )
+
+
+def test_nonconventional_commit_is_reported(repo):
+    cfg = cfg_for(repo)
+    git(repo, "commit", "-q", "--allow-empty", "-m", f"Not conventional\n\n{cfg.trailer}")
+    invalid = fingerprints.commits_with_invalid_subject("HEAD~1..HEAD", cfg)
+    assert len(invalid) == 1 and "Not conventional" in invalid[0]
+    with pytest.raises(RuntimeError, match="cannot read"):
+        fingerprints.commits_with_invalid_subject("missing-ref..HEAD", cfg)
+
+
 # ------------------------------------------------------------------------ versioning
 
 

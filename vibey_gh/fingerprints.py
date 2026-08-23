@@ -28,17 +28,53 @@ from vibey_gh.config import GhConfig, load_config
 # How far into a file the header may sit: enough for a shebang and a blank line, not
 # enough for it to be buried where nobody reads.
 HEAD_LINES = 5
+CONVENTIONAL_SUBJECT = re.compile(r"^(?:[a-z][a-z0-9-]*)(?:\([a-z0-9][a-z0-9._/-]*\))?!?: [^\s].*$")
 
 
 @dataclass
 class Report:
     missing_header: list[Path]
     missing_trailer: list[str]
+    invalid_subject: list[str]
     checked_files: int
 
     @property
     def ok(self) -> bool:
-        return not self.missing_header and not self.missing_trailer
+        return not self.missing_header and not self.missing_trailer and not self.invalid_subject
+
+
+def conventional_subject(subject: str) -> bool:
+    return bool(CONVENTIONAL_SUBJECT.fullmatch(subject.strip()))
+
+
+def normalize_commit_message(message: str) -> str:
+    """Return a Conventional Commit message without disturbing its body or trailers."""
+    if not message:
+        return message
+    subject_line, separator, rest = message.partition("\n")
+    carriage_return = "\r" if subject_line.endswith("\r") else ""
+    subject = subject_line.removesuffix("\r").strip()
+    if subject and not conventional_subject(subject):
+        return f"chore: {subject}{carriage_return}{separator}{rest}"
+    return message
+
+
+def commits_with_invalid_subject(rev_range: str, cfg: GhConfig) -> list[str]:
+    result = subprocess.run(
+        ["git", "log", "--no-merges", "--format=%H%x1f%s%x1e", rev_range],
+        cwd=cfg.root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"cannot read {rev_range}: {result.stderr.strip()}")
+    invalid = []
+    for record in filter(None, (item.strip("\n") for item in result.stdout.split("\x1e"))):
+        sha, subject = (record.split("\x1f") + [""])[:2]
+        if not conventional_subject(subject):
+            invalid.append(f"{sha[:9]} {subject}")
+    return invalid
 
 
 def sources(cfg: GhConfig) -> list[Path]:
@@ -93,4 +129,10 @@ def check(cfg: GhConfig | None = None, rev_range: str | None = None, apply: bool
         missing = []
 
     trailers = commits_missing_trailer(rev_range, cfg) if rev_range else []
-    return Report(missing_header=missing, missing_trailer=trailers, checked_files=len(files))
+    subjects = commits_with_invalid_subject(rev_range, cfg) if rev_range else []
+    return Report(
+        missing_header=missing,
+        missing_trailer=trailers,
+        invalid_subject=subjects,
+        checked_files=len(files),
+    )

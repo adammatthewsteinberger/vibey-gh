@@ -77,9 +77,12 @@ def test_mcp_protocol_lists_and_invokes_all_capabilities(monkeypatch):
     )
 
 
-def test_webhook_authentication_replay_validation_and_full_parity():
+def test_webhook_authentication_replay_validation_and_full_parity(tmp_path):
     dispatcher = surfaces.WebhookDispatcher(b"secret", _result)
     assert dispatcher.dispatch("1", "bad", b"{}")[0] == 401
+    valid_empty = b'{"capability":"version"}'
+    empty_signature = "sha256=" + hmac.new(b"secret", valid_empty, hashlib.sha256).hexdigest()
+    assert dispatcher.dispatch("", empty_signature, valid_empty)[0] == 409
     for index, capability in enumerate(surfaces.CAPABILITIES):
         body = json.dumps({"capability": capability, "arguments": ["--help"]}).encode()
         signature = "sha256=" + hmac.new(b"secret", body, hashlib.sha256).hexdigest()
@@ -92,13 +95,34 @@ def test_webhook_authentication_replay_validation_and_full_parity():
     with pytest.raises(ValueError, match="secret"):
         surfaces.WebhookDispatcher(b"")
 
+    persistent = surfaces.WebhookDispatcher(b"secret", _result, tmp_path / "deliveries")
+    body = b'{"capability":"version"}'
+    signature = "sha256=" + hmac.new(b"secret", body, hashlib.sha256).hexdigest()
+    assert persistent.dispatch("persistent", signature, body)[0] == 200
+    restarted = surfaces.WebhookDispatcher(b"secret", _result, tmp_path / "deliveries")
+    assert restarted.dispatch("persistent", signature, body)[0] == 409
 
-def test_cli_projects_api_mcp_sdk_and_webhook(monkeypatch, capsys):
+
+def test_cli_projects_api_mcp_sdk_and_webhook(monkeypatch, capsys, tmp_path):
     monkeypatch.setattr(surfaces, "invoke", _result)
     for name in ("api", "mcp", "sdk"):
         assert main([name, "version", "--arguments", '["--help"]']) == 0
     monkeypatch.setenv("VIBEY_GH_WEBHOOK_SECRET", "secret")
+    monkeypatch.setenv("VIBEY_GH_WEBHOOK_STATE_DIR", str(tmp_path / "deliveries"))
     assert main(["webhook", "version", "--delivery", "delivery"]) == 0
+    assert main(["webhook", "version", "--delivery", "delivery"]) == 1
     assert capsys.readouterr().out.count("version") == 4
     assert main(["api", "version", "--arguments", "{}"]) == 1
     assert "JSON array" in capsys.readouterr().err
+
+
+def test_cli_surface_adapters_propagate_capability_failures(monkeypatch, tmp_path):
+    def failed(capability, arguments):
+        return surfaces.Result(capability, 7, "", "failed")
+
+    monkeypatch.setattr(surfaces, "invoke", failed)
+    monkeypatch.setenv("VIBEY_GH_WEBHOOK_SECRET", "secret")
+    monkeypatch.setenv("VIBEY_GH_WEBHOOK_STATE_DIR", str(tmp_path / "deliveries"))
+    for name in ("api", "mcp", "sdk"):
+        assert main([name, "version"]) == 7
+    assert main(["webhook", "version", "--delivery", "failed-delivery"]) == 7

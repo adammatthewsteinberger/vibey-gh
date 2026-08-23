@@ -27,6 +27,11 @@ guidance, agent instructions, and configuration examples when behavior changes.
 
 Keep changes focused. Explain behavior, risk, tests, migration, and documentation impact.
 Every source file carries the configured header and every commit carries the configured
-`Made-With` trailer. Automated scans, review, repair, and merge operate on the exact head.
+`Made-With` trailer. Commit subjects must follow Conventional Commits, for example
+`feat(cli): add status output` or `fix: preserve exact head`. The local hook normalizes a
+nonconforming subject; for same-repository linear topic branches, the guarded workflow may
+rewrite subjects and force-update the exact branch with a lease. After that update, fetch
+and rebase local unpushed work onto `origin/<topic-branch>`. Automated scans, review,
+repair, and merge operate on the exact head.
 
 See `docs/development.md`, `docs/testing.md`, and `docs/releases.md`.

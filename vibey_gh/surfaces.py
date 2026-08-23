@@ -8,9 +8,11 @@ import hashlib
 import hmac
 import io
 import json
+import os
 from collections.abc import Callable
 from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 CAPABILITIES = (
@@ -136,18 +138,40 @@ def _mcp_tool(name: str) -> dict[str, Any]:
 class WebhookDispatcher:
     """Authenticated, replay-safe webhook projection of every capability."""
 
-    def __init__(self, secret: bytes, executor: Callable[[str, list[str]], Result] = invoke):
+    def __init__(
+        self,
+        secret: bytes,
+        executor: Callable[[str, list[str]], Result] | None = None,
+        delivery_dir: Path | None = None,
+    ):
         if not secret:
             raise ValueError("webhook secret must not be empty")
         self._secret = secret
-        self._executor = executor
+        self._executor = executor or invoke
         self._deliveries: set[str] = set()
+        self._delivery_dir = delivery_dir
+
+    def _claim(self, delivery: str) -> bool:
+        """Atomically claim a delivery in memory or in a process-safe directory."""
+        if self._delivery_dir is None:
+            if delivery in self._deliveries:
+                return False
+            self._deliveries.add(delivery)
+            return True
+        self._delivery_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+        marker = self._delivery_dir / hashlib.sha256(delivery.encode()).hexdigest()
+        try:
+            descriptor = os.open(marker, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        except FileExistsError:
+            return False
+        os.close(descriptor)
+        return True
 
     def dispatch(self, delivery: str, signature: str, body: bytes) -> tuple[int, dict[str, Any]]:
         expected = "sha256=" + hmac.new(self._secret, body, hashlib.sha256).hexdigest()
         if not hmac.compare_digest(signature, expected):
             return 401, {"error": "invalid signature"}
-        if not delivery or delivery in self._deliveries:
+        if not delivery:
             return 409, {"error": "duplicate or missing delivery"}
         try:
             value = json.loads(body)
@@ -156,7 +180,8 @@ class WebhookDispatcher:
             _validate(capability, arguments)
         except (json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
             return 400, {"error": str(exc)}
-        self._deliveries.add(delivery)
+        if not self._claim(delivery):
+            return 409, {"error": "duplicate or missing delivery"}
         return 200, self._executor(capability, arguments).as_dict()
 
 

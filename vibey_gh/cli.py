@@ -41,6 +41,8 @@ def _check(args) -> int:
         print(f"  {path.relative_to(cfg.root)}: missing the fingerprint header", file=sys.stderr)
     for commit in report.missing_trailer:
         print(f"  commit {commit}: missing the `{cfg.trailer_key}:` trailer", file=sys.stderr)
+    for commit in report.invalid_subject:
+        print(f"  commit {commit}: subject is not a Conventional Commit", file=sys.stderr)
     for problem in docs.problems:
         print(f"  documentation: {problem}", file=sys.stderr)
 
@@ -69,6 +71,22 @@ def _install(args) -> int:
         print(f"  notice: {notice}")
     print(f"vibey-gh: installed into {cfg.root}")
     return 0
+
+
+def _conventional_message(args) -> int:
+    if args.file:
+        message = args.file.read_text(encoding="utf-8")
+        args.file.write_text(fingerprints.normalize_commit_message(message), encoding="utf-8")
+    else:
+        print(fingerprints.normalize_commit_message(sys.stdin.read()), end="")
+    return 0
+
+
+def _conventional_check(args) -> int:
+    invalid = fingerprints.commits_with_invalid_subject(args.commits, load_config())
+    for commit in invalid:
+        print(commit)
+    return 1 if invalid else 0
 
 
 def _version(args) -> int:
@@ -261,12 +279,15 @@ def _surface(args) -> int:
         arguments = json.loads(args.arguments)
         if not isinstance(arguments, list):
             raise TypeError("arguments must be a JSON array")
+        capability_exit = 0
         if args.cmd == "api":
             status, payload = surfaces.api_dispatch(
                 "POST",
                 f"/v1/capabilities/{args.capability}",
                 json.dumps({"arguments": arguments}).encode(),
             )
+            if status == 200:
+                capability_exit = int(payload["exit_code"])
         elif args.cmd == "mcp":
             payload = surfaces.mcp_dispatch(
                 {
@@ -277,9 +298,13 @@ def _surface(args) -> int:
                 }
             )
             status = 200 if "result" in payload else 400
+            if status == 200:
+                result_text = payload["result"]["content"][0]["text"]
+                capability_exit = int(json.loads(result_text)["exit_code"])
         elif args.cmd == "sdk":
             result = surfaces.invoke(args.capability, arguments)
             status, payload = 200, result.as_dict()
+            capability_exit = result.exit_code
         else:
             secret = os.environ.get("VIBEY_GH_WEBHOOK_SECRET", "").encode()
             body = json.dumps({"capability": args.capability, "arguments": arguments}).encode()
@@ -287,14 +312,22 @@ def _surface(args) -> int:
                 "sha256="
                 + __import__("hmac").new(secret, body, __import__("hashlib").sha256).hexdigest()
             )
-            status, payload = surfaces.WebhookDispatcher(secret).dispatch(
+            state_dir = Path(
+                os.environ.get(
+                    "VIBEY_GH_WEBHOOK_STATE_DIR",
+                    str(load_config().root / ".vibey-gh" / "webhook-deliveries"),
+                )
+            )
+            status, payload = surfaces.WebhookDispatcher(secret, delivery_dir=state_dir).dispatch(
                 args.delivery, signature, body
             )
+            if status == 200:
+                capability_exit = int(payload["exit_code"])
     except (json.JSONDecodeError, TypeError, ValueError) as exc:
         print(f"vibey-gh: {exc}", file=sys.stderr)
         return 1
     print(json.dumps(payload, sort_keys=True))
-    return 0 if status == 200 else 1
+    return capability_exit if status == 200 else 1
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -325,6 +358,18 @@ def main(argv: list[str] | None = None) -> int:
     for name, attr in (("trailer", "trailer"), ("trailer-key", "trailer_key")):
         p = sub.add_parser(name, help=f"print the {name}")
         p.set_defaults(func=lambda a, _attr=attr: (print(getattr(load_config(), _attr)), 0)[1])
+
+    conventional = sub.add_parser(
+        "conventional-message", help="normalize a commit message to Conventional Commits"
+    )
+    conventional.add_argument("--file", type=Path, help="rewrite this commit-message file")
+    conventional.set_defaults(func=_conventional_message)
+
+    conventional_check = sub.add_parser(
+        "conventional-check", help="verify Conventional Commit subjects in a range"
+    )
+    conventional_check.add_argument("--commits", required=True, metavar="RANGE")
+    conventional_check.set_defaults(func=_conventional_check)
 
     m = sub.add_parser("merge-train", help="merge every ready pull request")
     m.add_argument("--method", default="squash", choices=("squash", "rebase", "merge"))

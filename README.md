@@ -183,6 +183,16 @@ PR CI validates resulting commits. Managed automation never sends a deletion ref
 `main` or `develop`, and automatic branch deletion stays disabled because `develop` is
 itself the head of production promotion PRs. See [SECURITY.md](SECURITY.md).
 
+The sole history-rewrite exception is Conventional Commits self-healing: only a
+same-repository linear topic branch may be normalized and pushed with an exact-head
+`--force-with-lease`. Forks, stale heads, merge commits, `develop`, and `main` fail closed,
+and contributor-controlled code is never executed by that privileged job.
+
+Webhook delivery IDs are claimed atomically in a persistent local state directory, so
+replay rejection survives CLI process restarts and concurrent receivers. Deployments must
+place `VIBEY_GH_WEBHOOK_STATE_DIR` on durable, access-controlled storage and retain the raw
+request bytes for HMAC verification; see [the CLI and adapter reference](docs/cli.md).
+
 ## Commands
 
 | Command | Human purpose |
@@ -191,6 +201,7 @@ itself the head of production promotion PRs. See [SECURITY.md](SECURITY.md).
 | `vibey-gh install` | Render configured workflows, install/chains hooks, and install release-site assets. |
 | `vibey-gh version [--since REF] [--dev BUILD] [--apply] [--explain]` | Derive, explain, print, or apply the next release version. |
 | `vibey-gh trailer` / `trailer-key` | Print the configured provenance trailer or its key for scripts and workflows. |
+| `vibey-gh conventional-message [--file COMMIT_EDITMSG]` / `conventional-check --commits BASE..HEAD` | Normalize one commit message or audit every subject in a revision range against Conventional Commits. |
 | `vibey-gh merge-train [--pr N] [--method METHOD] [--dry-run]` | Judge one or all PRs and merge only policy-ready exact heads. |
 | `vibey-gh pr-automation evaluate --pr N --head-sha SHA` | Return the stable structured decision for one exact PR head. |
 | `vibey-gh pr-automation ready-draft --pr N --head-sha SHA` | Mark a stable exact draft head ready without racing newer commits. |
@@ -214,7 +225,9 @@ were important.
 ### Provenance, enforced in two places
 
 Every code change carries a fingerprint. Source files get a header comment; **every commit
-gets a trailer**. The trailer is what makes the rule total — a change to a Markdown file or
+gets a Conventional Commit subject and a trailer**. The local hook normalizes the subject
+before appending provenance, and CI audits the complete PR range. The trailer is what makes
+the rule total — a change to a Markdown file or
 a JSON manifest still arrives as a commit, and the commit is fingerprinted even when the
 file cannot be.
 
@@ -443,6 +456,12 @@ Every canonical capability is exposed and tested through all five supported surf
 - MCP: `initialize`, `tools/list`, and `tools/call`
 - Webhook: HMAC-SHA256 authenticated, delivery-ID replay-safe dispatch
 
+The two Conventional Commit commands are deliberately outside this canonical registry:
+they are local git-hook/CI helpers that consume stdin, commit-message files, or revision
+ranges. Exposing those host-specific mutation primitives through a remote API, MCP tool, or
+webhook would expand privilege without adding an automation capability. Every repository
+automation capability in `surfaces.CAPABILITIES` remains available through all five forms.
+
 The parity contract enumerates every capability from one registry, invokes every adapter,
 and fails CI if any surface is absent or divergent. Because `Docs` is a configured scan,
 missing documentation or interface parity blocks the exact-head PR gate and enters the
@@ -515,6 +534,7 @@ trusted_authors = ["your-login", "dependabot[bot]"]
 | Workflow | Responsibility |
 |---|---|
 | Branch intake | Turns a new topic branch into one reusable draft PR. |
+| Conventional Commits | Normalizes guarded same-repository topic history and republishes it with an exact-head lease. |
 | CI / Provenance / Docs | Validate code, history, human docs, agent docs, plugins, and interfaces. |
 | PR automation | Aggregates exact-head scans; reviews, repairs, resolves conflicts, and gates. |
 | Merge train | Squash-merges into `develop` and rebase-merges promotions into `main`. |
@@ -546,6 +566,11 @@ unprivileged PR scans execute the repaired code. This separation is why a repair
 always followed by a new scan rather than being treated as proof of correctness.
 
 ## Day-two operations
+
+If Conventional Commits rewrites your topic branch, preserve unpushed work, run
+`git fetch origin`, and rebase it onto the new explicit `origin/<topic-branch>` head. With
+no unpushed work, reset only that local topic branch to its remote counterpart. Never
+reset or force-push `develop` or `main`.
 
 ### Upgrade vibey-gh
 

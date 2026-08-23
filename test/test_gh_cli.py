@@ -190,6 +190,32 @@ def test_trailer_helpers(repo, capsys):
     assert capsys.readouterr().out.strip() == "Made-With"
 
 
+def test_conventional_message_normalizes_file_and_stdin(repo, tmp_path, monkeypatch, capsys):
+    message = tmp_path / "COMMIT_EDITMSG"
+    message.write_text("Bad subject\n\nBody\n")
+    assert main(["conventional-message", "--file", str(message)]) == 0
+    assert message.read_text() == "chore: Bad subject\n\nBody\n"
+    monkeypatch.setattr("sys.stdin.read", lambda: "fix: already valid\n")
+    assert main(["conventional-message"]) == 0
+    assert capsys.readouterr().out == "fix: already valid\n"
+
+
+def test_conventional_check_reports_invalid_range(repo, capsys):
+    subprocess.run(
+        ["git", "commit", "-q", "--allow-empty", "-m", "Invalid subject"],
+        cwd=repo,
+        check=True,
+    )
+    assert main(["conventional-check", "--commits", "HEAD~1..HEAD"]) == 1
+    assert "Invalid subject" in capsys.readouterr().out
+    subprocess.run(
+        ["git", "commit", "-q", "--allow-empty", "-m", "fix: valid subject"],
+        cwd=repo,
+        check=True,
+    )
+    assert main(["conventional-check", "--commits", "HEAD~1..HEAD"]) == 0
+
+
 def test_check_names_the_commit_range_it_cleared(repo, capsys):
     main(["install"])
     main(["check", "--ci", "--apply"])
