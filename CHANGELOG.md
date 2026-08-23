@@ -5,6 +5,9 @@ This file follows Keep a Changelog and semantic versioning conventions.
 
 ## Unreleased
 
+- Fix GraphQL-only PR-state comment updates, synchronize package version metadata,
+  correct constrained Claude command patterns, and ship real managed CodeQL and
+  five-surface API-drift gates.
 - Add a configurable comprehensive FOSS and multi-agent documentation contract.
 - Add guarded AI documentation authoring and repair automation.
 - Add configurable crawler, sitemap, SEO, structured-data, and LLM discovery surfaces.

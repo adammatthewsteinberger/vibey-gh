@@ -135,6 +135,20 @@ def test_pr_gate_requires_exact_head_semantic_documentation_review_for_every_aut
     assert "repository-wide semantic documentation audit" in text
     assert "complete, approachable guide" in text
     assert "--disallowedTools Agent" in text
+    assert "Bash(gh pr diff:*)" in text
+    assert "Bash(gh:pr:diff:*)" not in text
+
+
+def test_security_and_api_drift_workflows_are_real_managed_gates():
+    text = (WORKFLOWS / "pr-automation.yml").read_text(encoding="utf-8")
+    codeql = (WORKFLOWS / "codeql.yml").read_text(encoding="utf-8")
+    drift = (WORKFLOWS / "api-drift.yml").read_text(encoding="utf-8")
+    assert "name: CodeQL" in codeql
+    assert "github/codeql-action/init@6d786de4d6f3531a740e445b53a42b622bbbace8" in codeql
+    assert "github/codeql-action/analyze@6d786de4d6f3531a740e445b53a42b622bbbace8" in codeql
+    assert "name: API drift (Cloud Agents OpenAPI)" in drift
+    assert "MCP, API, CLI, SDK, and webhook parity" in drift
+    assert "from vibey_gh.surfaces import CAPABILITIES, SURFACES, parity" in drift
     assert "Do not spawn subagents" in text
     assert text.count("GH_REPO: ${{ github.repository }}") >= 2
     assert "isolated temporary" in text

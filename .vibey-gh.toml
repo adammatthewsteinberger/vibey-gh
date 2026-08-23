@@ -8,7 +8,7 @@ sources = [
 ]
 
 [version]
-files         = ["pyproject.toml"]
+files         = ["pyproject.toml", "vibey_gh/__init__.py"]
 content_paths = ["vibey_gh/"]
 code_paths    = ["vibey_gh/"]
 

@@ -1,6 +1,7 @@
 # Operations
 
-Required repository secrets are `ANTHROPIC_API_KEY` and `AUTOMERGE_TOKEN`; PyPI/TestPyPI
+`ANTHROPIC_API_KEY` is required. Add `AUTOMERGE_TOKEN` only when the default
+`GITHUB_TOKEN` cannot satisfy branch rulesets or repository-settings writes; PyPI/TestPyPI
 use trusted publishing environments. Enable Actions write permissions, PR creation,
 GitHub Pages via Actions, Packages, Releases, and Deployments. Use workflow dispatch for
 recovery. Inspect exact run and head SHA before retrying. Never solve a blocked release by
