@@ -103,9 +103,39 @@ def test_documentation_workflow_authors_guarded_refresh_prs():
     assert 'branch="vibey-gh/docs/refresh-${RUN_ID}"' in text
     assert 'git push origin "HEAD:refs/heads/${BRANCH}"' in text
     assert "gh pr create" in text
+    assert ".complete == true" in text
+    assert "gaps_remaining // []" in text
+    assert "gh pr create" in text and '--body "$body" || true' not in text
     assert "Never execute repository code" in text
     assert "git push --delete" not in text
     assert "--force" not in text
+
+
+def test_pr_gate_requires_exact_head_semantic_documentation_review_for_every_author():
+    text = (WORKFLOWS / "pr-automation.yml").read_text(encoding="utf-8")
+    assert "Exact-head code and documentation review" in text
+    assert "needs.evaluate.outputs.state == 'ready'" in text
+    assert "repository-wide semantic documentation audit" in text
+    assert "complete, approachable guide" in text
+    for field in (
+        "complete",
+        "accurate",
+        "human_readable",
+        "all_capabilities_documented",
+        "all_commands_documented",
+        "all_configuration_documented",
+        "examples_sufficient",
+        "onboarding_sufficient",
+        "operations_sufficient",
+        "security_sufficient",
+        "release_process_sufficient",
+        "links_valid",
+    ):
+        assert f'"{field}"' in text
+        assert f".{field} == true" in text
+    assert "((.findings // []) | length == 0)" in text
+    assert "Exact-head semantic review result:" in text
+    assert '[ "$REVIEW_PASSED" = true ]' in text
 
 
 def test_properdocs_theme_is_channel_aware_and_accessible():
