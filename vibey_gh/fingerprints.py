@@ -22,6 +22,7 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+from vibey_gh import debugging
 from vibey_gh.config import GhConfig, load_config
 
 # How far into a file the header may sit: enough for a shebang and a blank line, not
@@ -36,6 +37,7 @@ class Report:
     duplicate_header: list[Path]
     missing_trailer: list[str]
     invalid_subject: list[str]
+    branch_logging: list[str]
     checked_files: int
 
     @property
@@ -45,6 +47,7 @@ class Report:
             and not self.duplicate_header
             and not self.missing_trailer
             and not self.invalid_subject
+            and not self.branch_logging
         )
 
 
@@ -158,10 +161,12 @@ def check(cfg: GhConfig | None = None, rev_range: str | None = None, apply: bool
 
     trailers = commits_missing_trailer(rev_range, cfg) if rev_range else []
     subjects = commits_with_invalid_subject(rev_range, cfg) if rev_range else []
+    branch_logging = debugging.branch_logging_problems(files)
     return Report(
         missing_header=missing,
         duplicate_header=duplicated,
         missing_trailer=trailers,
         invalid_subject=subjects,
+        branch_logging=branch_logging,
         checked_files=len(files),
     )

@@ -6,6 +6,15 @@ content but cannot execute it. AI tools edit only named scopes; trusted shell st
 paths and publish one commit. Secrets never enter prompts or artifacts. The merge train
 rechecks exact-head gates immediately before mutation.
 
+Advanced branch diagnostics are opt-in and metadata-only. Events exclude application
+values, exception text, arguments, locals, environment values, and secrets. Each JSONL
+record carries invocation and GitHub correlation, a monotonic sequence, and the preceding
+record's SHA-256 digest; recomputing the chain detects truncation, reordering, or mutation
+within the retained stream. Operators must protect and expire `VIBEY_GH_DEBUG_LOG` like
+other diagnostic telemetry. The hash chain is tamper-evident, not a digital signature;
+ship it to append-only or independently authenticated storage when adversarial log writers
+are in scope.
+
 The managed CodeQL workflow analyzes Python changes on both delivery branches and their
 pull requests. The API-drift workflow independently verifies that every canonical
 capability remains available through MCP, API, CLI, SDK, and webhook boundaries.

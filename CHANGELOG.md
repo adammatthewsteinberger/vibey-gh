@@ -5,6 +5,8 @@ This file follows Keep a Changelog and semantic versioning conventions.
 
 ## Unreleased
 
+- Require advanced debug instrumentation for every Python control-flow branch and add
+  opt-in, correlated, metadata-only JSONL tracing with tamper-evident SHA-256 chaining.
 - Enforce genuine 100% line and branch coverage with pytest-cov and align all contributor
   and testing documentation with the executable gate.
 - Fix a duplicated provenance header in the packaged source modules and make the

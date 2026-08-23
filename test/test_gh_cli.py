@@ -441,6 +441,13 @@ def test_api_and_mcp_surface_failures_return_nonzero(repo, monkeypatch, capsys):
     assert "error" in json.loads(capsys.readouterr().out)
 
 
+def test_check_reports_untraceable_debug_branches(repo, capsys):
+    bad = repo / "src" / "bad.py"
+    bad.write_text(load_config().header + "\nif:\n")
+    assert main(["check"]) == 1
+    assert "debug logging:" in capsys.readouterr().err
+
+
 @pytest.mark.parametrize("value", ("[]", "{bad"))
 def test_pr_automation_cli_rejects_bad_json(repo, capsys, value):
     assert main(["pr-automation", "record-review", "--pr", "7", "--input", value]) == 1

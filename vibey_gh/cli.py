@@ -11,6 +11,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 from vibey_gh import (
+    debugging,
     documentation,
     fingerprints,
     github_release,
@@ -47,6 +48,8 @@ def _check(args) -> int:
         print(f"  commit {commit}: missing the `{cfg.trailer_key}:` trailer", file=sys.stderr)
     for commit in report.invalid_subject:
         print(f"  commit {commit}: subject is not a Conventional Commit", file=sys.stderr)
+    for problem in report.branch_logging:
+        print(f"  debug logging: {problem}", file=sys.stderr)
     for problem in docs.problems:
         print(f"  documentation: {problem}", file=sys.stderr)
 
@@ -335,6 +338,7 @@ def _surface(args) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    debugging.enable()
     parser = argparse.ArgumentParser(prog="vibey-gh", description=__doc__)
     sub = parser.add_subparsers(dest="cmd", required=True)
 

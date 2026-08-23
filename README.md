@@ -220,7 +220,7 @@ request bytes for HMAC verification; see [the CLI and adapter reference](docs/cl
 
 | Command | Human purpose |
 |---|---|
-| `vibey-gh check [--apply] [--commits RANGE] [--ci]` | Verify installed assets, file fingerprints, commit trailers, documentation, marketplace structure, and interface parity; optionally repair missing source headers. |
+| `vibey-gh check [--apply] [--commits RANGE] [--ci]` | Verify installed assets, file fingerprints, commit trailers, traceable branch logging, documentation, marketplace structure, and interface parity; optionally repair missing source headers. |
 | `vibey-gh install` | Render configured workflows, install/chains hooks, and install release-site assets. |
 | `vibey-gh version [--since REF] [--dev BUILD] [--apply] [--explain]` | Derive, explain, print, or apply the next release version. |
 | `vibey-gh trailer` / `trailer-key` | Print the configured provenance trailer or its key for scripts and workflows. |
@@ -264,6 +264,26 @@ The `pre-push` hook refuses the push if either half is missing, to any branch, l
 remote. `git push --no-verify` still works, because a hook that cannot be bypassed in an
 emergency gets uninstalled instead; CI applies the same rule server-side, so skipping it
 locally defers the failure rather than avoiding it.
+
+### Advanced, fully traceable branch diagnostics
+
+Every configured Python source is compiled during `vibey-gh check`, and every control-flow
+opcode must be supported by the package-wide branch tracer. Enable it only when diagnosing
+a run; normal commands remain quiet:
+
+```bash
+VIBEY_GH_DEBUG=1 vibey-gh check
+VIBEY_GH_DEBUG=1 VIBEY_GH_DEBUG_LOG=.vibey-gh/branch-trace.jsonl vibey-gh merge-train
+```
+
+The JSONL stream records each branch evaluation and, when CPython exposes the successor,
+its taken or fallthrough outcome. Every event includes a schema version, trace ID,
+monotonic sequence, UTC and monotonic timestamps, PID, thread ID, source, function, line,
+bytecode offset/opcode/target, GitHub run/attempt/SHA correlation, the previous event hash,
+and its own SHA-256 hash. That produces an ordered, tamper-evident chain that can be joined
+back to a CI invocation. It records control-flow metadata only—never locals, arguments,
+return values, exception messages, environment values, or secrets. Set
+`VIBEY_GH_TRACE_ID` to propagate an existing correlation ID; otherwise a UUID is generated.
 
 ### Versions derived, not remembered
 

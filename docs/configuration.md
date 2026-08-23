@@ -94,3 +94,15 @@ fails closed when repository visibility is not private.
 
 Run `vibey-gh install`, review and commit generated assets, then run
 `vibey-gh check --ci`. Identity and Pages URLs are derived at runtime.
+
+## Advanced debug environment
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `VIBEY_GH_DEBUG` | unset | Set to `1`, `true`, `yes`, or `on` to enable structured branch tracing. |
+| `VIBEY_GH_DEBUG_LOG` | stderr | Append JSONL trace events to this operator-controlled path. |
+| `VIBEY_GH_TRACE_ID` | generated UUID | Correlate the trace with a wider diagnostic session. |
+
+GitHub correlation is read from `GITHUB_RUN_ID`, `GITHUB_RUN_ATTEMPT`, and `GITHUB_SHA`.
+These controls affect diagnostics only; source validation always confirms that every
+configured Python control-flow opcode can be represented by the tracer.
