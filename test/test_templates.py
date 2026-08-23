@@ -8,7 +8,9 @@ miserable thing to debug from the other end. Cheaper to catch here.
 
 from __future__ import annotations
 
+import json
 import re
+import shlex
 from pathlib import Path
 
 import pytest
@@ -28,6 +30,21 @@ def test_every_shipped_workflow_template_parses(path):
     parsed = yaml.safe_load(path.read_text(encoding="utf-8"))
     assert isinstance(parsed, dict)
     assert parsed.get("jobs")
+
+
+def test_every_claude_json_schema_survives_argument_tokenization():
+    schemas = []
+    for path in WORKFLOW_TEMPLATES:
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if "--json-schema " not in line:
+                continue
+            tokens = shlex.split(line.strip())
+            index = tokens.index("--json-schema")
+            schema = json.loads(tokens[index + 1])
+            assert schema["type"] == "object"
+            assert schema["properties"]
+            schemas.append((path.name, schema))
+    assert len(schemas) == 5
 
 
 @pytest.mark.parametrize("path", REPO_WORKFLOWS, ids=lambda p: p.name)

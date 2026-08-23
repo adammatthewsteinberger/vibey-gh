@@ -73,7 +73,7 @@ jobs:
             --model claude-sonnet-5
             --max-turns 180
             --allowedTools Read,Glob,Grep,Edit,Write
-            --json-schema {"type":"object","properties":{"complete":{"type":"boolean"},"files_changed":{"type":"array","items":{"type":"string"}},"gaps_remaining":{"type":"array","items":{"type":"string"}},"summary":{"type":"string"}},"required":["complete","files_changed","gaps_remaining","summary"]}
+            --json-schema '{"type":"object","properties":{"complete":{"type":"boolean"},"files_changed":{"type":"array","items":{"type":"string"}},"gaps_remaining":{"type":"array","items":{"type":"string"}},"summary":{"type":"string"}},"required":["complete","files_changed","gaps_remaining","summary"]}'
           prompt: |
             Act as the repository's comprehensive FOSS documentation maintainer. Inspect
             all source, configuration, tests, workflows, public interfaces, packaging,
