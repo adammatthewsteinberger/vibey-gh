@@ -17,6 +17,8 @@ This file follows Keep a Changelog and semantic versioning conventions.
   fail-closed manual raw-output diagnostic restricted to private repositories.
 - Keep promotion PR checks non-destructive: skip topic-history normalization for
   permanent branches and verify repository provenance without re-auditing admitted history.
+- Give repair agents a bounded trusted diagnostic bundle containing exact-head failed
+  check metadata and available failed-job logs before they classify or edit anything.
 
 ## Historical releases
 

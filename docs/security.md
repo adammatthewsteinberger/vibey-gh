@@ -19,6 +19,12 @@ workflows accept it only from an explicit manual dispatch when configuration opt
 GitHub reports private repository visibility. Public and event-triggered runs fail closed.
 Execution logs may instead be retained as access-controlled 90-day workflow artifacts.
 
+Before a repair session, trusted automation downloads failed-check metadata and available
+failed-job logs for the exact PR head into a bounded local diagnostic bundle. The bundle
+is treated as untrusted input, capped at 200,000 bytes, and read-only to the diagnosis;
+repository code is still never executed in the privileged job. This avoids speculative
+repairs when optional CI MCP tools are unavailable without granting Claude shell access.
+
 The Conventional Commits job is the sole guarded exception that may force-update history.
 It can act only on a same-repository topic branch, only from an exact checked SHA, only on
 linear history, and only with `--force-with-lease`. Permanent branches are rejected by
