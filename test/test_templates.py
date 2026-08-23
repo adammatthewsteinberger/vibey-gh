@@ -152,6 +152,9 @@ def test_repository_profile_is_configurable_and_never_mutates_branches():
     assert "__VIBEY_GH_PROFILE_SETTINGS__" in text
     assert "vulnerability-alerts" in text
     assert "automated-security-fixes" in text
+    assert text.count("secrets.AUTOMERGE_TOKEN || github.token") == 2
+    assert "Unable to verify ${setting}" in text
+    assert "HTTP 404" in text
     assert "branches/${branch}" in text
     assert "--jq .protected" in text
     assert "https://${OWNER}.github.io/${REPO_NAME}/" in text

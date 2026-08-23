@@ -59,7 +59,7 @@ jobs:
 
       - name: Verify public release surfaces
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.AUTOMERGE_TOKEN || github.token }}
           REPO: ${{ github.repository }}
           OWNER: ${{ github.repository_owner }}
           REPO_NAME: ${{ github.event.repository.name }}
@@ -111,12 +111,22 @@ jobs:
             setting=$1
             endpoint=$2
             expected_value=$(printf '%s' "$CONFIG_SETTINGS" | jq -r --arg setting "$setting" '.[$setting]')
-            if gh api "repos/${REPO}/${endpoint}" >/dev/null 2>&1; then
+            set +e
+            response=$(gh api "repos/${REPO}/${endpoint}" 2>&1)
+            api_status=$?
+            set -e
+            if [ "$api_status" -eq 0 ]; then
               actual_value=true
-            else
+            elif grep -q 'HTTP 404' <<< "$response"; then
               actual_value=false
+            else
+              echo "Unable to verify ${setting}: ${response}" >&2
+              return 1
             fi
-            test "$actual_value" = "$expected_value"
+            if [ "$actual_value" != "$expected_value" ]; then
+              echo "Repository setting ${setting}: expected ${expected_value}, got ${actual_value}" >&2
+              return 1
+            fi
           }
           verify_security vulnerability_alerts vulnerability-alerts
           verify_security automated_security_fixes automated-security-fixes
