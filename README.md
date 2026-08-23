@@ -89,20 +89,23 @@ tagging, GitHub Release creation, and repository-profile reconciliation.
 
 1. Create or confirm permanent `develop` and `main` branches.
 2. Install `vibey-gh` on a topic branch and review every generated file before committing.
-3. Add a repository-level `ANTHROPIC_API_KEY`; environment-only secrets are not available
+3. Author your own `CI` and `Release` workflows with those exact names; `install` does not
+   render them, and the rest of this checklist assumes they exist. See
+   [What gets installed](#what-gets-installed) for the required `Release` behavior.
+4. Add a repository-level `ANTHROPIC_API_KEY`; environment-only secrets are not available
    to the PR automation jobs that perform guarded review and repair.
-4. Add `AUTOMERGE_TOKEN` when the default Actions token cannot merge through your ruleset,
+5. Add `AUTOMERGE_TOKEN` when the default Actions token cannot merge through your ruleset,
    update repository settings, or create the required pull requests.
-5. In **Settings → Actions → General**, grant read/write workflow permissions and allow
+6. In **Settings → Actions → General**, grant read/write workflow permissions and allow
    Actions to create and approve pull requests.
-6. Configure GitHub Pages to deploy from **GitHub Actions**.
-7. Configure `testpypi` and `pypi` trusted-publishing environments if this is a Python
+7. Configure GitHub Pages to deploy from **GitHub Actions**.
+8. Configure `testpypi` and `pypi` trusted-publishing environments if this is a Python
    package. `develop` is the preview channel; `main` is production.
-8. Configure the branch ruleset. Require your ordinary scans plus
+9. Configure the branch ruleset. Require your ordinary scans plus
    `PR automation / gate`; do not use a rule that automatically deletes `develop` after a
    promotion merge.
-9. Run `vibey-gh check --ci`, inspect `git diff`, commit the generated assets, and push.
-10. Confirm the first branch creates one draft PR and that the exact-head gate—not an older
+10. Run `vibey-gh check --ci`, inspect `git diff`, commit the generated assets, and push.
+11. Confirm the first branch creates one draft PR and that the exact-head gate—not an older
     workflow result—controls its merge.
 
 ### What gets installed
@@ -112,6 +115,19 @@ release-site assets used by the dual-channel Pages deployment. Existing hooks ar
 `<hook>.local` and chained. Managed workflow files are replaced when their rendered source
 changes; opt out of individual workflows with `[install].workflows` rather than editing a
 generated copy that the next installation will overwrite.
+
+`install` does **not** render `CI` or `Release` workflows: every repository's build, test,
+and publish steps are different, so these two stay hand-authored by the adopting
+repository. This is intentional, not an oversight, but the names and behavior are load
+bearing: `release-repair.yml` watches for a `workflow_run` named exactly `CI`, and
+`github-release.yml`, `release-surfaces.yml`, and `release-repair.yml` all watch for one
+named exactly `Release`. Your `Release` workflow must run on `develop` and `main`, derive
+and apply the version with `vibey-gh version --apply` (or an equivalent explicit
+`--dev`/`--since` invocation), build the package, and publish it through the `testpypi`
+(from `develop`) and `pypi` (from `main`) trusted-publishing environments named in
+[Requirements](#requirements). Skip or misname either workflow and the installer, gate, and
+docs will all stay green while GitHub Release creation, release surfaces, repository-profile
+reconciliation, and release repair silently never trigger.
 
 ### What happens after a push
 
@@ -550,14 +566,18 @@ trusted_authors = ["your-login", "dependabot[bot]"]
 |---|---|
 | Branch intake | Turns a new topic branch into one reusable draft PR. |
 | Conventional Commits | Normalizes guarded same-repository topic history and republishes it with an exact-head lease. |
-| CI / Provenance / Docs | Validate code, history, human docs, agent docs, plugins, and interfaces. |
+| CI\* / Provenance / Docs | Validate code, history, human docs, agent docs, plugins, and interfaces. |
 | PR automation | Aggregates exact-head scans; reviews, repairs, resolves conflicts, and gates. |
 | Merge train | Squash-merges into `develop` and rebase-merges promotions into `main`. |
-| Release | Publishes `develop` dev builds to TestPyPI and `main` releases to PyPI. |
+| Release\* | Publishes `develop` dev builds to TestPyPI and `main` releases to PyPI. |
 | GitHub Release | Tags the exact production commit and generates release notes. |
 | Release surfaces | Publishes GHCR artifacts and Production/Preview ProperDocs sites. |
 | Repository profile | Enforces repository metadata, policy settings, security, and public surfaces. |
 | Release repair | Returns trusted post-merge fixes through an ordinary guarded PR. |
+
+\* `CI` and `Release` are not rendered by `vibey-gh install`; see
+[What gets installed](#what-gets-installed) for the exact name and behavior contract
+every other row in this table depends on.
 
 Scheduled and manual triggers are recovery backstops; normal delivery is event driven.
 

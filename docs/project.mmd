@@ -27,7 +27,8 @@ flowchart TB
     Promotion[Promotion]
     Versioning[Versioning]
     Release[GitHub releases]
-    Surfaces[Release surfaces]
+    CapabilitySurfaces["Capability surfaces (vibey_gh.surfaces)"]
+    ReleaseSurfaces[Release surfaces publishing]
     Realign[Realign released branches]
   end
 
@@ -56,16 +57,19 @@ flowchart TB
     PyPI[PyPI]
     Packages[GitHub Packages]
     Pages[GitHub Pages]
+    RepositoryProfile[Repository profile]
+    ReleaseRepair[Release repair]
   end
 
   Maintainer --> CLI
   Contributor --> Push
   Push --> PullRequest
-  CLI --> Config
-  SDK --> Core
-  API --> Core
-  MCP --> Core
-  Webhook --> Core
+  CLI --> CapabilitySurfaces
+  SDK --> CapabilitySurfaces
+  API --> CapabilitySurfaces
+  MCP --> CapabilitySurfaces
+  Webhook --> CapabilitySurfaces
+  CapabilitySurfaces --> Config
   Config --> Install
   Install --> PRAutomation
   Install --> MergeTrain
@@ -108,8 +112,15 @@ flowchart TB
   Main --> Pages
   Versioning --> Promotion
   Release --> PyPI
-  Surfaces --> Packages
-  Surfaces --> Pages
+  ReleaseSurfaces --> Packages
+  ReleaseSurfaces --> Pages
+  TestPyPI --> ReleaseSurfaces
+  PyPI --> ReleaseSurfaces
+  ReleaseSurfaces --> RepositoryProfile
+  CI --> ReleaseRepair
+  Release --> ReleaseRepair
+  ReleaseSurfaces --> ReleaseRepair
+  ReleaseRepair --> Guard
   Fingerprints --> CI
   Documentation --> Docs
   Guard --> Fingerprints
