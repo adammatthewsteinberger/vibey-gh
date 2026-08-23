@@ -66,6 +66,7 @@ jobs:
       pr: ${{ steps.resolve.outputs.pr }}
       head_sha: ${{ steps.resolve.outputs.head_sha }}
       state: ${{ steps.evaluate.outputs.state }}
+      evaluated_head_sha: ${{ steps.evaluate.outputs.evaluated_head_sha }}
       trusted: ${{ steps.evaluate.outputs.trusted }}
       failed_checks: ${{ steps.evaluate.outputs.failed_checks }}
       repair_attempt: ${{ steps.evaluate.outputs.repair_attempt }}
@@ -102,7 +103,8 @@ jobs:
           number="${INPUT_PR:-}"
           sha="${INPUT_SHA:-${EVENT_SHA:-}}"
           if [ -z "$number" ]; then
-            number=$(gh api "repos/${REPO}/commits/${sha}/pulls" --jq '.[0].number // empty')
+            number=$(gh api "repos/${REPO}/commits/${sha}/pulls" \
+              --jq '[.[] | select(.state == "open")][0].number // empty')
           fi
           if [ -z "$number" ]; then
             echo "::notice::completed workflow is not associated with an open PR"
@@ -126,6 +128,7 @@ jobs:
           result=$(vibey-gh pr-automation evaluate --pr "$PR" --head-sha "$HEAD_SHA")
           printf '%s\n' "$result" | jq .
           echo "state=$(jq -r .state <<<"$result")" >> "$GITHUB_OUTPUT"
+          echo "evaluated_head_sha=$(jq -r .head_sha <<<"$result")" >> "$GITHUB_OUTPUT"
           echo "trusted=$(jq -r .trusted <<<"$result")" >> "$GITHUB_OUTPUT"
           echo "failed_checks=$(jq -c .failed_checks <<<"$result")" >> "$GITHUB_OUTPUT"
           echo "repair_attempt=$(jq -r .repair_attempt <<<"$result")" >> "$GITHUB_OUTPUT"
@@ -414,6 +417,7 @@ jobs:
       needs.evaluate.result == 'success' &&
       needs.evaluate.outputs.pr != '' &&
       needs.evaluate.outputs.head_sha != '' &&
+      needs.evaluate.outputs.evaluated_head_sha == needs.evaluate.outputs.head_sha &&
       needs.evaluate.outputs.state != '' &&
       needs.evaluate.outputs.state != 'pending'
     runs-on: ubuntu-latest
@@ -429,6 +433,7 @@ jobs:
           PR: ${{ needs.evaluate.outputs.pr }}
           HEAD_SHA: ${{ needs.evaluate.outputs.head_sha }}
           STATE: ${{ needs.evaluate.outputs.state }}
+          REASON: ${{ needs.evaluate.outputs.reason }}
           REVIEW_PASSED: ${{ needs.review.outputs.passed }}
         run: |
           set -euo pipefail
@@ -440,11 +445,11 @@ jobs:
             -f name='PR automation / gate' -f head_sha="$HEAD_SHA" \
             -f status=completed -f conclusion="$conclusion" \
             -f "output[title]=PR automation: ${STATE}" \
-            -f "output[summary]=Run ${GITHUB_SERVER_URL}/${REPO}/actions/runs/${GITHUB_RUN_ID} evaluated ${HEAD_SHA}."
+            -f "output[summary]=${REASON}. Run ${GITHUB_SERVER_URL}/${REPO}/actions/runs/${GITHUB_RUN_ID} evaluated ${HEAD_SHA}."
           if [ "$conclusion" = success ]; then
             gh workflow run merge-train.yml --repo "$REPO" \
               --ref "${{ github.event.repository.default_branch }}" -f "pr=${PR}"
             exit 0
           fi
-          echo "PR is not ready: state=${STATE}, review_passed=${REVIEW_PASSED}"
+          echo "PR is not ready: state=${STATE}, reason=${REASON}, review_passed=${REVIEW_PASSED}"
           exit 1
