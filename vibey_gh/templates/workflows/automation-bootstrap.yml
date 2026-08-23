@@ -78,7 +78,9 @@ jobs:
             ([$checks[].name] | any(. == "Documentation contract")) and
             ([$checks[].name] | any(. == "Provenance")) and
             ([$checks[].name] | any(. == "Build")) and
-            ([$checks[].name] | any(. == "Lint"))
+            ([$checks[].name] | any(. == "Lint")) and
+            ([$checks[].name] | any(. == "Analyze Python")) and
+            ([$checks[].name] | any(. == "MCP, API, CLI, SDK, and webhook parity"))
           ' <<<"$checks" >/dev/null
 
           gh pr merge "$PR" --repo "$REPO" --squash --admin \
@@ -97,7 +99,7 @@ jobs:
             echo
             echo "- PR: #${PR}"
             echo "- Exact head: \`${EXPECTED_SHA}\`"
-            echo '- Independent CI, documentation, provenance, build, and lint gates: passed'
+            echo '- Independent CI, CodeQL, API drift, documentation, provenance, build, and lint gates: passed'
             echo '- Merge: explicitly authorized admin squash merge'
             echo '- Permanent branches: never deletion targets'
           } >> "$GITHUB_STEP_SUMMARY"

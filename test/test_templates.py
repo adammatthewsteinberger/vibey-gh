@@ -219,7 +219,14 @@ def test_automation_bootstrap_is_explicit_exact_head_and_permanent_branch_safe()
     assert 'test "$permission" = admin' in text
     assert 'test "$(jq -r .headRefOid' in text
     assert '--match-head-commit "$EXPECTED_SHA"' in text
-    for required in ("Documentation contract", "Provenance", "Build", "Lint"):
+    for required in (
+        "Documentation contract",
+        "Provenance",
+        "Build",
+        "Lint",
+        "Analyze Python",
+        "MCP, API, CLI, SDK, and webhook parity",
+    ):
         assert required in text
     assert '[ "$head" != "$INTEGRATION_BRANCH" ]' in text
     assert '[ "$head" != "$RELEASE_BRANCH" ]' in text
