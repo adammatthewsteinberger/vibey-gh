@@ -21,6 +21,7 @@ flowchart TB
     Config[Configuration and policy]
     Install[Installer and rendered templates]
     Fingerprints[Conventional Commits and Provenance]
+    Debugging["Debugging (opt-in, tamper-evident branch tracing)"]
     Documentation[Documentation contract]
     PRAutomation[PR Automation]
     MergeTrain[Merge train]
@@ -141,3 +142,5 @@ flowchart TB
   Fingerprints --> CI
   Documentation --> Docs
   Guard --> Fingerprints
+  CLI --> Debugging
+  Debugging --> Fingerprints

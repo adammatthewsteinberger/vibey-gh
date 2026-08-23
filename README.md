@@ -285,6 +285,11 @@ back to a CI invocation. It records control-flow metadata only—never locals, a
 return values, exception messages, environment values, or secrets. Set
 `VIBEY_GH_TRACE_ID` to propagate an existing correlation ID; otherwise a UUID is generated.
 
+`vibey-gh` itself only ever instruments its own installed package: `VIBEY_GH_DEBUG` traces
+`vibey_gh`'s internals, not a consuming project's source tree. Projects embedding
+`vibey_gh.debugging.enable(roots=(your_package_dir,))` directly get branch tracing scoped
+to their own code instead.
+
 ### Versions derived, not remembered
 
 ```bash

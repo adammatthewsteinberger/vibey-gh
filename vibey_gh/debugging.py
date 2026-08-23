@@ -32,6 +32,17 @@ def _is_branch(instruction: dis.Instruction) -> bool:
     return instruction.opcode in dis.hasjabs or instruction.opcode in dis.hasjrel
 
 
+def _unsupported_branch(instruction: dis.Instruction) -> bool:
+    """Return True when the tracer cannot faithfully classify this branch's outcome.
+
+    ``BranchTracer._resolve_pending`` decides "taken" vs. "fallthrough" by comparing
+    the actual successor offset against ``instruction.argval``, which dis populates
+    with the integer jump-target offset for every branch opcode it knows about. A
+    branch whose ``argval`` is not an int is one this tracer cannot classify.
+    """
+    return _is_branch(instruction) and not isinstance(instruction.argval, int)
+
+
 def _instructions(code: types.CodeType) -> dict[int, dis.Instruction]:
     return {instruction.offset: instruction for instruction in dis.get_instructions(code)}
 
@@ -57,9 +68,7 @@ def branch_logging_problems(paths: list[Path]) -> list[str]:
             continue
         for code in _code_objects(root):
             for instruction in dis.get_instructions(code):
-                if instruction.opcode in (*dis.hasjabs, *dis.hasjrel) and not _is_branch(
-                    instruction
-                ):
+                if _unsupported_branch(instruction):
                     problems.append(
                         f"{path}:{instruction.starts_line or code.co_firstlineno}: "
                         f"unsupported branch opcode {instruction.opname}"

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import dis
 import hashlib
 import io
 import json
@@ -29,7 +30,7 @@ def _records(stream: io.StringIO) -> list[dict]:
     return [json.loads(line) for line in stream.getvalue().splitlines()]
 
 
-def test_branch_validation_checks_every_python_code_object(tmp_path, monkeypatch):
+def test_branch_validation_checks_every_python_code_object(tmp_path):
     plain = tmp_path / "README.md"
     plain.write_text("not Python")
     valid = tmp_path / "valid.py"
@@ -41,9 +42,23 @@ def test_branch_validation_checks_every_python_code_object(tmp_path, monkeypatch
     assert len(problems) == 1
     assert "SyntaxError" in problems[0]
 
-    monkeypatch.setattr(debugging, "_is_branch", lambda instruction: False)
-    problems = debugging.branch_logging_problems([valid])
-    assert problems and "unsupported branch opcode" in problems[0]
+
+def test_branch_validation_flags_a_branch_the_tracer_cannot_classify(tmp_path):
+    valid = tmp_path / "valid.py"
+    valid.write_text("def choose(value):\n    return 1 if value else 0\n")
+    root = compile(valid.read_text(), str(valid), "exec")
+    branch = next(
+        instruction
+        for code in debugging._code_objects(root)
+        for instruction in dis.get_instructions(code)
+        if debugging._is_branch(instruction)
+    )
+    assert not debugging._unsupported_branch(branch)
+
+    # A branch opcode dis cannot resolve to an integer offset (e.g. a dynamic or
+    # computed target) is one this tracer's outcome classification cannot represent.
+    synthetic = branch._replace(argval="dynamic-target")
+    assert debugging._unsupported_branch(synthetic)
 
 
 def test_branch_trace_records_outcomes_and_a_verifiable_hash_chain(tmp_path):

@@ -106,3 +106,8 @@ Run `vibey-gh install`, review and commit generated assets, then run
 GitHub correlation is read from `GITHUB_RUN_ID`, `GITHUB_RUN_ATTEMPT`, and `GITHUB_SHA`.
 These controls affect diagnostics only; source validation always confirms that every
 configured Python control-flow opcode can be represented by the tracer.
+
+These environment variables only ever scope the tracer to `vibey_gh`'s own installed
+package directory; there is no CLI flag or environment variable to point it at a
+consuming project's source tree. A project embedding `vibey_gh.debugging` directly can
+call `enable(roots=(...))` with its own package directories to trace its own code instead.

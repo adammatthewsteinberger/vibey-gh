@@ -93,14 +93,22 @@ jobs:
           python - <<'PY'
           import glob
           import sys
+          import tomllib
           import zipfile
 
           # Read from the checked-out source tree rather than a hardcoded list, so a
           # template added later is asserted automatically instead of silently unchecked.
+          # The release theme assets don't exist at this path pre-build: hatch's
+          # force-include only maps them into the wheel at build time (pyproject.toml),
+          # so read their wheel destinations from that same table instead of globbing.
+          with open("pyproject.toml", "rb") as f:
+              force_include = tomllib.load(f)["tool"]["hatch"]["build"]["targets"]["wheel"][
+                  "force-include"
+              ]
           want = sorted(
               glob.glob("vibey_gh/templates/githooks/*")
               + glob.glob("vibey_gh/templates/workflows/*.yml")
-              + glob.glob("vibey_gh/templates/release/*")
+              + list(force_include.values())
           )
           names = set(zipfile.ZipFile(glob.glob("dist/*.whl")[0]).namelist())
           missing = [w for w in want if w not in names]
