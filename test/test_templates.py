@@ -178,6 +178,10 @@ def test_privileged_agent_cannot_mutate_git_or_execute_pr_code():
 
 def test_cancelled_or_pending_evaluations_cannot_publish_a_gate():
     text = (WORKFLOWS / "pr-automation.yml").read_text(encoding="utf-8")
+    assert "pull_request_target:" in text
+    assert "types: [opened, reopened, synchronize, ready_for_review]" in text
+    assert "github.event.pull_request.number" in text
+    assert "github.event.pull_request.head.sha" in text
     assert "always() && !cancelled()" in text
     assert "needs.evaluate.result == 'success'" in text
     assert "needs.evaluate.outputs.state != 'pending'" in text
