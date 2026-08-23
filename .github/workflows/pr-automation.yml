@@ -423,8 +423,10 @@ jobs:
             echo "No repair changes were produced"
             exit 0
           fi
+          git -C target config user.name 'vibey[bot]'
+          git -C target config user.email 'adam@matthewsteinberger.com'
           git -C target add -A
-          git -C target commit -m "Repair PR #${{ needs.evaluate.outputs.pr }} (attempt ${{ needs.evaluate.outputs.repair_attempt }})" \
+          git -C target commit -m "fix: repair PR #${{ needs.evaluate.outputs.pr }} (attempt ${{ needs.evaluate.outputs.repair_attempt }})" \
             -m "Made-With: Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), Developed by [Adam Matthew Steinberger](https://hire.adam.matthewsteinberger.com/) ([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/))."
           # A non-empty source makes this an update refspec. Never use a deletion
           # option or an empty-source ':branch' refspec here.
