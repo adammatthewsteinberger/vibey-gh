@@ -74,6 +74,24 @@ def test_release_surfaces_preserve_both_docs_channels_and_publish_oci_packages()
     assert "--delete" not in text
 
 
+def test_failed_permanent_branch_scans_use_a_guarded_repair_pr():
+    text = (WORKFLOWS / "release-repair.yml").read_text(encoding="utf-8")
+    assert (
+        'workflows: ["CI", "Provenance", "Release", "Release surfaces", "GitHub Release"]' in text
+    )
+    assert "github.event.workflow_run.conclusion == 'failure'" in text
+    assert '"$INTEGRATION_BRANCH"|"$RELEASE_BRANCH"' in text
+    assert "mcp__github_ci__download_job_log" in text
+    assert "Never execute package managers" in text
+    assert "Never lower coverage" in text
+    assert 'repair_branch="vibey-gh/repair/release-' in text
+    assert 'git -C target push origin "HEAD:refs/heads/${REPAIR_BRANCH}"' in text
+    assert 'gh pr create --repo "$REPO" --base "$BASE_BRANCH"' in text
+    assert "git push --delete" not in text
+    assert "git branch -D" not in text
+    assert "HEAD:refs/heads/${BASE_BRANCH}" not in text
+
+
 def test_repository_dogfoods_the_exact_rendered_workflows_and_hooks():
     root = Path(__file__).resolve().parent.parent
     ok, problems = installed(load_config(root), local=False)
