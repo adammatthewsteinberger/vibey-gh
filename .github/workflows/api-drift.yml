@@ -26,12 +26,22 @@ jobs:
           python - <<'PY'
           from vibey_gh.surfaces import CAPABILITIES, SURFACES, parity
 
-          expected = tuple(CAPABILITIES)
+          expected_capabilities = tuple(CAPABILITIES)
+          expected_surfaces = tuple(SURFACES)
           actual = parity()
-          if tuple(actual) != tuple(SURFACES):
-              raise SystemExit(f"surface registry drift: {tuple(actual)!r} != {tuple(SURFACES)!r}")
-          drift = {name: values for name, values in actual.items() if tuple(values) != expected}
+          if tuple(actual) != expected_capabilities:
+              raise SystemExit(
+                  f"capability registry drift: {tuple(actual)!r} != {expected_capabilities!r}"
+              )
+          drift = {
+              capability: surfaces
+              for capability, surfaces in actual.items()
+              if tuple(surfaces) != expected_surfaces
+          }
           if drift:
               raise SystemExit(f"capability parity drift: {drift!r}")
-          print(f"{len(expected)} capabilities are exposed through all {len(SURFACES)} surfaces")
+          print(
+              f"{len(expected_capabilities)} capabilities are exposed through "
+              f"all {len(expected_surfaces)} surfaces"
+          )
           PY

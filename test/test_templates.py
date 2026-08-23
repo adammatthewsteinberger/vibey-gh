@@ -149,6 +149,9 @@ def test_security_and_api_drift_workflows_are_real_managed_gates():
     assert "name: API drift (Cloud Agents OpenAPI)" in drift
     assert "MCP, API, CLI, SDK, and webhook parity" in drift
     assert "from vibey_gh.surfaces import CAPABILITIES, SURFACES, parity" in drift
+    assert "if tuple(actual) != expected_capabilities:" in drift
+    assert "if tuple(surfaces) != expected_surfaces" in drift
+    assert "if tuple(actual) != tuple(SURFACES):" not in drift
     assert "Do not spawn subagents" in text
     assert text.count("GH_REPO: ${{ github.repository }}") >= 2
     assert "isolated temporary" in text
