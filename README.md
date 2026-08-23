@@ -435,8 +435,11 @@ generate_llms_full_txt = true
 generate_json_ld = true
 ```
 
-Sanitized progress is the safe default. Raw Claude JSON is never emitted during ordinary
-PR or scan-triggered runs. A repository may opt into private diagnostics with
+Sanitized progress is the safe default. Claude's progress-comment mode is enabled only for
+the direct PR/issue events the action supports; `workflow_run`, `workflow_dispatch`, and
+`pull_request_target` retain safe phase-level job visibility without requesting that
+unsupported mode. Raw Claude JSON is never emitted during ordinary PR or scan-triggered
+runs. A repository may opt into private diagnostics with
 `allow_private_full_output = true`, then manually dispatch `PR automation` with
 `full_claude_output = true`. The workflow fails closed unless the event is manual and the
 repository visibility is private. Execution records remain 90-day artifacts when

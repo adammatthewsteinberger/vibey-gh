@@ -123,7 +123,12 @@ def test_rendered_workflow_uses_config_and_is_valid_yaml_shape(tmp_path):
     assert 'workflows: ["CI: strict", "Docs"]' in rendered
     assert "--model chosen-model" in rendered
     assert "schedule backstop disabled" in rendered
-    assert "track_progress: false" in rendered
+    assert "track_progress: ${{ false &&" in rendered
+    assert "github.event_name == 'pull_request'" in rendered
+    assert (
+        "github.event_name == 'workflow_dispatch'"
+        not in rendered.split("track_progress:", 1)[1].splitlines()[0]
+    )
     assert "&& true }}" in rendered
     assert "execution_file != '' && false" in rendered
     assert "__VIBEY_GH_" not in rendered

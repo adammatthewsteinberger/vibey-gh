@@ -39,6 +39,7 @@ flowchart TB
     EphemeralGit[Credential-free ephemeral Git context]
     CredentialHelper[Token-free action credential helper]
     SafeProgress[Sanitized Claude progress and restricted artifacts]
+    ProgressGuard[Supported-event progress guard]
     RawOutput[Manual private-only raw Claude diagnostics]
     Diagnostics[Bounded exact-head failed-check evidence]
     Guard[Exact SHA, branch, lease, and policy guards]
@@ -89,6 +90,7 @@ flowchart TB
   Trusted --> EphemeralGit
   EphemeralGit --> CredentialHelper
   Sandbox --> SafeProgress
+  ProgressGuard --> SafeProgress
   Guard --> RawOutput
   CI --> Diagnostics
   Diagnostics --> Sandbox

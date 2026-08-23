@@ -234,7 +234,7 @@ jobs:
           # A nonmatching sentinel activates the action's token-free credential-helper
           # path without authorizing any non-write actor.
           allowed_non_write_users: "__vibey_gh_no_nonwrite_users__"
-          track_progress: true
+          track_progress: ${{ true && (github.event_name == 'pull_request' || github.event_name == 'issues' || github.event_name == 'issue_comment' || github.event_name == 'pull_request_review_comment' || github.event_name == 'pull_request_review') }}
           show_full_output: ${{ inputs.full_claude_output && github.event_name == 'workflow_dispatch' && github.event.repository.visibility == 'private' && false }}
           additional_permissions: |
             actions: read
@@ -443,7 +443,7 @@ jobs:
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           allowed_non_write_users: "__vibey_gh_no_nonwrite_users__"
-          track_progress: true
+          track_progress: ${{ true && (github.event_name == 'pull_request' || github.event_name == 'issues' || github.event_name == 'issue_comment' || github.event_name == 'pull_request_review_comment' || github.event_name == 'pull_request_review') }}
           show_full_output: ${{ inputs.full_claude_output && github.event_name == 'workflow_dispatch' && github.event.repository.visibility == 'private' && false }}
           additional_permissions: |
             actions: read
@@ -609,7 +609,7 @@ jobs:
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           allowed_non_write_users: "__vibey_gh_no_nonwrite_users__"
-          track_progress: true
+          track_progress: ${{ true && (github.event_name == 'pull_request' || github.event_name == 'issues' || github.event_name == 'issue_comment' || github.event_name == 'pull_request_review_comment' || github.event_name == 'pull_request_review') }}
           show_full_output: ${{ inputs.full_claude_output && github.event_name == 'workflow_dispatch' && github.event.repository.visibility == 'private' && false }}
           plugin_marketplaces: |
             https://github.com/adammatthewsteinberger/vibey-skills.git
