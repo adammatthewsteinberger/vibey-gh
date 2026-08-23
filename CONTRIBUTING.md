@@ -15,7 +15,7 @@ uv run pytest
 uv run ruff check .
 uv run black --check .
 uv run isort --check-only .
-uv run mypy --strict vibey_gh
+uv run mypy vibey_gh
 uv run vibey-gh check --ci
 ```
 
