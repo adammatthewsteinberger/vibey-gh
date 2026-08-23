@@ -105,7 +105,7 @@ def advance_develop(work: Path, message: str = "new content") -> None:
 
 
 def test_identical_trees_promote_nothing(project, fake_gh):
-    result = promote_mod.promote(cfg_for(project))
+    result = promote_mod.promote(cfg_for(project), wait=True)
     assert result.pull_request is None
     assert "nothing to promote" in " ".join(result.notes)
     assert not calls(fake_gh)  # and it does not even talk to GitHub
@@ -119,7 +119,7 @@ def test_a_rewritten_history_with_the_same_tree_is_still_nothing(project, fake_g
     git(project, "fetch", "-q", "origin")
     assert git(project, "rev-parse", "origin/develop") != git(project, "rev-parse", "origin/main")
 
-    result = promote_mod.promote(cfg_for(project))
+    result = promote_mod.promote(cfg_for(project), wait=True)
     assert "nothing to promote" in " ".join(result.notes)
 
 
@@ -138,7 +138,7 @@ def test_a_content_change_bumps_opens_waits_and_merges(project, fake_gh):
         },
     )
 
-    result = promote_mod.promote(cfg_for(project))
+    result = promote_mod.promote(cfg_for(project), wait=True)
 
     assert result.bumped == "1.1.0"  # content changed -> minor
     assert result.version == "1.1.0"
@@ -160,7 +160,7 @@ def test_an_existing_pull_request_is_reused(project, fake_gh):
             "pr merge 7 --rebase": {},
         },
     )
-    result = promote_mod.promote(cfg_for(project))
+    result = promote_mod.promote(cfg_for(project), wait=True)
     assert result.pull_request == 7
     assert "reusing #7" in " ".join(result.notes)
     assert not [c for c in calls(fake_gh) if c.startswith("pr create")]
@@ -176,14 +176,14 @@ def test_a_ruleset_that_refuses_the_plain_merge_falls_back_to_admin(project, fak
             "pr merge 7 --rebase --admin": {},
         },
     )
-    result = promote_mod.promote(cfg_for(project))
+    result = promote_mod.promote(cfg_for(project), wait=True)
     assert result.merged is True and result.bypassed is True
 
 
 def test_a_merge_nothing_can_satisfy_leaves_the_pull_request_open(project, fake_gh):
     advance_develop(project)
     script(fake_gh, {"pr list": {"out": "7\n"}, "pr checks 7": {}})
-    result = promote_mod.promote(cfg_for(project))
+    result = promote_mod.promote(cfg_for(project), wait=True)
     assert result.merged is False
     assert "open and green for a human" in " ".join(result.notes)
 
@@ -200,18 +200,20 @@ def test_failing_checks_stop_the_merge(project, fake_gh):
             "pr checks 7": {"code": 1},
         },
     )
-    result = promote_mod.promote(cfg_for(project))
+    result = promote_mod.promote(cfg_for(project), wait=True)
     assert result.merged is False
     assert "checks did not pass" in " ".join(result.notes)
     assert not [c for c in calls(fake_gh) if c.startswith("pr merge")]
 
 
-def test_waiting_can_be_turned_off(project, fake_gh):
+def test_event_driven_mode_does_not_wait_or_merge(project, fake_gh):
     advance_develop(project)
     script(fake_gh, {"pr list": {"out": "7\n"}, "pr merge 7 --rebase": {}})
     result = promote_mod.promote(cfg_for(project), wait=False)
-    assert result.merged is True
+    assert result.merged is False
     assert not [c for c in calls(fake_gh) if c.startswith("pr checks")]
+    assert not [c for c in calls(fake_gh) if c.startswith("pr merge")]
+    assert "event-driven" in " ".join(result.notes)
 
 
 def test_a_bump_that_cannot_be_pushed_is_fatal(project, fake_gh):
@@ -257,7 +259,7 @@ def test_a_promotion_with_nothing_to_bump_still_proceeds(project, fake_gh):
     git(project, "fetch", "-q", "origin")
 
     script(fake_gh, {"pr list": {"out": "7\n"}, "pr checks 7": {}, "pr merge 7 --rebase": {}})
-    result = promote_mod.promote(cfg_for(project))
+    result = promote_mod.promote(cfg_for(project), wait=True)
 
     assert result.bumped is None
     assert result.merged is True

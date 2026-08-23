@@ -17,9 +17,10 @@ from __future__ import annotations
 import json
 import subprocess
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from vibey_gh.config import GhConfig, normalise_actor
+from vibey_gh.pr_automation import BLOCKED_LABEL, EXHAUSTED_LABEL, EXTERNAL_REPAIR_LABEL
 
 NEEDS_REVIEW_LABEL = "needs-human-review"
 # The phrase the owner-notification comment is recognised by. Matching on our own text is
@@ -105,6 +106,10 @@ def judge(pr: dict, cfg: GhConfig) -> Verdict:
     author = (pr.get("author") or {}).get("login", "")
     rollup = pr.get("statusCheckRollup") or []
     review = pr.get("reviewDecision") or ""
+    labels = {
+        label.get("name", "") if isinstance(label, dict) else str(label)
+        for label in pr.get("labels") or []
+    }
 
     pending = [c for c in rollup if c.get("status") not in (None, "COMPLETED")]
     failing = [
@@ -117,6 +122,10 @@ def judge(pr: dict, cfg: GhConfig) -> Verdict:
         reason = "draft"
     elif pr.get("mergeable") == "CONFLICTING":
         reason = f"conflicts with {cfg.integration_branch}"
+    elif pr.get("mergeStateStatus") == "BEHIND":
+        reason = "head branch is behind its target"
+    elif labels & {BLOCKED_LABEL, EXHAUSTED_LABEL}:
+        reason = "PR automation requires operator action"
     elif review == "CHANGES_REQUESTED":
         reason = "changes requested"
     elif pending:
@@ -125,7 +134,18 @@ def judge(pr: dict, cfg: GhConfig) -> Verdict:
         reason = f"{len(failing)} check(s) failing"
     else:
         trusted = {normalise_actor(a) for a in cfg.trusted_authors}
-        if normalise_actor(author) not in trusted and review != "APPROVED":
+        if cfg.owner:
+            trusted.add(normalise_actor(cfg.owner))
+        automation_passed = any(
+            c.get("name") == "PR automation / gate"
+            and c.get("status") == "COMPLETED"
+            and c.get("conclusion") == "SUCCESS"
+            for c in rollup
+        )
+        untrusted = normalise_actor(author) not in trusted or EXTERNAL_REPAIR_LABEL in labels
+        if untrusted and cfg.pr_automation.enabled and not automation_passed:
+            reason = "automated outside-author review has not passed"
+        elif untrusted and not cfg.pr_automation.enabled and review != "APPROVED":
             owner = cfg.owner or "the code owner"
             reason = f"from @{author} and not approved — needs {owner}'s review"
             held = True
@@ -133,7 +153,19 @@ def judge(pr: dict, cfg: GhConfig) -> Verdict:
     return Verdict(pr["number"], pr.get("title", ""), author, reason, held_for_review=held)
 
 
-def open_pull_requests(cfg: GhConfig) -> list[dict]:
+_PR_FIELDS = (
+    "number,title,state,isDraft,mergeable,mergeStateStatus,reviewDecision,"
+    "statusCheckRollup,author,labels,headRefOid,baseRefName"
+)
+
+
+def pull_request(number: int) -> dict:
+    return cast(dict, _gh_json("pr", "view", str(number), "--json", _PR_FIELDS))
+
+
+def open_pull_requests(cfg: GhConfig, number: int | None = None) -> list[dict]:
+    if number is not None:
+        return [pull_request(number)]
     numbers = _gh_json(
         "pr",
         "list",
@@ -154,10 +186,14 @@ def open_pull_requests(cfg: GhConfig) -> list[dict]:
                 "view",
                 str(entry["number"]),
                 "--json",
-                "number,title,isDraft,mergeable,reviewDecision," "statusCheckRollup,author",
+                _PR_FIELDS,
             )
         )
     return out
+
+
+def method_for(pr: dict, cfg: GhConfig, default: str = "squash") -> str:
+    return "rebase" if pr.get("baseRefName") == cfg.release_branch else default
 
 
 def merge(number: int, method: str = "squash") -> tuple[bool, bool]:
@@ -165,7 +201,10 @@ def merge(number: int, method: str = "squash") -> tuple[bool, bool]:
     approving-review requirement is unmet — even for an admin's token, because bypassing
     is opt-in per call — so fall back to --admin, which succeeds only if the token really
     carries the admin role."""
-    base = ["gh", "pr", "merge", str(number), f"--{method}", "--delete-branch"]
+    # Never ask GitHub to delete the head branch. In particular, the promotion PR's head
+    # is `develop`; deleting it after a develop -> main merge would destroy a permanent
+    # branch even though the merge itself was correct.
+    base = ["gh", "pr", "merge", str(number), f"--{method}"]
     if subprocess.run(base, capture_output=True, text=True, check=False).returncode == 0:
         return True, False
     return (

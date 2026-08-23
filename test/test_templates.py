@@ -8,12 +8,14 @@ miserable thing to debug from the other end. Cheaper to catch here.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
 import yaml
 
-from vibey_gh.install import TEMPLATES, WORKFLOWS
+from vibey_gh.config import load_config
+from vibey_gh.install import TEMPLATES, WORKFLOWS, installed
 
 WORKFLOW_TEMPLATES = sorted(WORKFLOWS.glob("*.yml"))
 REPO_WORKFLOWS = sorted(
@@ -34,6 +36,35 @@ def test_this_repository_s_own_workflows_parse(path):
     parsed = yaml.safe_load(path.read_text(encoding="utf-8"))
     assert isinstance(parsed, dict)
     assert parsed.get("jobs")
+
+
+def test_repository_dogfoods_the_exact_rendered_workflows_and_hooks():
+    root = Path(__file__).resolve().parent.parent
+    ok, problems = installed(load_config(root), local=False)
+    assert ok, problems
+
+
+def test_managed_automation_can_update_but_never_delete_develop_or_main():
+    text = "\n".join(path.read_text(encoding="utf-8") for path in WORKFLOW_TEMPLATES)
+    assert "HEAD:refs/heads/${HEAD_REF}" in text
+    assert "--delete-branch" not in text
+    assert "git push --delete" not in text
+    assert "git branch -D" not in text
+    assert "DELETE /git/refs" not in text
+
+
+def test_every_managed_third_party_action_is_immutably_pinned():
+    for path in [*WORKFLOW_TEMPLATES, *REPO_WORKFLOWS]:
+        for action, revision in re.findall(r"uses:\s+([^@\s]+)@([^\s#]+)", path.read_text()):
+            assert re.fullmatch(r"[0-9a-f]{40}", revision), f"{path.name}: {action}@{revision}"
+
+
+def test_privileged_agent_cannot_mutate_git_or_execute_pr_code():
+    text = (WORKFLOWS / "pr-automation.yml").read_text(encoding="utf-8")
+    assert "Bash(git:" not in text
+    assert "Never execute package\n" in text
+    assert "python -m pip install --quiet ./target" not in text
+    assert "run: ./target" not in text
 
 
 @pytest.mark.parametrize("name", ["pre-push", "commit-msg"])

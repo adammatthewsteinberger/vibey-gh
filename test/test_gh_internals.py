@@ -16,8 +16,9 @@ from pathlib import Path
 
 import pytest
 
+import vibey_gh.pr_automation as pa
 from vibey_gh import fingerprints, install, merge_train, realign, versioning
-from vibey_gh.config import GhConfig
+from vibey_gh.config import GhConfig, PrAutomationConfig
 
 
 def git(cwd: Path, *a: str) -> str:
@@ -230,10 +231,12 @@ def test_open_pull_requests_lists_then_views_each_one(fake_gh):
         fake_gh,
         {
             listing: {"out": json.dumps([{"number": 4}, {"number": 7}])},
-            "pr view 4 --json number,title,isDraft,mergeable,reviewDecision,"
-            "statusCheckRollup,author": {"out": json.dumps({"number": 4, "title": "four"})},
-            "pr view 7 --json number,title,isDraft,mergeable,reviewDecision,"
-            "statusCheckRollup,author": {"out": json.dumps({"number": 7, "title": "seven"})},
+            f"pr view 4 --json {merge_train._PR_FIELDS}": {
+                "out": json.dumps({"number": 4, "title": "four"})
+            },
+            f"pr view 7 --json {merge_train._PR_FIELDS}": {
+                "out": json.dumps({"number": 7, "title": "seven"})
+            },
         },
     )
     assert [pr["title"] for pr in merge_train.open_pull_requests(cfg)] == ["four", "seven"]
@@ -256,13 +259,13 @@ def test_a_failing_gh_call_raises_with_its_stderr(fake_gh):
 
 
 def test_merge_prefers_a_plain_merge(fake_gh):
-    script(fake_gh, {"pr merge 5 --squash --delete-branch": {"code": 0}})
+    script(fake_gh, {"pr merge 5 --squash": {"code": 0}})
     assert merge_train.merge(5) == (True, False)
-    assert calls(fake_gh) == ["pr merge 5 --squash --delete-branch"]
+    assert calls(fake_gh) == ["pr merge 5 --squash"]
 
 
 def test_merge_falls_back_to_admin_and_reports_the_bypass(fake_gh):
-    script(fake_gh, {"pr merge 5 --rebase --delete-branch --admin": {"code": 0}})
+    script(fake_gh, {"pr merge 5 --rebase --admin": {"code": 0}})
     assert merge_train.merge(5, "rebase") == (True, True)
     assert calls(fake_gh)[-1].endswith("--admin")
 
@@ -580,9 +583,49 @@ def test_a_gh_that_cannot_read_the_comments_still_notifies(fake_gh):
 
 
 def test_the_trust_gate_marks_the_verdict_as_held():
-    cfg = GhConfig(root=Path.cwd(), owner="theowner", trusted_authors=("theowner",))
+    cfg = GhConfig(
+        root=Path.cwd(),
+        owner="theowner",
+        trusted_authors=("theowner",),
+        pr_automation=PrAutomationConfig(enabled=False),
+    )
     outside = merge_train.judge({"number": 7, "title": "t", "author": {"login": "outsider"}}, cfg)
     assert outside.held_for_review is True
+
+
+def test_event_driven_merge_guards_and_single_pr_lookup(monkeypatch):
+    cfg = GhConfig(root=Path.cwd(), owner="owner", trusted_authors=("owner",))
+    unreviewed = merge_train.judge(
+        {"number": 1, "title": "t", "author": {"login": "outsider"}}, cfg
+    )
+    assert "automated outside-author review" in unreviewed.reason
+    behind = merge_train.judge(
+        {"number": 1, "title": "t", "author": {"login": "owner"}, "mergeStateStatus": "BEHIND"},
+        cfg,
+    )
+    assert "behind" in behind.reason
+    blocked = merge_train.judge(
+        {"number": 1, "title": "t", "author": {"login": "owner"}, "labels": [pa.BLOCKED_LABEL]},
+        cfg,
+    )
+    assert "operator" in blocked.reason
+    outsider = merge_train.judge(
+        {
+            "number": 1,
+            "title": "t",
+            "author": {"login": "outsider"},
+            "statusCheckRollup": [
+                {"name": "PR automation / gate", "status": "COMPLETED", "conclusion": "SUCCESS"}
+            ],
+        },
+        cfg,
+    )
+    assert outsider.ready
+    monkeypatch.setattr(merge_train, "_gh_json", lambda *a: {"number": 9})
+    assert merge_train.pull_request(9) == {"number": 9}
+    assert merge_train.open_pull_requests(cfg, 9) == [{"number": 9}]
+    assert merge_train.method_for({"baseRefName": "main"}, cfg, "squash") == "rebase"
+    assert merge_train.method_for({"baseRefName": "develop"}, cfg, "merge") == "merge"
 
     draft = merge_train.judge(
         {"number": 8, "title": "t", "isDraft": True, "author": {"login": "outsider"}}, cfg
