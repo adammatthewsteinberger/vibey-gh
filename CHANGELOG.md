@@ -15,6 +15,8 @@ This file follows Keep a Changelog and semantic versioning conventions.
   untrusted pull-request checkouts isolated from repository credentials.
 - Add configurable sanitized Claude progress, restricted execution artifacts, and a
   fail-closed manual raw-output diagnostic restricted to private repositories.
+- Keep promotion PR checks non-destructive: skip topic-history normalization for
+  permanent branches and verify repository provenance without re-auditing admitted history.
 
 ## Historical releases
 

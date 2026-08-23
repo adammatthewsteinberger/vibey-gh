@@ -304,10 +304,21 @@ def test_conventional_commits_self_heal_only_guarded_topic_history():
     assert '--force-with-lease="refs/heads/${HEAD_REF}:${HEAD_SHA}"' in text
     assert '"$INTEGRATION_BRANCH"|"$RELEASE_BRANCH"|develop|main' in text
     assert "permanent branch history is never rewritten" in text
+    assert "github.event.pull_request.head.ref != '__VIBEY_GH_INTEGRATION_BRANCH__'" in text
+    assert "github.event.pull_request.head.ref != '__VIBEY_GH_RELEASE_BRANCH__'" in text
     assert "Refusing automatic rewrite of merge commits" in text
     assert "./target" not in text
     assert "git push --delete" not in text
     assert "--delete-branch" not in text
+
+
+def test_promotion_checks_provenance_without_rewriting_or_reauditing_history():
+    text = (WORKFLOWS / "provenance.yml").read_text(encoding="utf-8")
+    assert 'if [ "$HEAD_REF" = "$INTEGRATION_BRANCH" ]' in text
+    assert '[ "$BASE_REF" = "$RELEASE_BRANCH" ]' in text
+    assert "Promotion PR: checking repository provenance" in text
+    assert "vibey-gh check --ci" in text
+    assert 'vibey-gh check --ci --commits "${BASE_SHA}..HEAD"' in text
 
 
 def test_every_managed_third_party_action_is_immutably_pinned():

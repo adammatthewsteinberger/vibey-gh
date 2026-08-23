@@ -57,9 +57,17 @@ jobs:
       - name: Check provenance
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          INTEGRATION_BRANCH: __VIBEY_GH_INTEGRATION_BRANCH__
+          RELEASE_BRANCH: __VIBEY_GH_RELEASE_BRANCH__
         run: |
           set -euo pipefail
-          if [ -n "${BASE_SHA:-}" ]; then
+          if [ "$HEAD_REF" = "$INTEGRATION_BRANCH" ] && \
+             [ "$BASE_REF" = "$RELEASE_BRANCH" ]; then
+            echo "Promotion PR: checking repository provenance without rewriting or re-auditing admitted history."
+            vibey-gh check --ci
+          elif [ -n "${BASE_SHA:-}" ]; then
             git fetch --quiet --depth=50 origin "${BASE_SHA}" 2>/dev/null || true
             vibey-gh check --ci --commits "${BASE_SHA}..HEAD"
           else
