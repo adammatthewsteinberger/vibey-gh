@@ -60,11 +60,14 @@ def test_an_outdated_vibey_hook_is_replaced_not_chained(repo):
     hook = repo / install.HOOKS_DIR / "pre-push"
     hook.write_text(hook.read_text() + "\n# stale vibey-gh copy\n")
     (repo / install.WORKFLOWS_DIR / "provenance.yml").write_text("stale\n")
+    release_asset = repo / install.RELEASE_ASSETS_DIR / "vibey.css"
+    release_asset.write_text("stale\n")
 
     ok, problems = install.installed(cfg)
     assert not ok
     assert any("pre-push is out of date" in p for p in problems)
     assert any("provenance.yml is out of date" in p for p in problems)
+    assert any("vibey.css is out of date" in p for p in problems)
 
     assert outcomes(install.install(cfg))["pre-push"] == "updated"
     assert not (repo / install.HOOKS_DIR / "pre-push.local").exists()
@@ -101,6 +104,19 @@ def test_install_can_leave_core_hookspath_alone(repo):
         check=False,
     )
     assert got.stdout.strip() == ""
+
+
+def test_release_assets_are_found_inside_an_installed_wheel(repo, tmp_path, monkeypatch):
+    packaged = tmp_path / "installed-package" / "templates" / "release"
+    packaged.mkdir(parents=True)
+    (packaged / "vibey.css").write_text("theme")
+    (packaged / "channel.js").write_text("provenance")
+    monkeypatch.setattr(install, "PACKAGED_RELEASE_ASSETS", packaged)
+
+    assert install._release_assets(GhConfig(root=repo)) == [
+        (packaged / "vibey.css", "vibey.css"),
+        (packaged / "channel.js", "channel.js"),
+    ]
 
 
 # ---------------------------------------------------------------- fingerprints

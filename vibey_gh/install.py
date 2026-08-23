@@ -20,7 +20,10 @@ from vibey_gh.config import GhConfig, load_config
 
 TEMPLATES = Path(__file__).parent / "templates" / "githooks"
 WORKFLOWS = Path(__file__).parent / "templates" / "workflows"
+PACKAGED_RELEASE_ASSETS = Path(__file__).parent / "templates" / "release"
+SOURCE_RELEASE_ASSETS = Path(__file__).parent.parent / "docs"
 WORKFLOWS_DIR = ".github/workflows"
+RELEASE_ASSETS_DIR = ".github/vibey-gh/release"
 HOOKS = ("commit-msg", "pre-push")
 HOOKS_DIR = ".githooks"
 
@@ -48,6 +51,26 @@ def _managed_workflows(cfg: GhConfig) -> list[Path]:
         return every
     wanted = set(cfg.managed_workflows)
     return [p for p in every if p.name in wanted]
+
+
+def _release_assets(cfg: GhConfig) -> list[tuple[Path, str]]:
+    """Theme files installed only with the release-surfaces workflow.
+
+    Source checkouts use ``docs`` directly; wheels force-include the same bytes beside
+    the workflow templates. This keeps one authored copy while making installed projects
+    self-contained and independent of the vibey-gh repository.
+    """
+    if not any(path.name == "release-surfaces.yml" for path in _managed_workflows(cfg)):
+        return []
+    if PACKAGED_RELEASE_ASSETS.is_dir():
+        return [
+            (PACKAGED_RELEASE_ASSETS / "vibey.css", "vibey.css"),
+            (PACKAGED_RELEASE_ASSETS / "channel.js", "channel.js"),
+        ]
+    return [
+        (SOURCE_RELEASE_ASSETS / "stylesheets" / "vibey.css", "vibey.css"),
+        (SOURCE_RELEASE_ASSETS / "javascripts" / "channel.js", "channel.js"),
+    ]
 
 
 def render_workflow(source: Path, cfg: GhConfig) -> str:
@@ -136,6 +159,18 @@ def install(cfg: GhConfig | None = None, hooks_path: bool = True) -> list[Action
         dest.write_text(wanted, encoding="utf-8")
         actions.append(Action(f"{WORKFLOWS_DIR}/{source.name}", outcome))
 
+    asset_target = cfg.root / RELEASE_ASSETS_DIR
+    for source, name in _release_assets(cfg):
+        asset_target.mkdir(parents=True, exist_ok=True)
+        dest = asset_target / name
+        wanted = source.read_text(encoding="utf-8")
+        if dest.exists() and dest.read_text(encoding="utf-8") == wanted:
+            actions.append(Action(f"{RELEASE_ASSETS_DIR}/{name}", "unchanged"))
+            continue
+        outcome = "updated" if dest.exists() else "installed"
+        dest.write_text(wanted, encoding="utf-8")
+        actions.append(Action(f"{RELEASE_ASSETS_DIR}/{name}", outcome))
+
     if hooks_path:
         subprocess.run(
             ["git", "config", "core.hooksPath", HOOKS_DIR],
@@ -171,6 +206,13 @@ def installed(cfg: GhConfig | None = None, local: bool = True) -> tuple[bool, li
             problems.append(f"{WORKFLOWS_DIR}/{source.name} is missing")
         elif dest.read_text(encoding="utf-8") != render_workflow(source, cfg):
             problems.append(f"{WORKFLOWS_DIR}/{source.name} is out of date")
+
+    for source, name in _release_assets(cfg):
+        dest = cfg.root / RELEASE_ASSETS_DIR / name
+        if not dest.exists():
+            problems.append(f"{RELEASE_ASSETS_DIR}/{name} is missing")
+        elif dest.read_text(encoding="utf-8") != source.read_text(encoding="utf-8"):
+            problems.append(f"{RELEASE_ASSETS_DIR}/{name} is out of date")
 
     if local:
         import subprocess
