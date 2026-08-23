@@ -39,7 +39,10 @@ def _check(args) -> int:
     for path in report.missing_header:
         print(f"  {path.relative_to(cfg.root)}: missing the fingerprint header", file=sys.stderr)
     for path in report.duplicate_header:
-        print(f"  {path.relative_to(cfg.root)}: fingerprint header appears more than once", file=sys.stderr)
+        print(
+            f"  {path.relative_to(cfg.root)}: fingerprint header appears more than once",
+            file=sys.stderr,
+        )
     for commit in report.missing_trailer:
         print(f"  commit {commit}: missing the `{cfg.trailer_key}:` trailer", file=sys.stderr)
     for commit in report.invalid_subject:

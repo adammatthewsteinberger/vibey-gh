@@ -116,6 +116,15 @@ def test_duplicate_header_is_detected_and_deduped(repo):
     assert fingerprints.check(cfg).ok
 
 
+def test_has_header_reports_presence(repo):
+    cfg = cfg_for(repo)
+    target = repo / "src" / "__init__.py"
+    assert not fingerprints.has_header(target.read_text(), cfg)
+
+    fingerprints.check(cfg, apply=True)
+    assert fingerprints.has_header(target.read_text(), cfg)
+
+
 def test_header_goes_after_a_shebang(repo):
     cfg = cfg_for(repo)
     target = repo / "src" / "__init__.py"

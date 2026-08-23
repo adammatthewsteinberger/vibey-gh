@@ -16,6 +16,7 @@ import pytest
 from vibey_gh import github_release, merge_train, pr_automation
 from vibey_gh import realign as realign_mod
 from vibey_gh.cli import main
+from vibey_gh.config import load_config
 from vibey_gh.merge_train import Verdict
 
 
@@ -68,6 +69,14 @@ def test_check_reports_missing_documentation(repo, capsys):
     config.write_text(config.read_text().replace("enabled = false", "enabled = true"))
     assert main(["check", "--ci"]) == 1
     assert "documentation:" in capsys.readouterr().err
+
+
+def test_check_reports_a_duplicate_header(repo, capsys):
+    cfg = load_config(repo)
+    target = repo / "src" / "__init__.py"
+    target.write_text(f"{cfg.header}\n{cfg.header}\n" + target.read_text())
+    assert main(["check", "--ci"]) == 1
+    assert "more than once" in capsys.readouterr().err
 
 
 def test_check_reports_a_missing_commit_trailer(repo, capsys):
