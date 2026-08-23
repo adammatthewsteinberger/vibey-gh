@@ -7,6 +7,12 @@ GitHub Pages via Actions, Packages, Releases, and Deployments. Use workflow disp
 recovery. Inspect exact run and head SHA before retrying. Never solve a blocked release by
 deleting, force-pushing, weakening a gate, or switching production to TestPyPI.
 
+When a bug in privileged workflow code itself blocks a repair PR from repairing its own
+gate, dispatch `Automation bootstrap` (see [Workflows](workflows.md)) with the exact PR
+number, exact head SHA, and explicit authorization. It requires administrator permission
+and every independent gate already passing on that SHA, and it is the only path that
+squash-merges to `develop` without an ordinary PR automation review.
+
 When Conventional Commits rewrites a topic branch, synchronize the local checkout before
 new work. Preserve unpushed work first, then use `git fetch origin` and rebase it onto the
 new remote head; if there is no unpushed work, reset the local topic branch to its explicit
