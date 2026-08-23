@@ -153,7 +153,9 @@ def evaluate(
     if pr.get("state", "OPEN") != "OPEN":
         return result("blocked", "pull request is not open")
     if pr.get("isDraft"):
-        return result("blocked", "pull request is a draft")
+        # Draft intake is intentionally nonterminal. `ready_draft` promotes the exact
+        # head once its scans are stable; until then no failing gate may be published.
+        return result("pending", "pull request is a draft awaiting a stable head")
     state = stored
     if state is None or state.current_sha != head:
         state = AutomationState(lineage_sha=head, current_sha=head)

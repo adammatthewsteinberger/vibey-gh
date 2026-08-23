@@ -308,6 +308,13 @@ def test_cancelled_or_pending_evaluations_cannot_publish_a_gate():
     assert "github.event.workflow_run.pull_requests[0].number" in text
 
 
+def test_draft_evaluation_is_nonterminal_until_ready_draft_promotes_it():
+    source = (Path(__file__).resolve().parent.parent / "vibey_gh/pr_automation.py").read_text(
+        encoding="utf-8"
+    )
+    assert 'return result("pending", "pull request is a draft awaiting a stable head")' in source
+
+
 def test_new_branch_intake_is_draft_idempotent_and_excludes_permanent_branches():
     text = (WORKFLOWS / "branch-intake.yml").read_text(encoding="utf-8")
     assert "github.event.created == true" not in text

@@ -132,7 +132,7 @@ def test_installation_notices_report_missing_secrets(monkeypatch):
     [
         ({"headRefOid": "new"}, "blocked", "stale event"),
         ({"state": "CLOSED"}, "blocked", "not open"),
-        ({"isDraft": True}, "blocked", "draft"),
+        ({"isDraft": True}, "pending", "draft awaiting a stable head"),
         ({"mergeable": "CONFLICTING"}, "conflict", "conflicts"),
         ({"reviewDecision": "CHANGES_REQUESTED"}, "blocked", "requested changes"),
         ({"labels": [pa.BLOCKED_LABEL]}, "blocked", "operator"),
