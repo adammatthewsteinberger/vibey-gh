@@ -38,6 +38,23 @@ def test_this_repository_s_own_workflows_parse(path):
     assert parsed.get("jobs")
 
 
+def test_release_environments_are_disjoint_by_branch():
+    """main must never request TestPyPI, whose environment permits only develop."""
+    release = yaml.safe_load(
+        (Path(__file__).resolve().parent.parent / ".github/workflows/release.yml").read_text(
+            encoding="utf-8"
+        )
+    )
+    jobs = release["jobs"]
+    assert jobs["testpypi"]["if"] == "github.ref == 'refs/heads/develop'"
+    assert jobs["testpypi"]["environment"] == "testpypi"
+    assert jobs["testpypi"]["needs"] == "build"
+    assert jobs["pypi"]["if"] == "github.ref == 'refs/heads/main'"
+    assert jobs["pypi"]["environment"] == "pypi"
+    assert jobs["pypi"]["needs"] == "build"
+    assert "verify" not in jobs
+
+
 def test_repository_dogfoods_the_exact_rendered_workflows_and_hooks():
     root = Path(__file__).resolve().parent.parent
     ok, problems = installed(load_config(root), local=False)
