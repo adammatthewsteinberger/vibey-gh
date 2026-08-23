@@ -105,6 +105,12 @@ def test_rendered_workflow_uses_config_and_is_valid_yaml_shape(tmp_path):
     assert "schedule backstop disabled" in rendered
     assert "__VIBEY_GH_" not in rendered
 
+    intake = source.with_name("branch-intake.yml")
+    rendered_intake = render_workflow(intake, cfg(tmp_path))
+    assert "- develop" in rendered_intake
+    assert "- main" in rendered_intake
+    assert "__VIBEY_GH_" not in rendered_intake
+
 
 def test_installation_notices_report_missing_secrets(monkeypatch):
     monkeypatch.setattr(
@@ -273,6 +279,49 @@ def test_fetch_evaluate_record_and_labels(monkeypatch, tmp_path):
     monkeypatch.setattr(subprocess, "run", lambda args, **kw: calls.append(args) or completed())
     pa.ensure_labels()
     assert len(calls) == 4 and all(call[:3] == ["gh", "label", "create"] for call in calls)
+
+
+@pytest.mark.parametrize(
+    "changes,reason",
+    [
+        ({"headRefOid": "new"}, "stale head"),
+        ({"state": "CLOSED", "isDraft": True}, "not an open draft"),
+        ({"isDraft": False}, "not an open draft"),
+        ({"isDraft": True, "isCrossRepository": True}, "fork drafts"),
+        ({"isDraft": True}, "no current-head"),
+    ],
+)
+def test_ready_draft_unstable_states_are_noops(monkeypatch, tmp_path, changes, reason):
+    monkeypatch.setattr(pa, "fetch_pr", lambda number: pr(**changes))
+    result = pa.ready_draft(12, "abc", cfg(tmp_path))
+    assert result["promoted"] is False
+    assert reason in result["reason"]
+
+
+@pytest.mark.parametrize("author", ("owner", "outsider"))
+def test_ready_draft_promotes_green_trusted_or_reviewable_head(monkeypatch, tmp_path, author):
+    draft = pr(
+        isDraft=True,
+        isCrossRepository=False,
+        author={"login": author},
+        statusCheckRollup=[check()],
+    )
+    monkeypatch.setattr(pa, "fetch_pr", lambda number: draft)
+    calls = []
+    monkeypatch.setattr(subprocess, "run", lambda args, **kwargs: calls.append(args) or completed())
+    assert pa.ready_draft(12, "abc", cfg(tmp_path))["promoted"] is True
+    assert calls == [["gh", "pr", "ready", "12"]]
+
+
+def test_ready_draft_reports_github_failure(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        pa,
+        "fetch_pr",
+        lambda number: pr(isDraft=True, isCrossRepository=False, statusCheckRollup=[check()]),
+    )
+    monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: completed(1, err="denied"))
+    with pytest.raises(RuntimeError, match="could not mark PR ready"):
+        pa.ready_draft(12, "abc", cfg(tmp_path))
 
 
 def test_mirror_fork_success_and_failures(monkeypatch, tmp_path):

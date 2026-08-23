@@ -243,7 +243,7 @@ def fetch_pr(number: int) -> dict[str, Any]:
             "--json",
             "number,title,state,isDraft,mergeable,mergeStateStatus,reviewDecision,"
             "statusCheckRollup,author,labels,comments,headRefOid,headRefName,headRepository,"
-            "headRepositoryOwner,baseRefName,body",
+            "headRepositoryOwner,isCrossRepository,baseRefName,body",
         ),
     )
 
@@ -251,6 +251,35 @@ def fetch_pr(number: int) -> dict[str, Any]:
 def evaluate_pr(number: int, head_sha: str, cfg: GhConfig) -> Evaluation:
     pr = fetch_pr(number)
     return evaluate(pr, cfg, expected_sha=head_sha, stored=parse_state(pr.get("comments") or []))
+
+
+def ready_draft(number: int, head_sha: str, cfg: GhConfig) -> dict[str, Any]:
+    """Promote one exact, green draft head; every unstable condition is a no-op."""
+    pr = fetch_pr(number)
+    if str(pr.get("headRefOid") or "") != head_sha:
+        return {"promoted": False, "reason": "stale head"}
+    if pr.get("state", "OPEN") != "OPEN" or not pr.get("isDraft"):
+        return {"promoted": False, "reason": "not an open draft"}
+    if pr.get("isCrossRepository"):
+        return {"promoted": False, "reason": "fork drafts are not mutated"}
+
+    candidate = dict(pr)
+    candidate["isDraft"] = False
+    decision = evaluate(
+        candidate,
+        cfg,
+        expected_sha=head_sha,
+        stored=parse_state(pr.get("comments") or []),
+    )
+    if decision.state not in {"ready", "review"}:
+        return {"promoted": False, "reason": decision.reason}
+
+    run = subprocess.run(
+        ["gh", "pr", "ready", str(number)], capture_output=True, text=True, check=False
+    )
+    if run.returncode:
+        raise RuntimeError(f"could not mark PR ready: {run.stderr.strip()}")
+    return {"promoted": True, "reason": "current head is stable"}
 
 
 def updated_state(
