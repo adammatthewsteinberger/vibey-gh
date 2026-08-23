@@ -228,6 +228,37 @@ def test_automation_bootstrap_is_explicit_exact_head_and_permanent_branch_safe()
     assert "--delete-branch" not in text
 
 
+def test_automation_bootstrap_scope_check_rejects_files_outside_automation_core():
+    import subprocess
+
+    text = (WORKFLOWS / "automation-bootstrap.yml").read_text(encoding="utf-8")
+    match = re.search(
+        r"if grep -Ev '([^']+)' changed-files\.txt; then\n"
+        r"\s*echo \"::error::changed files are not confined to automation-core paths\" >&2\n"
+        r"\s*exit 1\n"
+        r"\s*fi",
+        text,
+    )
+    assert match, "expected a fail-closed scope check in automation-bootstrap.yml"
+    pattern = match.group(1)
+
+    in_scope_only = "vibey_gh/templates/workflows/automation-bootstrap.yml\ntest/test_templates.py\n"
+    mixed_scope = in_scope_only + "vibey_gh/versioning.py\n"
+
+    def confinement_check_passes(changed_files: str) -> bool:
+        # Mirrors the workflow's own gate: `if grep -Ev ...; then <fail>; fi` fails the
+        # step when grep finds an out-of-scope line (exit 0), and passes when grep finds
+        # none (exit 1, no matches).
+        script = f"grep -Ev '{pattern}' <<'EOF'\n{changed_files}EOF\n"
+        result = subprocess.run(
+            ["sh", "-c", script], capture_output=True, text=True, check=False
+        )
+        return result.returncode != 0
+
+    assert confinement_check_passes(in_scope_only)
+    assert not confinement_check_passes(mixed_scope)
+
+
 def test_properdocs_theme_is_channel_aware_and_accessible():
     root = Path(__file__).resolve().parent.parent
     config = (root / "properdocs.yml").read_text(encoding="utf-8")
