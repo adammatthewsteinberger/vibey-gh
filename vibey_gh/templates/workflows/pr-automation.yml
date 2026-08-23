@@ -406,7 +406,16 @@ jobs:
   gate:
     name: gate
     needs: [evaluate, review, mirror-fork, repair, escalate]
-    if: always() && github.event_name != 'schedule'
+    # A superseded workflow_run is cancelled by the per-PR concurrency group. `always()`
+    # alone would still run this job with empty needs outputs and publish a bogus failing
+    # check. Pending scans likewise must produce no terminal gate yet.
+    if: >-
+      always() && !cancelled() && github.event_name != 'schedule' &&
+      needs.evaluate.result == 'success' &&
+      needs.evaluate.outputs.pr != '' &&
+      needs.evaluate.outputs.head_sha != '' &&
+      needs.evaluate.outputs.state != '' &&
+      needs.evaluate.outputs.state != 'pending'
     runs-on: ubuntu-latest
     permissions:
       actions: write
