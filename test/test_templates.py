@@ -67,6 +67,14 @@ def test_privileged_agent_cannot_mutate_git_or_execute_pr_code():
     assert "run: ./target" not in text
 
 
+def test_cancelled_or_pending_evaluations_cannot_publish_a_gate():
+    text = (WORKFLOWS / "pr-automation.yml").read_text(encoding="utf-8")
+    assert "always() && !cancelled()" in text
+    assert "needs.evaluate.result == 'success'" in text
+    assert "needs.evaluate.outputs.state != 'pending'" in text
+    assert "needs.evaluate.outputs.state != ''" in text
+
+
 @pytest.mark.parametrize("name", ["pre-push", "commit-msg"])
 def test_every_shipped_hook_is_valid_shell(name):
     import subprocess
