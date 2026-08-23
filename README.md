@@ -7,6 +7,41 @@ documentation maintenance, and post-release branch realignment.
 **No dependencies.** Everything is stdlib. This runs in every CI job of every repository
 that adopts it, so a dependency it grows is a dependency all of them grow.
 
+> **In one sentence:** install `vibey-gh` once, describe your repository in
+> `.vibey-gh.toml`, and let exact-head gates carry a change from its first push through
+> review, bounded repair, protected-branch merge, release, documentation, packages, and
+> provenance—while stopping for conditions that require an operator.
+
+## Start here
+
+- **Evaluating the project?** Read [Why vibey-gh](#why-vibey-gh), then
+  [What happens after a push](#what-happens-after-a-push).
+- **Installing it?** Follow [Requirements](#requirements), [Quick start](#quick-start),
+  and [Adoption checklist](#adoption-checklist).
+- **Operating it?** Keep [Workflows](#workflows), [Failure and recovery model](#failure-and-recovery-model),
+  and [Troubleshooting](#troubleshooting) nearby.
+- **Extending it?** Begin with [Architecture](#architecture),
+  [Security model](#security-model), and [CONTRIBUTING.md](CONTRIBUTING.md).
+
+### What vibey-gh does—and does not do
+
+`vibey-gh` is a repository delivery control plane, not a replacement for your test suite,
+package builder, or application runtime. Your repository owns what “correct” means. This
+project owns the transitions around that evidence: when a result is current, when a repair
+is permitted, when a protected branch may advance, which release channel receives an
+artifact, and what proof travels with it.
+
+It is deliberately opinionated about four invariants:
+
+1. **Only exact-head evidence counts.** A green check or review for an older commit cannot
+   authorize the current commit.
+2. **Repair may improve the work, never the standard.** Automation cannot lower coverage,
+   remove a required job, soften an assertion, or disguise an operational failure as code.
+3. **Permanent branches may advance but may never be deleted.** Managed workflows can
+   merge into `develop` and `main`; no managed path emits a deletion refspec for either.
+4. **Untrusted work is data in privileged jobs.** Source and logs may be inspected or
+   edited, but contributor-controlled commands are not executed beside write credentials.
+
 ## Why vibey-gh
 
 GitHub can run tests, but a dependable open-source delivery system needs much more than a
@@ -50,6 +85,85 @@ Push a topic branch. Branch intake creates a draft PR, exact-head scans decide w
 stable, and the event chain handles review, repair, merge, promotion, publication, docs,
 tagging, GitHub Release creation, and repository-profile reconciliation.
 
+### Adoption checklist
+
+1. Create or confirm permanent `develop` and `main` branches.
+2. Install `vibey-gh` on a topic branch and review every generated file before committing.
+3. Add a repository-level `ANTHROPIC_API_KEY`; environment-only secrets are not available
+   to the PR automation jobs that perform guarded review and repair.
+4. Add `AUTOMERGE_TOKEN` when the default Actions token cannot merge through your ruleset,
+   update repository settings, or create the required pull requests.
+5. In **Settings → Actions → General**, grant read/write workflow permissions and allow
+   Actions to create and approve pull requests.
+6. Configure GitHub Pages to deploy from **GitHub Actions**.
+7. Configure `testpypi` and `pypi` trusted-publishing environments if this is a Python
+   package. `develop` is the preview channel; `main` is production.
+8. Configure the branch ruleset. Require your ordinary scans plus
+   `PR automation / gate`; do not use a rule that automatically deletes `develop` after a
+   promotion merge.
+9. Run `vibey-gh check --ci`, inspect `git diff`, commit the generated assets, and push.
+10. Confirm the first branch creates one draft PR and that the exact-head gate—not an older
+    workflow result—controls its merge.
+
+### What gets installed
+
+The installer manages `.githooks/`, selected files under `.github/workflows/`, and the
+release-site assets used by the dual-channel Pages deployment. Existing hooks are moved to
+`<hook>.local` and chained. Managed workflow files are replaced when their rendered source
+changes; opt out of individual workflows with `[install].workflows` rather than editing a
+generated copy that the next installation will overwrite.
+
+### What happens after a push
+
+```text
+topic branch push
+      │
+      ▼
+one reusable draft PR
+      │
+      ▼
+all configured scans settle for the exact head SHA
+      │
+      ├── actionable failure ──► bounded AI repair ──► new SHA ──► rescan
+      ├── conflict ────────────► guarded conflict repair ────────► rescan
+      ├── operator-only issue ─► explicit blocked state and required action
+      └── green ───────────────► semantic docs review (+ outside-author code review)
+                                      │
+                                      ├── findings ─► bounded repair ─► rescan + rereview
+                                      └── pass ─────► exact-head gate
+                                                            │
+                                                            ▼
+                                            squash merge to develop
+                                                            │
+                                                            ▼
+                                             promotion PR to main
+                                                            │
+                                                            ▼
+                                             rebase merge + release
+```
+
+Every new commit invalidates earlier evidence and starts evaluation for the new SHA. The
+repair budget is three attempts per contributor lineage by default. Bot-authored repair
+commits do not reset it; a new human/contributor commit does.
+
+### Your first successful run
+
+On a healthy installation you should observe, in order:
+
+- a draft PR for the topic branch;
+- ordinary CI, provenance, security, API-drift, and documentation scans;
+- an exact-head semantic documentation verdict—even for a trusted author;
+- an outside-author code review when applicable;
+- a successful `PR automation / gate` attached to the current SHA;
+- a squash merge into `develop`;
+- a TestPyPI development release and Preview documentation update;
+- a `develop → main` promotion PR;
+- a rebase merge into `main`, followed by PyPI, tag, GitHub Release, GHCR, Production
+  documentation, and repository-profile verification.
+
+No single repository must enable every publishing surface. Disable or omit workflows that
+do not match the repository, then keep the remaining contract explicit and testable.
+
 ## Architecture
 
 Configuration value objects describe desired state; deterministic evaluators judge
@@ -73,14 +187,20 @@ itself the head of production promotion PRs. See [SECURITY.md](SECURITY.md).
 
 | Command | Human purpose |
 |---|---|
-| `vibey-gh install` | Install or update hooks, workflows, and release assets without discarding local hooks. |
-| `vibey-gh check --ci` | Verify provenance, installation, documentation, marketplace, and interface parity. |
-| `vibey-gh version --explain` | Explain the derived semantic-version decision. |
-| `vibey-gh promote` | Open or reuse the asynchronous `develop → main` release PR. |
-| `vibey-gh realign` | Align identical `develop` and `main` trees after a rebase merge. |
-| `vibey-gh pr-automation evaluate` | Return the structured exact-head PR decision. |
-| `vibey-gh merge-train --pr N` | Judge and merge one gated PR with the target's merge method. |
-| `vibey-gh sdk`, `api`, `mcp`, `webhook` | Exercise capabilities through every public surface. |
+| `vibey-gh check [--apply] [--commits RANGE] [--ci]` | Verify installed assets, file fingerprints, commit trailers, documentation, marketplace structure, and interface parity; optionally repair missing source headers. |
+| `vibey-gh install` | Render configured workflows, install/chains hooks, and install release-site assets. |
+| `vibey-gh version [--since REF] [--dev BUILD] [--apply] [--explain]` | Derive, explain, print, or apply the next release version. |
+| `vibey-gh trailer` / `trailer-key` | Print the configured provenance trailer or its key for scripts and workflows. |
+| `vibey-gh merge-train [--pr N] [--method METHOD] [--dry-run]` | Judge one or all PRs and merge only policy-ready exact heads. |
+| `vibey-gh pr-automation evaluate --pr N --head-sha SHA` | Return the stable structured decision for one exact PR head. |
+| `vibey-gh pr-automation ready-draft --pr N --head-sha SHA` | Mark a stable exact draft head ready without racing newer commits. |
+| `vibey-gh pr-automation record-review` / `record-repair` | Persist machine-readable lineage state used by retries and exact-head gating. |
+| `vibey-gh pr-automation mirror-fork --pr N` | Preserve a fork head in a linked repository-owned replacement PR when repair needs write access. |
+| `vibey-gh pr-automation ensure-labels` | Idempotently create the automation’s operational labels. |
+| `vibey-gh promote [--no-wait]` | Open or reuse the asynchronous `develop → main` promotion PR. |
+| `vibey-gh github-release --target SHA [--version VERSION]` | Create or reuse an immutable tag and GitHub Release for an exact production SHA. |
+| `vibey-gh realign` | Align identical `develop` and `main` trees after a rebase merge without discarding work. |
+| `vibey-gh sdk|api|mcp|webhook CAPABILITY` | Invoke the same canonical capability through each supported public surface. |
 
 Run `vibey-gh --help` and read [docs/cli.md](docs/cli.md) for the full reference.
 
@@ -283,12 +403,21 @@ generate_json_ld = true
 
 ### Comprehensive documentation and AI maintenance
 
-The `Docs` workflow enforces the complete FOSS and multi-agent documentation contract on
-every push and pull request. A scheduled or manually dispatched privileged maintenance job
-then performs a repository-wide semantic refresh: it reads source, tests, configuration,
-packaging, workflows, and releases; creates missing documentation; repairs stale claims;
-and opens a guarded documentation PR. It never executes repository code in the privileged
-job, never commits application changes, and never mutates a permanent branch directly.
+The `Docs` workflow enforces the deterministic FOSS and multi-agent documentation contract
+on every push and pull request. That structural check is intentionally necessary but not
+sufficient: after scans settle, PR automation performs an exact-head semantic audit for
+every author. It compares the README and complete documentation suite with source, tests,
+configuration, packaging, workflows, releases, and the CLI/SDK/API/MCP/webhook capability
+registry. A PR cannot pass merely by containing expected filenames or headings. It must be
+accurate, complete, human-readable, operationally useful, and free of actionable findings.
+
+Findings enter the same bounded repair loop as a failing scan. The repaired SHA is rescanned
+and rereviewed; an older documentation verdict never satisfies the gate. A scheduled or
+manually dispatched maintenance job remains a repository-wide backstop: it creates missing
+documentation, repairs stale claims, and opens a guarded documentation PR. It never
+executes repository code in the privileged job, commits application changes, or mutates a
+permanent branch directly. It must return `complete=true` with no remaining gaps before a
+documentation PR may be published; PR-creation errors fail loudly.
 
 The required suite includes `README`, changelog, license, conduct, contribution, security,
 support, architecture, operations, testing, release, governance, accessibility, dependency,
@@ -396,6 +525,79 @@ trusted_authors = ["your-login", "dependabot[bot]"]
 | Release repair | Returns trusted post-merge fixes through an ordinary guarded PR. |
 
 Scheduled and manual triggers are recovery backstops; normal delivery is event driven.
+
+## Failure and recovery model
+
+The automation distinguishes failures by what can safely resolve them:
+
+| Condition | Automated response | Human action |
+|---|---|---|
+| Test, lint, type, coverage, documentation, or review finding | Inspect and edit under the bounded repair policy; push one repair commit; rescan the new SHA | Review the escalation only if the attempt budget is exhausted |
+| Same-repository merge conflict | Materialize the exact conflict set; allow edits only to conflicted files; push one ordinary resolution commit | Resolve manually if the conflict is ambiguous or the budget expires |
+| Fork PR needs edits | Create a linked repository-owned replacement PR with attribution | Continue discussion on the linked PR when needed |
+| Missing secret, expired token, billing/credit exhaustion, registry denial, unsupported runner, or unavailable external service | Mark `vibey-gh:automation-blocked`; make no speculative source edit | Correct the named repository or provider setting, then redispatch |
+| Three unsuccessful repair attempts in one contributor lineage | Mark `vibey-gh:repair-exhausted`; publish remaining failures and run links | Push a new human-authored commit or deliberately reset the lineage |
+| Stale workflow completion | Ignore it; it cannot create a successful current-head gate | None |
+| Failed trusted post-merge release workflow | Open a repair branch and ordinary PR; never patch a permanent branch directly | Correct operator-only infrastructure failures |
+
+Repair jobs can read and edit files but cannot run contributor-controlled package managers,
+tests, builds, scripts, or binaries while privileged credentials are present. The ordinary
+unprivileged PR scans execute the repaired code. This separation is why a repair result is
+always followed by a new scan rather than being treated as proof of correctness.
+
+## Day-two operations
+
+### Upgrade vibey-gh
+
+Upgrade the package on a topic branch, rerun `vibey-gh install`, and commit the rendered
+workflow and asset differences. Never hand-copy only one generated workflow: templates,
+configuration rendering, tests, and the dogfood copies form one versioned contract.
+
+```bash
+python -m pip install --upgrade vibey-gh
+vibey-gh install
+vibey-gh check --ci
+git diff -- .github .githooks
+```
+
+### Disable a managed surface intentionally
+
+Use configuration rather than deleting a generated file. For example, a repository that
+publishes no Python package can omit the release workflows from `[install].workflows`.
+`vibey-gh check` then verifies the chosen subset instead of repeatedly reinstalling a file
+the repository does not want.
+
+### Recover a missed event
+
+Use the workflow’s manual dispatch with the PR number and exact current head SHA. Scheduled
+backstops also redispatch open PR evaluations. Re-running an old workflow is harmless: the
+exact-head comparison prevents its result from authorizing a newer commit.
+
+### Audit an automation decision
+
+Start with the PR’s `PR automation / gate`, then follow the linked workflow run. The job
+summary contains the evaluated SHA, aggregate scans, trust classification, repair attempt,
+semantic review result, and merge decision. Review artifacts are retained for 90 days.
+State comments use machine-readable markers and are updated idempotently rather than
+creating an unbounded comment stream.
+
+## Project documentation map
+
+| Need | Canonical document |
+|---|---|
+| Human overview and adoption | This README |
+| Complete CLI arguments | [docs/cli.md](docs/cli.md) |
+| Every configuration field | [docs/configuration.md](docs/configuration.md) |
+| Components and dependency direction | [docs/architecture.md](docs/architecture.md) |
+| Workflow triggers, permissions, and transitions | [docs/workflows.md](docs/workflows.md) |
+| Operating and recovering the system | [docs/operations.md](docs/operations.md) |
+| Releases and publishing channels | [docs/releases.md](docs/releases.md) |
+| Threats and privileged-job boundaries | [docs/threat-model.md](docs/threat-model.md) and [SECURITY.md](SECURITY.md) |
+| Local development and verification | [docs/development.md](docs/development.md) and [docs/testing.md](docs/testing.md) |
+| Common failures | [docs/troubleshooting.md](docs/troubleshooting.md) |
+| Governance, support, and conduct | [docs/governance.md](docs/governance.md), [SUPPORT.md](SUPPORT.md), and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) |
+| Agent instructions and skills | [AGENTS.md](AGENTS.md), [CLAUDE.md](CLAUDE.md), [GEMINI.md](GEMINI.md), `.cursor/`, `.agent/`, `.agents/`, and `.claude/` |
+| Architectural decisions | [docs/adr/README.md](docs/adr/README.md) |
 
 ## Troubleshooting
 

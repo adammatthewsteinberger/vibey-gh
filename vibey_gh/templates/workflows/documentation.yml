@@ -97,6 +97,18 @@ jobs:
             rename, or delete branches. Edit documentation and documentation configuration
             only. Do not invent capabilities: mark unknowns explicitly and derive claims
             from code and tests. Return complete=false if any material gap remains.
+      - name: Require a complete semantic maintenance result
+        if: steps.claude.outputs.structured_output != ''
+        env:
+          STRUCTURED: ${{ steps.claude.outputs.structured_output }}
+        run: |
+          set -euo pipefail
+          jq -e '.complete == true and ((.gaps_remaining // []) | length == 0)' \
+            <<<"$STRUCTURED" >/dev/null || {
+            echo "::error::Documentation maintenance reported unresolved gaps"
+            jq . <<<"$STRUCTURED"
+            exit 1
+          }
       - name: Publish one guarded documentation commit and PR
         if: steps.claude.outputs.structured_output != ''
         env:
@@ -119,7 +131,7 @@ jobs:
           body=$(jq -r '.summary + "\n\nRemaining gaps:\n" + ((.gaps_remaining // []) | map("- " + .) | join("\n"))' <<<"$STRUCTURED")
           gh pr create --repo "$REPO" --base __VIBEY_GH_INTEGRATION_BRANCH__ \
             --head "$BRANCH" --title 'docs: comprehensive automated refresh' \
-            --body "$body" || true
+            --body "$body"
       - name: Archive the documentation-maintenance record
         if: always() && steps.claude.outputs.execution_file != ''
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
