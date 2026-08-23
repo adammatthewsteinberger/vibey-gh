@@ -5,6 +5,8 @@ This file follows Keep a Changelog and semantic versioning conventions.
 
 ## Unreleased
 
+- Replace the placeholder GitHub automation README with a comprehensive operator guide
+  and enforce its required sections, minimum depth, and exact provenance deterministically.
 - Fix GraphQL-only PR-state comment updates, synchronize package version metadata,
   correct constrained Claude command patterns, and ship real managed CodeQL and
   five-surface API-drift gates.
