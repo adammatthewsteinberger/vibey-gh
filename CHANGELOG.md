@@ -5,6 +5,9 @@ This file follows Keep a Changelog and semantic versioning conventions.
 
 ## Unreleased
 
+- Fix a duplicated provenance header in the packaged source modules and make the
+  fingerprint check detect and repair a header repeated within a file, not just a header
+  that is missing.
 - Treat concurrent PR-head advances during repair or conflict publication as stale no-ops
   while preserving ordinary non-fast-forward protection and never force-pushing.
 - Replace the placeholder GitHub automation README with a comprehensive operator guide

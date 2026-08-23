@@ -101,6 +101,21 @@ def test_header_is_detected_and_inserted(repo):
     assert fingerprints.check(cfg).ok
 
 
+def test_duplicate_header_is_detected_and_deduped(repo):
+    cfg = cfg_for(repo)
+    target = repo / "src" / "__init__.py"
+    target.write_text(f"{cfg.header}\n{cfg.header}\n" + target.read_text())
+
+    report = fingerprints.check(cfg)
+    assert [p.name for p in report.duplicate_header] == ["__init__.py"]
+    assert not report.ok
+
+    fingerprints.check(cfg, apply=True)
+    lines = target.read_text().splitlines()
+    assert lines.count(cfg.header) == 1
+    assert fingerprints.check(cfg).ok
+
+
 def test_header_goes_after_a_shebang(repo):
     cfg = cfg_for(repo)
     target = repo / "src" / "__init__.py"

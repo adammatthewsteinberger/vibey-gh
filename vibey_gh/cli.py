@@ -1,5 +1,4 @@
 # Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), Developed by [Adam Matthew Steinberger](https://hire.adam.matthewsteinberger.com/) ([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/)).
-# Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), Developed by [Adam Matthew Steinberger](https://hire.adam.matthewsteinberger.com/) ([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/)).
 """`vibey-gh` — the command the hooks and the CI workflows call."""
 
 from __future__ import annotations
@@ -39,6 +38,8 @@ def _check(args) -> int:
         print(f"  hooks: {problem}", file=sys.stderr)
     for path in report.missing_header:
         print(f"  {path.relative_to(cfg.root)}: missing the fingerprint header", file=sys.stderr)
+    for path in report.duplicate_header:
+        print(f"  {path.relative_to(cfg.root)}: fingerprint header appears more than once", file=sys.stderr)
     for commit in report.missing_trailer:
         print(f"  commit {commit}: missing the `{cfg.trailer_key}:` trailer", file=sys.stderr)
     for commit in report.invalid_subject:
