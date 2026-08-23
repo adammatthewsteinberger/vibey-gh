@@ -47,19 +47,29 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           OWNER: ${{ github.repository_owner }}
-          OWNER_TYPE: ${{ github.event.repository.owner.type }}
           REPO_NAME: ${{ github.event.repository.name }}
-          PACKAGE_NAMES_QUERY: ".[].name"
+          GHCR_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           curl --fail --silent --show-error --location --retry 5 \
             "https://${OWNER}.github.io/${REPO_NAME}/" >/dev/null
           test "$(gh api "repos/${REPO}/releases?per_page=1" --jq 'length')" -gt 0
           test "$(gh api "repos/${REPO}/deployments?per_page=1" --jq 'length')" -gt 0
-          package_owner=users
-          if [ "$OWNER_TYPE" = Organization ]; then package_owner=orgs; fi
-          gh api "${package_owner}/${OWNER}/packages?package_type=container&per_page=100" \
-            --jq "$PACKAGE_NAMES_QUERY" | grep -Fxq "${REPO_NAME}/python"
+          package="${OWNER,,}/${REPO_NAME,,}/python"
+          registry_token=$(curl --fail --silent --show-error --user "${GITHUB_ACTOR}:${GHCR_TOKEN}" \
+            --get --data-urlencode "scope=repository:${package}:pull" \
+            'https://ghcr.io/token' | jq -er .token)
+          package_found=false
+          for channel in main develop; do
+            if curl --fail --silent --show-error --head \
+              -H "Authorization: Bearer ${registry_token}" \
+              -H 'Accept: application/vnd.oci.image.manifest.v1+json' \
+              "https://ghcr.io/v2/${package}/manifests/${channel}" >/dev/null; then
+              package_found=true
+              break
+            fi
+          done
+          test "$package_found" = true
           {
             echo '### Repository profile reconciled'
             echo

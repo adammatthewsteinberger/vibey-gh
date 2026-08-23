@@ -15,6 +15,27 @@
     brand.insertAdjacentElement("afterend", badge);
   }
 
+  const primaryNav = document.querySelector("#navbar-collapse .navbar-nav");
+  if (primaryNav) {
+    primaryNav.querySelectorAll("a.nav-link").forEach((link) => {
+      if (link.textContent.trim() !== "Home") link.closest("li")?.remove();
+    });
+    const pagesRoot = "__PAGES_ROOT__";
+    for (const [label, target] of [["Production", "main"], ["Preview", "develop"]]) {
+      const item = document.createElement("li");
+      item.className = "nav-item";
+      const link = document.createElement("a");
+      link.className = `nav-link channel-link${channel === target ? " active" : ""}`;
+      link.href = `${pagesRoot}${target}/`;
+      link.textContent = label;
+      item.append(link);
+      primaryNav.append(item);
+    }
+    document.querySelectorAll("[data-release-target]").forEach((link) => {
+      link.href = `${pagesRoot}${link.dataset.releaseTarget}/`;
+    });
+  }
+
   const editLink = [...document.querySelectorAll("a.nav-link")].find((link) =>
     link.textContent.includes("Edit on GitHub"),
   );

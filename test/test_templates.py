@@ -110,6 +110,14 @@ def test_properdocs_theme_is_channel_aware_and_accessible():
     assert "Made with ❤️ by" in script
     assert "https://adammatthewsteinberger.github.io/vibey/" in script
     assert "https://hire.adam.matthewsteinberger.com" in script
+    assert "__PAGES_ROOT__" in script
+    assert '["Production", "main"]' in script
+    assert '["Preview", "develop"]' in script
+    assert "Release channels: release-channels.md" not in config
+    index = (root / "docs/index.md").read_text(encoding="utf-8")
+    assert 'data-release-target="main"' in index
+    assert 'data-release-target="develop"' in index
+    assert "link.dataset.releaseTarget" in script
 
 
 def test_repository_profile_is_configurable_and_never_mutates_branches():
@@ -123,7 +131,8 @@ def test_repository_profile_is_configurable_and_never_mutates_branches():
     assert "curl --fail --silent --show-error" in text
     assert "repos/${REPO}/releases?per_page=1" in text
     assert "repos/${REPO}/deployments?per_page=1" in text
-    assert "package_type=container" in text
+    assert "scope=repository:${package}:pull" in text
+    assert "https://ghcr.io/v2/${package}/manifests/${channel}" in text
     assert "git push" not in text
     assert "--delete" not in text
 

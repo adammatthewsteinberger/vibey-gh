@@ -224,6 +224,7 @@ jobs:
           replacements = {
               "__REPOSITORY__": repository,
               "__REPOSITORY_URL__": f"{os.environ['GITHUB_SERVER_URL']}/{repository}",
+              "__PAGES_ROOT__": f"https://{owner}.github.io/{name}/",
               "__RELEASE_SHA__": sha,
               "__SHORT_SHA__": sha[:12],
               "__RELEASE_BRANCH__": os.environ["RELEASE_BRANCH"],
