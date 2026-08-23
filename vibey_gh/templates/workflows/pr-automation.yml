@@ -5,6 +5,9 @@ name: PR automation
 # [pr_automation].scan_workflows; each completion re-evaluates the entire current-head
 # rollup, so only the last scan to settle causes review, repair, or merge readiness.
 on:
+  pull_request_target:
+    branches: [__VIBEY_GH_INTEGRATION_BRANCH__, __VIBEY_GH_RELEASE_BRANCH__]
+    types: [opened, reopened, synchronize, ready_for_review]
   workflow_run:
     workflows: __VIBEY_GH_SCAN_WORKFLOWS__
     types: [completed]
@@ -32,7 +35,7 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: pr-automation-${{ github.repository }}-${{ inputs.pr || github.event.workflow_run.head_sha || github.run_id }}
+  group: pr-automation-${{ github.repository }}-${{ inputs.pr || github.event.pull_request.number || github.event.workflow_run.head_sha || github.run_id }}
   cancel-in-progress: true
 
 jobs:
@@ -105,10 +108,12 @@ jobs:
           INPUT_SHA: ${{ inputs.head_sha }}
           EVENT_PR: ${{ github.event.workflow_run.pull_requests[0].number }}
           EVENT_SHA: ${{ github.event.workflow_run.head_sha }}
+          TARGET_PR: ${{ github.event.pull_request.number }}
+          TARGET_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
-          number="${INPUT_PR:-${EVENT_PR:-}}"
-          sha="${INPUT_SHA:-${EVENT_SHA:-}}"
+          number="${INPUT_PR:-${TARGET_PR:-${EVENT_PR:-}}}"
+          sha="${INPUT_SHA:-${TARGET_SHA:-${EVENT_SHA:-}}}"
           if [ -z "$number" ]; then
             number=$(gh api "repos/${REPO}/commits/${sha}/pulls" \
               --jq '[.[] | select(.state == "open")][0].number // empty')
@@ -135,13 +140,15 @@ jobs:
           vibey-gh pr-automation ready-draft --pr "$PR" --head-sha "$HEAD_SHA" | jq .
           result=$(vibey-gh pr-automation evaluate --pr "$PR" --head-sha "$HEAD_SHA")
           printf '%s\n' "$result" | jq .
-          echo "state=$(jq -r .state <<<"$result")" >> "$GITHUB_OUTPUT"
-          echo "evaluated_head_sha=$(jq -r .head_sha <<<"$result")" >> "$GITHUB_OUTPUT"
-          echo "trusted=$(jq -r .trusted <<<"$result")" >> "$GITHUB_OUTPUT"
-          echo "failed_checks=$(jq -c .failed_checks <<<"$result")" >> "$GITHUB_OUTPUT"
-          echo "repair_attempt=$(jq -r .repair_attempt <<<"$result")" >> "$GITHUB_OUTPUT"
-          echo "reason=$(jq -r .reason <<<"$result")" >> "$GITHUB_OUTPUT"
-          printf '### PR automation evaluation\n\n```json\n%s\n```\n' \
+          {
+            echo "state=$(jq -r .state <<<"$result")"
+            echo "evaluated_head_sha=$(jq -r .head_sha <<<"$result")"
+            echo "trusted=$(jq -r .trusted <<<"$result")"
+            echo "failed_checks=$(jq -c .failed_checks <<<"$result")"
+            echo "repair_attempt=$(jq -r .repair_attempt <<<"$result")"
+            echo "reason=$(jq -r .reason <<<"$result")"
+          } >> "$GITHUB_OUTPUT"
+          printf "### PR automation evaluation\n\n\`\`\`json\n%s\n\`\`\`\n" \
             "$(jq . <<<"$result")" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Read branch ownership
@@ -154,10 +161,12 @@ jobs:
         run: |
           set -euo pipefail
           meta=$(gh pr view "$PR" --repo "$REPO" --json headRefName,baseRefName,headRepository,isCrossRepository)
-          echo "head_ref=$(jq -r .headRefName <<<"$meta")" >> "$GITHUB_OUTPUT"
-          echo "base_ref=$(jq -r .baseRefName <<<"$meta")" >> "$GITHUB_OUTPUT"
-          echo "head_repo=$(jq -r .headRepository.nameWithOwner <<<"$meta")" >> "$GITHUB_OUTPUT"
-          echo "fork=$(jq -r .isCrossRepository <<<"$meta")" >> "$GITHUB_OUTPUT"
+          {
+            echo "head_ref=$(jq -r .headRefName <<<"$meta")"
+            echo "base_ref=$(jq -r .baseRefName <<<"$meta")"
+            echo "head_repo=$(jq -r .headRepository.nameWithOwner <<<"$meta")"
+            echo "fork=$(jq -r .isCrossRepository <<<"$meta")"
+          } >> "$GITHUB_OUTPUT"
 
   review:
     name: Automated outside-author review

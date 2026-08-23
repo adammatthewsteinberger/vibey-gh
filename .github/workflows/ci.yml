@@ -103,6 +103,7 @@ jobs:
               "vibey_gh/templates/workflows/github-release.yml",
               "vibey_gh/templates/workflows/release-surfaces.yml",
               "vibey_gh/templates/workflows/release-repair.yml",
+              "vibey_gh/templates/workflows/repository-profile.yml",
               "vibey_gh/templates/release/vibey.css",
               "vibey_gh/templates/release/channel.js",
           ]

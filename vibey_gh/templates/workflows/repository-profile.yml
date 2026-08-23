@@ -1,0 +1,70 @@
+# Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger.
+name: Repository profile
+
+on:
+  workflow_run:
+    workflows: ["Release surfaces"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+  deployments: read
+  packages: read
+
+jobs:
+  reconcile:
+    name: Reconcile repository profile
+    if: >-
+      __VIBEY_GH_PROFILE_ENABLED__ &&
+      (github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Update identity, Pages homepage, and topics
+        env:
+          GH_TOKEN: ${{ secrets.AUTOMERGE_TOKEN || github.token }}
+          REPO: ${{ github.repository }}
+          OWNER: ${{ github.repository_owner }}
+          REPO_NAME: ${{ github.event.repository.name }}
+          CONFIG_DESCRIPTION: __VIBEY_GH_PROFILE_DESCRIPTION__
+          CONFIG_TOPICS: '__VIBEY_GH_PROFILE_TOPICS__'
+        run: |
+          set -euo pipefail
+          pages_url="https://${OWNER}.github.io/${REPO_NAME}/"
+          description="$CONFIG_DESCRIPTION"
+          if [ -z "$description" ]; then
+            description="${REPO_NAME} — automated delivery, release provenance, and living documentation."
+          fi
+          gh api "repos/${REPO}" --method PATCH \
+            -f description="$description" -f homepage="$pages_url" -F has_downloads=true >/dev/null
+          printf '%s' "$CONFIG_TOPICS" | gh api "repos/${REPO}/topics" \
+            --method PUT --input - >/dev/null
+
+      - name: Verify public release surfaces
+        env:
+          GH_TOKEN: ${{ secrets.AUTOMERGE_TOKEN || github.token }}
+          REPO: ${{ github.repository }}
+          OWNER: ${{ github.repository_owner }}
+          OWNER_TYPE: ${{ github.event.repository.owner.type }}
+          REPO_NAME: ${{ github.event.repository.name }}
+          PACKAGE_NAMES_QUERY: ".[].name"
+        run: |
+          set -euo pipefail
+          gh api "repos/${REPO}/pages" --jq '.html_url' >/dev/null
+          test "$(gh api "repos/${REPO}/releases?per_page=1" --jq 'length')" -gt 0
+          test "$(gh api "repos/${REPO}/deployments?per_page=1" --jq 'length')" -gt 0
+          package_owner=users
+          if [ "$OWNER_TYPE" = Organization ]; then package_owner=orgs; fi
+          gh api "${package_owner}/${OWNER}/packages?package_type=container&per_page=100" \
+            --jq "$PACKAGE_NAMES_QUERY" | grep -Fxq "${REPO_NAME}/python"
+          {
+            echo '### Repository profile reconciled'
+            echo
+            echo "- Homepage: https://${OWNER}.github.io/${REPO_NAME}/"
+            echo '- Releases: available'
+            echo '- Deployments: available'
+            echo '- Packages: available'
+            echo '- Protected branches: untouched'
+          } >> "$GITHUB_STEP_SUMMARY"

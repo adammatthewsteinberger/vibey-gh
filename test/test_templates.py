@@ -82,6 +82,9 @@ def test_release_surfaces_preserve_both_docs_channels_and_publish_oci_packages()
     assert "__RELEASE_SHA__" in text
     assert "vibey-gh:repository" in text
     assert "managed release theme is missing" in text
+    assert "Made with ❤️ by" in text
+    assert "https://adammatthewsteinberger.github.io/vibey/" in text
+    assert "https://hire.adam.matthewsteinberger.com" in text
 
 
 def test_properdocs_theme_is_channel_aware_and_accessible():
@@ -101,6 +104,24 @@ def test_properdocs_theme_is_channel_aware_and_accessible():
     assert "__REPOSITORY__@__SHORT_SHA__" in script
     assert "__RELEASE_BRANCH__" in script
     assert "__RELEASE_CHANNEL__" in script
+    assert "Made with ❤️ by" in script
+    assert "https://adammatthewsteinberger.github.io/vibey/" in script
+    assert "https://hire.adam.matthewsteinberger.com" in script
+
+
+def test_repository_profile_is_configurable_and_never_mutates_branches():
+    text = (WORKFLOWS / "repository-profile.yml").read_text(encoding="utf-8")
+    assert 'workflows: ["Release surfaces"]' in text
+    assert "__VIBEY_GH_PROFILE_DESCRIPTION__" in text
+    assert "__VIBEY_GH_PROFILE_TOPICS__" in text
+    assert 'homepage="$pages_url"' in text
+    assert "repos/${REPO}/topics" in text
+    assert "repos/${REPO}/pages" in text
+    assert "repos/${REPO}/releases?per_page=1" in text
+    assert "repos/${REPO}/deployments?per_page=1" in text
+    assert "package_type=container" in text
+    assert "git push" not in text
+    assert "--delete" not in text
 
 
 def test_failed_permanent_branch_scans_use_a_guarded_repair_pr():
@@ -157,6 +178,10 @@ def test_privileged_agent_cannot_mutate_git_or_execute_pr_code():
 
 def test_cancelled_or_pending_evaluations_cannot_publish_a_gate():
     text = (WORKFLOWS / "pr-automation.yml").read_text(encoding="utf-8")
+    assert "pull_request_target:" in text
+    assert "types: [opened, reopened, synchronize, ready_for_review]" in text
+    assert "github.event.pull_request.number" in text
+    assert "github.event.pull_request.head.sha" in text
     assert "always() && !cancelled()" in text
     assert "needs.evaluate.result == 'success'" in text
     assert "needs.evaluate.outputs.state != 'pending'" in text
