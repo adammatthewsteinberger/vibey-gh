@@ -164,7 +164,34 @@ _PR_FIELDS = (
 
 
 def pull_request(number: int) -> dict:
-    return cast(dict, _gh_json("pr", "view", str(number), "--json", _PR_FIELDS))
+    pr = cast(dict, _gh_json("pr", "view", str(number), "--json", _PR_FIELDS))
+    _include_exact_head_gate(pr)
+    return pr
+
+
+def _include_exact_head_gate(pr: dict) -> None:
+    """GitHub may omit a freshly API-created check from a PR rollup for a few seconds.
+
+    The check is already durable on the exact commit. Reading that authoritative endpoint
+    closes the event-to-merge race without relaxing any gate: only a completed successful
+    check with the exact required name is copied into the rollup.
+    """
+    rollup = pr.setdefault("statusCheckRollup", [])
+    if any(item.get("name") == "PR automation / gate" for item in rollup):
+        return
+    sha = str(pr.get("headRefOid") or "")
+    if not sha:
+        return
+    repository = _gh_json("repo", "view", "--json", "nameWithOwner")["nameWithOwner"]
+    response = _gh_json("api", f"repos/{repository}/commits/{sha}/check-runs")
+    for item in response.get("check_runs", []):
+        if (
+            item.get("name") == "PR automation / gate"
+            and item.get("status") == "completed"
+            and item.get("conclusion") == "success"
+        ):
+            rollup.append({"name": item["name"], "status": "COMPLETED", "conclusion": "SUCCESS"})
+            return
 
 
 def open_pull_requests(cfg: GhConfig, number: int | None = None) -> list[dict]:
@@ -184,15 +211,7 @@ def open_pull_requests(cfg: GhConfig, number: int | None = None) -> list[dict]:
     )
     out: list[dict] = []
     for entry in numbers or []:
-        out.append(
-            _gh_json(
-                "pr",
-                "view",
-                str(entry["number"]),
-                "--json",
-                _PR_FIELDS,
-            )
-        )
+        out.append(pull_request(int(entry["number"])))
     return out
 
 

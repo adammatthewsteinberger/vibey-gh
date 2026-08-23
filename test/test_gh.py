@@ -248,6 +248,56 @@ def test_readiness_gate(tmp_path, pr, ready, fragment):
         assert fragment in verdict.reason
 
 
+def test_pull_request_recovers_fresh_exact_head_gate(monkeypatch):
+    calls = []
+
+    def fake(*args):
+        calls.append(args)
+        if args[:2] == ("pr", "view"):
+            return _pr(headRefOid="abc", statusCheckRollup=[])
+        if args[:2] == ("repo", "view"):
+            return {"nameWithOwner": "owner/repo"}
+        return {
+            "check_runs": [
+                {"name": "PR automation / gate", "status": "completed", "conclusion": "success"}
+            ]
+        }
+
+    monkeypatch.setattr(merge_train, "_gh_json", fake)
+    pr = merge_train.pull_request(1)
+    assert pr["statusCheckRollup"][-1]["conclusion"] == "SUCCESS"
+    assert any(args[0] == "api" for args in calls)
+
+
+def test_exact_head_gate_lookup_skips_existing_missing_sha_and_nonpassing(monkeypatch):
+    called = []
+    monkeypatch.setattr(
+        merge_train,
+        "_gh_json",
+        lambda *args: (
+            called.append(args) or {"nameWithOwner": "owner/repo"}
+            if args[0] == "repo"
+            else {
+                "check_runs": [
+                    {"name": "PR automation / gate", "status": "completed", "conclusion": "failure"}
+                ]
+            }
+        ),
+    )
+    existing = {"statusCheckRollup": [{"name": "PR automation / gate"}], "headRefOid": "x"}
+    merge_train._include_exact_head_gate(existing)
+    merge_train._include_exact_head_gate({"statusCheckRollup": []})
+    failing = {"statusCheckRollup": [], "headRefOid": "x"}
+    merge_train._include_exact_head_gate(failing)
+    assert failing["statusCheckRollup"] == []
+
+
+def test_open_pull_requests_reuses_exact_head_lookup(monkeypatch, tmp_path):
+    monkeypatch.setattr(merge_train, "_gh_json", lambda *args: [{"number": 2}])
+    monkeypatch.setattr(merge_train, "pull_request", lambda number: {"number": number})
+    assert merge_train.open_pull_requests(cfg_for(tmp_path)) == [{"number": 2}]
+
+
 # -------------------------------------------------------------------------- install
 
 
@@ -300,7 +350,9 @@ def test_realign_refuses_when_the_branches_differ(repo, monkeypatch):
 
 
 def test_cli_check_reports_failure_then_success(repo, monkeypatch, capsys):
-    (repo / ".vibey-gh.toml").write_text('[fingerprint]\nsources = ["src/*.py"]\n')
+    (repo / ".vibey-gh.toml").write_text(
+        '[fingerprint]\nsources = ["src/*.py"]\n[documentation]\nenabled=false\n'
+    )
     monkeypatch.chdir(repo)
     assert cli_main(["check", "--ci"]) == 1
     install.install(load_config(repo), hooks_path=False)

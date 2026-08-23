@@ -180,6 +180,7 @@ def evaluate(
 
     ignored = set(cfg.pr_automation.ignored_checks) | {
         "PR automation / gate",
+        "gate",
         "Merge train / merge",
     }
     checks = [_check(item) for item in pr.get("statusCheckRollup") or []]

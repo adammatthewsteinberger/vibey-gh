@@ -15,4 +15,13 @@ markdown_extensions:
   - md_in_html
 nav:
   - Home: index.md
+  - Architecture: architecture.md
+  - Configuration: configuration.md
+  - CLI: cli.md
+  - Workflows: workflows.md
+  - Security: security.md
+  - Operations: operations.md
+  - Contributing: development.md
+  - Releases: releases.md
+  - Support: troubleshooting.md
 strict: true
