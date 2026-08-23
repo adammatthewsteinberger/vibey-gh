@@ -45,5 +45,5 @@ vibey-gh install
 The installed runtime stays dependency-free. The generated workflows remain pinned,
 auditable, and independently testable.
 
-[Explore release channels](release-channels.md){ .primary-action }
-[Read the complete reference](https://github.com/adammatthewsteinberger/vibey-gh#readme){ .secondary-action }
+[Production](#){ .primary-action data-release-target="main" }
+[Preview](#){ .secondary-action data-release-target="develop" }
