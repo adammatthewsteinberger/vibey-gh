@@ -26,6 +26,11 @@ on:
         required: false
         default: false
         type: boolean
+      full_claude_output:
+        description: "Expose raw Claude JSON (manual private-repository diagnostics only)"
+        required: false
+        default: false
+        type: boolean
   schedule:
     - cron: "47 */6 * * *"
 
@@ -90,6 +95,17 @@ jobs:
       head_repo: ${{ steps.meta.outputs.head_repo }}
       base_ref: ${{ steps.meta.outputs.base_ref }}
     steps:
+      - name: Validate diagnostic output policy
+        if: inputs.full_claude_output == true
+        env:
+          ALLOWED: false
+          VISIBILITY: ${{ github.event.repository.visibility }}
+        run: |
+          set -euo pipefail
+          if [ "$ALLOWED" != true ] || [ "$VISIBILITY" != private ]; then
+            echo "Full Claude output is disabled or unsafe for this repository visibility."
+            exit 1
+          fi
       - name: Check out trusted automation
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -214,6 +230,8 @@ jobs:
         uses: anthropics/claude-code-action@8569a83495a3f6f0c50a90e46351d3816fed1a75 # v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          track_progress: true
+          show_full_output: ${{ inputs.full_claude_output && github.event_name == 'workflow_dispatch' && github.event.repository.visibility == 'private' && false }}
           additional_permissions: |
             actions: read
             checks: read
@@ -298,7 +316,7 @@ jobs:
           vibey-gh pr-automation record-review --pr "$PR" --input "$payload"
           echo "passed=$(jq -r .pass <<<"$payload")" >> "$GITHUB_OUTPUT"
       - name: Archive review record
-        if: always() && steps.claude.outputs.execution_file != ''
+        if: always() && steps.claude.outputs.execution_file != '' && true
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: pr-review-${{ needs.evaluate.outputs.pr }}-${{ github.run_id }}
@@ -385,6 +403,8 @@ jobs:
         uses: anthropics/claude-code-action@8569a83495a3f6f0c50a90e46351d3816fed1a75 # v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          track_progress: true
+          show_full_output: ${{ inputs.full_claude_output && github.event_name == 'workflow_dispatch' && github.event.repository.visibility == 'private' && false }}
           additional_permissions: |
             actions: read
             checks: read
@@ -478,7 +498,7 @@ jobs:
           fi
           gh pr edit "$PR" --repo "$REPO" --remove-label vibey-gh:repairing || true
       - name: Archive repair record
-        if: always() && steps.claude.outputs.execution_file != ''
+        if: always() && steps.claude.outputs.execution_file != '' && true
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: pr-repair-${{ needs.evaluate.outputs.pr }}-${{ github.run_id }}
@@ -541,6 +561,8 @@ jobs:
         uses: anthropics/claude-code-action@8569a83495a3f6f0c50a90e46351d3816fed1a75 # v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          track_progress: true
+          show_full_output: ${{ inputs.full_claude_output && github.event_name == 'workflow_dispatch' && github.event.repository.visibility == 'private' && false }}
           plugin_marketplaces: |
             https://github.com/adammatthewsteinberger/vibey-skills.git
           plugins: |
@@ -618,7 +640,7 @@ jobs:
             '. + {head_sha:$head_sha,fixable:true}' <<<"$STRUCTURED")
           vibey-gh pr-automation record-repair --pr "$PR" --input "$payload"
       - name: Archive conflict-resolution record
-        if: always() && steps.claude.outputs.execution_file != ''
+        if: always() && steps.claude.outputs.execution_file != '' && true
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: pr-conflict-${{ needs.evaluate.outputs.pr }}-${{ github.run_id }}

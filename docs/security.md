@@ -13,6 +13,12 @@ out with `persist-credentials: false`. The disposable context is removed with `a
 before trusted persistence or publishing. Only the later trusted publish step attaches
 `GH_TOKEN` through `gh auth setup-git`; no Claude step can read that authenticated context.
 
+Claude observability is sanitized by default. Raw `show_full_output` logging can expose
+assistant messages, tool results, repository contents, and CI material, so managed
+workflows accept it only from an explicit manual dispatch when configuration opts in and
+GitHub reports private repository visibility. Public and event-triggered runs fail closed.
+Execution logs may instead be retained as access-controlled 90-day workflow artifacts.
+
 The Conventional Commits job is the sole guarded exception that may force-update history.
 It can act only on a same-repository topic branch, only from an exact checked SHA, only on
 linear history, and only with `--force-with-lease`. Permanent branches are rejected by

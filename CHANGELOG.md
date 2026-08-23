@@ -13,6 +13,8 @@ This file follows Keep a Changelog and semantic versioning conventions.
 - Use the native GitHub workflow credential when persisting AI review and repair state.
 - Run Claude Code Action from a disposable, credential-free Git context while keeping
   untrusted pull-request checkouts isolated from repository credentials.
+- Add configurable sanitized Claude progress, restricted execution artifacts, and a
+  fail-closed manual raw-output diagnostic restricted to private repositories.
 
 ## Historical releases
 

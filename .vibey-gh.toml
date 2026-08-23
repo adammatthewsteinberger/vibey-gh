@@ -31,6 +31,11 @@ repair_untrusted_authors = true
 replace_fork_prs = true
 retain_schedule_backstop = true
 
+[pr_automation.observability]
+sanitized_progress = true
+archive_execution_file = true
+allow_private_full_output = false
+
 [github_release]
 enabled = true
 tag_prefix = "v"
