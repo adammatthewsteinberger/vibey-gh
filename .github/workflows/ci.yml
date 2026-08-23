@@ -95,22 +95,16 @@ jobs:
           import sys
           import zipfile
 
-          want = [
-              "vibey_gh/templates/githooks/pre-push",
-              "vibey_gh/templates/githooks/commit-msg",
-              "vibey_gh/templates/workflows/provenance.yml",
-              "vibey_gh/templates/workflows/merge-train.yml",
-              "vibey_gh/templates/workflows/pr-automation.yml",
-              "vibey_gh/templates/workflows/github-release.yml",
-              "vibey_gh/templates/workflows/release-surfaces.yml",
-              "vibey_gh/templates/workflows/release-repair.yml",
-              "vibey_gh/templates/workflows/repository-profile.yml",
-              "vibey_gh/templates/release/vibey.css",
-              "vibey_gh/templates/release/channel.js",
-          ]
+          # Read from the checked-out source tree rather than a hardcoded list, so a
+          # template added later is asserted automatically instead of silently unchecked.
+          want = sorted(
+              glob.glob("vibey_gh/templates/githooks/*")
+              + glob.glob("vibey_gh/templates/workflows/*.yml")
+              + glob.glob("vibey_gh/templates/release/*")
+          )
           names = set(zipfile.ZipFile(glob.glob("dist/*.whl")[0]).namelist())
           missing = [w for w in want if w not in names]
           if missing:
               sys.exit("missing from the wheel: " + ", ".join(missing))
-          print("all templates present")
+          print(f"all {len(want)} templates present")
           PY
