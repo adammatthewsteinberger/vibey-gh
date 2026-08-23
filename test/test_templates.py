@@ -38,6 +38,23 @@ def test_this_repository_s_own_workflows_parse(path):
     assert parsed.get("jobs")
 
 
+def test_release_environments_are_disjoint_by_branch():
+    """main must never request TestPyPI, whose environment permits only develop."""
+    release = yaml.safe_load(
+        (Path(__file__).resolve().parent.parent / ".github/workflows/release.yml").read_text(
+            encoding="utf-8"
+        )
+    )
+    jobs = release["jobs"]
+    assert jobs["testpypi"]["if"] == "github.ref == 'refs/heads/develop'"
+    assert jobs["testpypi"]["environment"] == "testpypi"
+    assert jobs["testpypi"]["needs"] == "build"
+    assert jobs["pypi"]["if"] == "github.ref == 'refs/heads/main'"
+    assert jobs["pypi"]["environment"] == "pypi"
+    assert jobs["pypi"]["needs"] == "build"
+    assert "verify" not in jobs
+
+
 def test_repository_dogfoods_the_exact_rendered_workflows_and_hooks():
     root = Path(__file__).resolve().parent.parent
     ok, problems = installed(load_config(root), local=False)
@@ -65,6 +82,11 @@ def test_privileged_agent_cannot_mutate_git_or_execute_pr_code():
     assert "Never execute package\n" in text
     assert "python -m pip install --quiet ./target" not in text
     assert "run: ./target" not in text
+    assert "Resolve merge conflicts" in text
+    assert "--allowedTools Read,Glob,Grep,Edit" in text
+    assert 'git -C target push origin "HEAD:refs/heads/${HEAD_REF}"' in text
+    assert "resolver edited non-conflict path" in text
+    assert text.count("secrets.AUTOMERGE_TOKEN || github.token") >= 3
 
 
 def test_cancelled_or_pending_evaluations_cannot_publish_a_gate():
@@ -77,6 +99,17 @@ def test_cancelled_or_pending_evaluations_cannot_publish_a_gate():
     assert "reason=${REASON}" in text
     assert 'select(.state == "open")' in text
     assert "github.event.workflow_run.pull_requests[0].number" in text
+
+
+def test_new_branch_intake_is_draft_idempotent_and_excludes_permanent_branches():
+    text = (WORKFLOWS / "branch-intake.yml").read_text(encoding="utf-8")
+    assert "github.event.created == true" in text
+    assert "gh pr list" in text
+    assert "gh pr create" in text and "--draft" in text
+    assert "secrets.AUTOMERGE_TOKEN || github.token" in text
+    assert "__VIBEY_GH_INTEGRATION_BRANCH__" in text
+    assert "__VIBEY_GH_RELEASE_BRANCH__" in text
+    assert '"vibey-gh/repair/**"' in text
 
 
 @pytest.mark.parametrize("name", ["pre-push", "commit-msg"])

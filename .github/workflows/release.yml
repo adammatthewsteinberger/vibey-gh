@@ -1,10 +1,9 @@
 # Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger.
 name: Release
 
-# develop publishes a dev build to TestPyPI; main publishes the real thing to PyPI.
-# TestPyPI comes first on the main path because a PyPI version is immutable — it can
-# never be reused, even after a yank — so the only chance to catch a bad artifact is
-# before it is uploaded.
+# develop publishes a dev build to TestPyPI; main publishes the real thing directly to
+# PyPI. Keep the two deployment paths disjoint: the TestPyPI environment intentionally
+# permits only develop, so a main job must never request that environment.
 on:
   push:
     branches: [main, develop]
@@ -66,6 +65,7 @@ jobs:
   testpypi:
     name: Publish to TestPyPI
     needs: build
+    if: github.ref == 'refs/heads/develop'
     runs-on: ubuntu-latest
     environment: testpypi
     permissions:
@@ -78,37 +78,9 @@ jobs:
           repository-url: https://test.pypi.org/legacy/
           skip-existing: true
 
-  verify:
-    name: Verify the TestPyPI artifact
-    needs: [build, testpypi]
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
-        with: { python-version: "3.12" }
-      - name: Install that exact version from TestPyPI and run it
-        env:
-          VERSION: ${{ needs.build.outputs.version }}
-        run: |
-          set -euo pipefail
-          # --no-cache-dir: pip caches the simple index, and a cached index can never
-          # show an upload made seconds ago.
-          for i in $(seq 1 20); do
-            if pip install --no-cache-dir --quiet \
-                 --index-url https://test.pypi.org/simple/ \
-                 --extra-index-url https://pypi.org/simple/ \
-                 "vibey-gh==${VERSION}"; then
-              break
-            fi
-            echo "not indexed yet (attempt $i); waiting"
-            sleep 30
-          done
-          test "$(vibey-gh trailer-key)" = "Made-With"
-          echo "installed ${VERSION} from TestPyPI and it runs"
-
   pypi:
     name: Publish to PyPI
-    needs: [build, verify]
+    needs: build
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: pypi

@@ -1,0 +1,48 @@
+# Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger.
+name: Branch intake
+
+# A newly published topic branch gets one draft PR. Later pushes do not create duplicates;
+# scan-completion automation promotes the draft only when its exact head is stable.
+on:
+  push:
+    branches-ignore:
+      - __VIBEY_GH_INTEGRATION_BRANCH__
+      - __VIBEY_GH_RELEASE_BRANCH__
+      - "vibey-gh/repair/**"
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: branch-intake-${{ github.repository }}-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  draft:
+    name: Open draft pull request
+    if: github.event.created == true && !github.event.deleted
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create exactly one draft PR
+        env:
+          # GitHub commonly disables "Allow Actions to create pull requests". The
+          # existing automation token is the trusted fallback in that configuration.
+          GH_TOKEN: ${{ secrets.AUTOMERGE_TOKEN || github.token }}
+          REPO: ${{ github.repository }}
+          HEAD_REF: ${{ github.ref_name }}
+          BASE_REF: __VIBEY_GH_INTEGRATION_BRANCH__
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          existing=$(gh pr list --repo "$REPO" --state open --head "$HEAD_REF" \
+            --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            echo "PR #${existing} already tracks ${HEAD_REF}; no-op"
+            exit 0
+          fi
+          title=$(gh api "repos/${REPO}/commits/${HEAD_SHA}" \
+            --jq '.commit.message | split("\n")[0]')
+          gh pr create --repo "$REPO" --draft --base "$BASE_REF" --head "$HEAD_REF" \
+            --title "$title" \
+            --body $'Automatically opened as a draft for the new branch.\n\nVibey GH will mark this PR ready only after all configured scans pass for its exact current head.'
