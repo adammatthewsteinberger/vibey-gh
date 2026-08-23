@@ -40,6 +40,7 @@ flowchart TB
   subgraph Delivery["Event-driven delivery"]
     CI[CI, tests, lint, build]
     Docs[Documentation and Mermaid review]
+    Conventional[Conventional Commits self-heal]
     Review[Claude exact-head review]
     Repair[Bounded self-healing repair]
     Develop[develop]
@@ -62,6 +63,9 @@ flowchart TB
   Install --> PRAutomation
   Install --> MergeTrain
   PullRequest --> CI
+  PullRequest --> Conventional
+  Conventional --> Guard
+  Guard --> PullRequest
   PullRequest --> Docs
   CI --> PRAutomation
   Docs --> PRAutomation

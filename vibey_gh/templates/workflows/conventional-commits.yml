@@ -53,6 +53,7 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.AUTOMERGE_TOKEN || github.token }}
       - name: Normalize every nonconforming commit message
+        working-directory: target
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
@@ -67,10 +68,10 @@ jobs:
             echo "Refusing automatic rewrite of merge commits"
             exit 1
           }
-          git -C target switch -C "$HEAD_REF" "$HEAD_SHA"
-          FILTER_BRANCH_SQUELCH_WARNING=1 git -C target filter-branch -f \
+          git switch -C "$HEAD_REF" "$HEAD_SHA"
+          FILTER_BRANCH_SQUELCH_WARNING=1 git filter-branch -f \
             --msg-filter 'vibey-gh conventional-message' "${BASE_SHA}..${HEAD_REF}"
-          current=$(git -C target ls-remote origin "refs/heads/${HEAD_REF}" | cut -f1)
+          current=$(git ls-remote origin "refs/heads/${HEAD_REF}" | cut -f1)
           test "$current" = "$HEAD_SHA"
-          git -C target push --force-with-lease="refs/heads/${HEAD_REF}:${HEAD_SHA}" \
+          git push --force-with-lease="refs/heads/${HEAD_REF}:${HEAD_SHA}" \
             origin "HEAD:refs/heads/${HEAD_REF}"
