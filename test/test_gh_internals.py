@@ -275,6 +275,43 @@ def test_merge_reports_failure_when_even_admin_is_refused(fake_gh):
     assert merge_train.merge(5) == (False, True)
 
 
+@pytest.mark.parametrize(
+    "pr,expected",
+    [
+        ({"headRefName": "fix/thing"}, True),
+        ({"headRefName": "feature/thing"}, True),
+        ({"headRefName": "develop"}, False),
+        ({"headRefName": "main"}, False),
+        ({"headRefName": "trunk"}, False),
+        ({"headRefName": "stable"}, False),
+        ({"headRefName": "fix/fork", "isCrossRepository": True}, False),
+        ({}, False),
+    ],
+)
+def test_only_same_repo_topic_branches_are_cleanup_candidates(pr, expected):
+    cfg = GhConfig(root=Path.cwd(), integration_branch="trunk", release_branch="stable")
+    assert merge_train.should_delete_head(pr, cfg) is expected
+
+
+def test_topic_branch_cleanup_uses_the_exact_ref(fake_gh):
+    script(
+        fake_gh,
+        {
+            "repo view --json nameWithOwner": {"out": '{"nameWithOwner":"o/r"}'},
+            "api repos/o/r/git/refs/heads/fix/thing --method DELETE": {},
+        },
+    )
+    assert merge_train.delete_head_branch({"headRefName": "fix/thing"}) is True
+
+
+def test_topic_branch_cleanup_reports_api_refusal(fake_gh):
+    script(
+        fake_gh,
+        {"repo view --json nameWithOwner": {"out": '{"nameWithOwner":"o/r"}'}},
+    )
+    assert merge_train.delete_head_branch({"headRefName": "fix/thing"}) is False
+
+
 # ---------------------------------------------------------------- realign
 
 

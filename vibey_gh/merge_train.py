@@ -159,7 +159,7 @@ def judge(pr: dict, cfg: GhConfig) -> Verdict:
 
 _PR_FIELDS = (
     "number,title,state,isDraft,mergeable,mergeStateStatus,reviewDecision,"
-    "statusCheckRollup,author,labels,headRefOid,baseRefName"
+    "statusCheckRollup,author,labels,headRefOid,headRefName,baseRefName,isCrossRepository"
 )
 
 
@@ -198,6 +198,21 @@ def open_pull_requests(cfg: GhConfig, number: int | None = None) -> list[dict]:
 
 def method_for(pr: dict, cfg: GhConfig, default: str = "squash") -> str:
     return "rebase" if pr.get("baseRefName") == cfg.release_branch else default
+
+
+def should_delete_head(pr: dict, cfg: GhConfig) -> bool:
+    """Delete merged topic branches, never permanent or contributor-fork branches."""
+    head = str(pr.get("headRefName") or "")
+    permanent = {"main", "develop", cfg.integration_branch, cfg.release_branch}
+    return bool(head) and head not in permanent and not pr.get("isCrossRepository", False)
+
+
+def delete_head_branch(pr: dict) -> bool:
+    """Best-effort deletion after a successful merge; never called for permanent refs."""
+    repository = _gh_json("repo", "view", "--json", "nameWithOwner")["nameWithOwner"]
+    head = str(pr["headRefName"])
+    ok, _ = _gh("api", f"repos/{repository}/git/refs/heads/{head}", "--method", "DELETE")
+    return ok
 
 
 def merge(number: int, method: str = "squash") -> tuple[bool, bool]:
