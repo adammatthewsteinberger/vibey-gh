@@ -38,6 +38,57 @@ DEFAULT_TRAILER = (
     f"{DEFAULT_TRAILER_KEY}: Vibey, the auto-vibecoding machine by Adam Matthew Steinberger"
 )
 DEFAULT_SOURCES = ("tools/*.py", "src/**/*.py", ".github/workflows/*.yml")
+DEFAULT_SCAN_WORKFLOWS = (
+    "CI",
+    "Provenance",
+    "CodeQL",
+    "Docs",
+    "API drift (Cloud Agents OpenAPI)",
+)
+DEFAULT_IGNORED_CHECKS = ("PR automation / gate", "Merge train / merge")
+
+
+@dataclass(frozen=True)
+class PrAutomationConfig:
+    enabled: bool = True
+    scan_workflows: tuple[str, ...] = DEFAULT_SCAN_WORKFLOWS
+    ignored_checks: tuple[str, ...] = DEFAULT_IGNORED_CHECKS
+    max_repair_attempts: int = 3
+    model: str = "claude-sonnet-5"
+    review_untrusted_authors: bool = True
+    repair_untrusted_authors: bool = True
+    replace_fork_prs: bool = True
+    retain_schedule_backstop: bool = True
+
+    def __post_init__(self) -> None:
+        _unique_nonempty("pr_automation.scan_workflows", self.scan_workflows)
+        _unique_nonempty("pr_automation.ignored_checks", self.ignored_checks)
+        if self.enabled and not self.scan_workflows:
+            raise ValueError("pr_automation.scan_workflows must not be empty when enabled")
+        if not 1 <= self.max_repair_attempts <= 10:
+            raise ValueError("pr_automation.max_repair_attempts must be between 1 and 10")
+        if not self.model.strip():
+            raise ValueError("pr_automation.model must not be empty")
+
+
+def _unique_nonempty(name: str, values: tuple[str, ...]) -> None:
+    if any(not value.strip() for value in values):
+        raise ValueError(f"{name} entries must be non-empty")
+    if len(set(values)) != len(values):
+        raise ValueError(f"{name} entries must be unique")
+
+
+@dataclass(frozen=True)
+class GithubReleaseConfig:
+    enabled: bool = True
+    tag_prefix: str = "v"
+    generate_notes: bool = True
+
+    def __post_init__(self) -> None:
+        if not self.tag_prefix or any(char.isspace() for char in self.tag_prefix):
+            raise ValueError(
+                "github_release.tag_prefix must be non-empty and contain no whitespace"
+            )
 
 
 @dataclass(frozen=True)
@@ -53,6 +104,8 @@ class GhConfig:
     release_branch: str = "main"
     owner: str = ""
     trusted_authors: tuple[str, ...] = ()
+    pr_automation: PrAutomationConfig = PrAutomationConfig()
+    github_release: GithubReleaseConfig = GithubReleaseConfig()
     # Which bundled workflow templates this repository wants installed and kept current.
     # None means all of them, which is the right default for a repository adopting the
     # whole thing. A repository with its own richer workflows sets `workflows = []` and
@@ -91,6 +144,19 @@ def load_config(root: Path | None = None) -> GhConfig:
     br = data.get("branches", {})
     tr = data.get("merge_train", {})
     inst = data.get("install", {})
+    auto = data.get("pr_automation", {})
+    release = data.get("github_release", {})
+    automation = PrAutomationConfig(
+        enabled=auto.get("enabled", True),
+        scan_workflows=tuple(auto.get("scan_workflows", DEFAULT_SCAN_WORKFLOWS)),
+        ignored_checks=tuple(auto.get("ignored_checks", DEFAULT_IGNORED_CHECKS)),
+        max_repair_attempts=auto.get("max_repair_attempts", 3),
+        model=auto.get("model", "claude-sonnet-5"),
+        review_untrusted_authors=auto.get("review_untrusted_authors", True),
+        repair_untrusted_authors=auto.get("repair_untrusted_authors", True),
+        replace_fork_prs=auto.get("replace_fork_prs", True),
+        retain_schedule_backstop=auto.get("retain_schedule_backstop", True),
+    )
     return GhConfig(
         root=root,
         text=fp.get("text", DEFAULT_TEXT),
@@ -104,6 +170,12 @@ def load_config(root: Path | None = None) -> GhConfig:
         release_branch=br.get("release", "main"),
         owner=tr.get("owner", ""),
         trusted_authors=tuple(tr.get("trusted_authors", ())),
+        pr_automation=automation,
+        github_release=GithubReleaseConfig(
+            enabled=release.get("enabled", True),
+            tag_prefix=release.get("tag_prefix", "v"),
+            generate_notes=release.get("generate_notes", True),
+        ),
     )
 
 

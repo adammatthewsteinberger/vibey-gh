@@ -9,8 +9,10 @@ else thought were important.
 
 from __future__ import annotations
 
+import json
 import shutil
 import stat
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -46,6 +48,43 @@ def _managed_workflows(cfg: GhConfig) -> list[Path]:
         return every
     wanted = set(cfg.managed_workflows)
     return [p for p in every if p.name in wanted]
+
+
+def render_workflow(source: Path, cfg: GhConfig) -> str:
+    wanted = source.read_text(encoding="utf-8")
+    wanted = wanted.replace("__VIBEY_GH_RELEASE_BRANCH__", cfg.release_branch)
+    if source.name != "pr-automation.yml":
+        return wanted
+    workflows = json.dumps(list(cfg.pr_automation.scan_workflows))
+    schedule = (
+        '  schedule:\n    - cron: "47 */6 * * *"'
+        if cfg.pr_automation.retain_schedule_backstop
+        else "  # schedule backstop disabled by .vibey-gh.toml"
+    )
+    return (
+        wanted.replace("__VIBEY_GH_SCAN_WORKFLOWS__", workflows)
+        .replace("  # __VIBEY_GH_SCHEDULE__", schedule)
+        .replace("__VIBEY_GH_MODEL__", cfg.pr_automation.model)
+    )
+
+
+def installation_notices() -> tuple[str, ...]:
+    """Best-effort secret inventory plus settings the GitHub API cannot infer safely."""
+    notices = [
+        "enable Actions read/write permissions and allow Actions to create pull requests",
+    ]
+    run = subprocess.run(
+        ["gh", "secret", "list", "--json", "name"], capture_output=True, text=True, check=False
+    )
+    if run.returncode == 0:
+        try:
+            present = {str(item["name"]) for item in json.loads(run.stdout)}
+        except (json.JSONDecodeError, KeyError, TypeError):
+            present = set()
+        for name in ("ANTHROPIC_API_KEY", "AUTOMERGE_TOKEN"):
+            if name not in present:
+                notices.append(f"configure repository secret {name}")
+    return tuple(notices)
 
 
 def install(cfg: GhConfig | None = None, hooks_path: bool = True) -> list[Action]:
@@ -89,7 +128,7 @@ def install(cfg: GhConfig | None = None, hooks_path: bool = True) -> list[Action
     wf_target.mkdir(parents=True, exist_ok=True)
     for source in _managed_workflows(cfg):
         dest = wf_target / source.name
-        wanted = source.read_text(encoding="utf-8")
+        wanted = render_workflow(source, cfg)
         if dest.exists() and dest.read_text(encoding="utf-8") == wanted:
             actions.append(Action(f"{WORKFLOWS_DIR}/{source.name}", "unchanged"))
             continue
@@ -98,8 +137,6 @@ def install(cfg: GhConfig | None = None, hooks_path: bool = True) -> list[Action
         actions.append(Action(f"{WORKFLOWS_DIR}/{source.name}", outcome))
 
     if hooks_path:
-        import subprocess
-
         subprocess.run(
             ["git", "config", "core.hooksPath", HOOKS_DIR],
             cwd=cfg.root,
@@ -132,7 +169,7 @@ def installed(cfg: GhConfig | None = None, local: bool = True) -> tuple[bool, li
         dest = cfg.root / WORKFLOWS_DIR / source.name
         if not dest.exists():
             problems.append(f"{WORKFLOWS_DIR}/{source.name} is missing")
-        elif dest.read_text(encoding="utf-8") != source.read_text(encoding="utf-8"):
+        elif dest.read_text(encoding="utf-8") != render_workflow(source, cfg):
             problems.append(f"{WORKFLOWS_DIR}/{source.name} is out of date")
 
     if local:

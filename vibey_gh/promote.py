@@ -118,7 +118,7 @@ def promote(
     *,
     dry_run: bool = False,
     method: str = DEFAULT_METHOD,
-    wait: bool = True,
+    wait: bool = False,
 ) -> Promotion:
     cfg = cfg or load_config()
     result = Promotion()
@@ -181,7 +181,11 @@ def promote(
         result.say(f"reusing #{number}")
     result.pull_request = number
 
-    if wait and not checks_pass(cfg, number):
+    if not wait:
+        result.say(f"#{number} will be merged by the event-driven PR automation gate")
+        return result
+
+    if not checks_pass(cfg, number):
         result.say(f"checks did not pass on #{number}; leaving it open")
         return result
 

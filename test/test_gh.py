@@ -16,7 +16,7 @@ import pytest
 
 from vibey_gh import fingerprints, install, merge_train, realign, versioning
 from vibey_gh.cli import main as cli_main
-from vibey_gh.config import GhConfig, load_config, normalise_actor
+from vibey_gh.config import GhConfig, PrAutomationConfig, load_config, normalise_actor
 
 # --------------------------------------------------------------------------- helpers
 
@@ -237,7 +237,10 @@ def _pr(**kw):
 )
 def test_readiness_gate(tmp_path, pr, ready, fragment):
     cfg = cfg_for(
-        tmp_path, owner="owner", trusted_authors=("owner", "claude[bot]", "github-actions[bot]")
+        tmp_path,
+        owner="owner",
+        trusted_authors=("owner", "claude[bot]", "github-actions[bot]"),
+        pr_automation=PrAutomationConfig(enabled=False),
     )
     verdict = merge_train.judge(pr, cfg)
     assert verdict.ready is ready

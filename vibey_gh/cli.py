@@ -4,10 +4,22 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
+from dataclasses import asdict
+from pathlib import Path
 
-from vibey_gh import fingerprints, install, merge_train, promote, realign, versioning
+from vibey_gh import (
+    fingerprints,
+    github_release,
+    install,
+    merge_train,
+    pr_automation,
+    promote,
+    realign,
+    versioning,
+)
 from vibey_gh.config import load_config
 
 
@@ -48,6 +60,8 @@ def _install(args) -> int:
     cfg = load_config()
     for action in install.install(cfg):
         print(f"  {action.hook}: {action.outcome}")
+    for notice in install.installation_notices():
+        print(f"  notice: {notice}")
     print(f"vibey-gh: installed into {cfg.root}")
     return 0
 
@@ -83,7 +97,11 @@ def _summary_rows(rows: list[tuple[int, str, str]], merged: int, skipped: int) -
 
 def _merge_train(args) -> int:
     cfg = load_config()
-    prs = merge_train.open_pull_requests(cfg)
+    prs = (
+        merge_train.open_pull_requests(cfg, number=args.pr)
+        if args.pr is not None
+        else merge_train.open_pull_requests(cfg)
+    )
     if not prs:
         print(f"vibey-gh: no open pull requests into {cfg.integration_branch}")
         _write_summary(args, "No open pull requests.\n")
@@ -110,11 +128,12 @@ def _merge_train(args) -> int:
             rows.append((v.number, v.title, f"would {args.method}-merge"))
             continue
 
-        ok, bypassed = merge_train.merge(v.number, args.method)
+        method = merge_train.method_for(pr, cfg, args.method)
+        ok, bypassed = merge_train.merge(v.number, method)
         if ok:
             note = " (review requirement bypassed)" if bypassed else ""
-            print(f"  #{v.number} {args.method}-merged{note}")
-            rows.append((v.number, v.title, f"{args.method}-merged{note}"))
+            print(f"  #{v.number} {method}-merged{note}")
+            rows.append((v.number, v.title, f"{method}-merged{note}"))
             merged += 1
         else:
             print(f"  #{v.number} could not be merged — the ruleset refused it")
@@ -123,6 +142,51 @@ def _merge_train(args) -> int:
 
     print(f"vibey-gh: merged {merged}, skipped {skipped}")
     _write_summary(args, _summary_rows(rows, merged, skipped))
+    return 0
+
+
+def _read_json(value: str) -> dict:
+    if value == "-":
+        raw = sys.stdin.read()
+    else:
+        path = Path(value)
+        raw = path.read_text(encoding="utf-8") if path.is_file() else value
+    parsed = json.loads(raw)
+    if not isinstance(parsed, dict):
+        raise TypeError("input JSON must be an object")
+    return parsed
+
+
+def _pr_automation(args) -> int:
+    cfg = load_config()
+    try:
+        if args.action == "evaluate":
+            print(pr_automation.evaluate_pr(args.pr, args.head_sha, cfg).to_json())
+        elif args.action in {"record-review", "record-repair"}:
+            kind = args.action.removeprefix("record-")
+            state = pr_automation.record(args.pr, _read_json(args.input), kind)
+            print(json.dumps(asdict(state), sort_keys=True))
+        elif args.action == "mirror-fork":
+            print(json.dumps(pr_automation.mirror_fork(args.pr, cfg), sort_keys=True))
+        elif args.action == "ensure-labels":
+            pr_automation.ensure_labels()
+            print("vibey-gh: PR automation labels are ready")
+        else:  # pragma: no cover - argparse constrains this
+            raise ValueError(f"unknown action: {args.action}")
+    except (RuntimeError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        print(f"vibey-gh: {exc}", file=sys.stderr)
+        return 1
+    return 0
+
+
+def _github_release(args) -> int:
+    cfg = load_config()
+    try:
+        result = github_release.publish(cfg, target=args.target, version=args.version)
+    except (RuntimeError, ValueError, KeyError, json.JSONDecodeError) as exc:
+        print(f"vibey-gh: {exc}", file=sys.stderr)
+        return 1
+    print(json.dumps(asdict(result), sort_keys=True))
     return 0
 
 
@@ -142,7 +206,7 @@ def _write_summary(args, text: str) -> None:
 def _promote(args) -> int:
     try:
         result = promote.promote(
-            load_config(), dry_run=args.dry_run, method=args.method, wait=not args.no_wait
+            load_config(), dry_run=args.dry_run, method=args.method, wait=args.wait
         )
     except RuntimeError as exc:
         print(f"vibey-gh: {exc}", file=sys.stderr)
@@ -202,6 +266,7 @@ def main(argv: list[str] | None = None) -> int:
 
     m = sub.add_parser("merge-train", help="merge every ready pull request")
     m.add_argument("--method", default="squash", choices=("squash", "rebase", "merge"))
+    m.add_argument("--pr", type=int, help="evaluate only this pull request")
     m.add_argument("--dry-run", action="store_true")
     m.add_argument(
         "--label",
@@ -216,15 +281,50 @@ def main(argv: list[str] | None = None) -> int:
     )
     m.set_defaults(func=_merge_train)
 
+    automation = sub.add_parser(
+        "pr-automation", help="evaluate and persist event-driven PR automation state"
+    )
+    automation_sub = automation.add_subparsers(dest="action", required=True)
+    evaluate = automation_sub.add_parser("evaluate", help="classify one exact PR head")
+    evaluate.add_argument("--pr", type=int, required=True)
+    evaluate.add_argument("--head-sha", required=True)
+    evaluate.set_defaults(func=_pr_automation)
+    for command in ("record-review", "record-repair"):
+        record = automation_sub.add_parser(command, help=f"persist a structured {command[7:]}")
+        record.add_argument("--pr", type=int, required=True)
+        record.add_argument("--input", required=True, help="JSON object, file, or - for stdin")
+        record.set_defaults(func=_pr_automation)
+    mirror = automation_sub.add_parser(
+        "mirror-fork", help="open a repository-owned replacement for a fork PR"
+    )
+    mirror.add_argument("--pr", type=int, required=True)
+    mirror.set_defaults(func=_pr_automation)
+    labels = automation_sub.add_parser("ensure-labels", help="create or update automation labels")
+    labels.set_defaults(func=_pr_automation)
+
+    release = sub.add_parser(
+        "github-release", help="idempotently create an immutable version tag and GitHub Release"
+    )
+    release.add_argument("--target", required=True, help="exact main commit SHA to tag")
+    release.add_argument("--version", help="version override (default: configured version file)")
+    release.set_defaults(func=_github_release)
+
     p = sub.add_parser("promote", help="promote the integration branch to the release branch")
     p.add_argument(
         "--method", default=promote.DEFAULT_METHOD, choices=("rebase", "squash", "merge")
     )
     p.add_argument("--dry-run", action="store_true")
-    p.add_argument(
-        "--no-wait",
+    wait_mode = p.add_mutually_exclusive_group()
+    wait_mode.add_argument(
+        "--wait",
         action="store_true",
-        help="do not wait for the pull request's checks before merging",
+        help="legacy synchronous mode: wait for checks and merge in this process",
+    )
+    wait_mode.add_argument(
+        "--no-wait",
+        action="store_false",
+        dest="wait",
+        help="open the promotion PR and let event-driven automation merge it (default)",
     )
     p.add_argument(
         "--summary", metavar="FILE", help="write markdown here (default: $GITHUB_STEP_SUMMARY)"

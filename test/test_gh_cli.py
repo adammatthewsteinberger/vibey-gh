@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from vibey_gh import merge_train
+from vibey_gh import github_release, merge_train, pr_automation
 from vibey_gh import realign as realign_mod
 from vibey_gh.cli import main
 from vibey_gh.merge_train import Verdict
@@ -315,3 +315,72 @@ def test_a_promotion_that_cannot_proceed_is_an_error(repo, monkeypatch, capsys):
     monkeypatch.setattr(promote_mod, "promote", boom)
     assert main(["promote"]) == 1
     assert "could not push the version bump" in capsys.readouterr().err
+
+
+def test_pr_automation_cli_surfaces(repo, monkeypatch, tmp_path, capsys):
+    evaluation = pr_automation.Evaluation(7, "abc", "develop", "owner", True, "ready")
+    monkeypatch.setattr(pr_automation, "evaluate_pr", lambda *a: evaluation)
+    assert main(["pr-automation", "evaluate", "--pr", "7", "--head-sha", "abc"]) == 0
+    assert json.loads(capsys.readouterr().out)["state"] == "ready"
+
+    state = pr_automation.AutomationState("abc", "abc")
+    calls = []
+    monkeypatch.setattr(
+        pr_automation,
+        "record",
+        lambda number, payload, kind: calls.append((number, payload, kind)) or state,
+    )
+    payload = tmp_path / "payload.json"
+    payload.write_text('{"pass": true}')
+    assert main(["pr-automation", "record-review", "--pr", "7", "--input", str(payload)]) == 0
+    monkeypatch.setattr("sys.stdin.read", lambda: '{"fixable": true}')
+    assert main(["pr-automation", "record-repair", "--pr", "7", "--input", "-"]) == 0
+    assert calls == [(7, {"pass": True}, "review"), (7, {"fixable": True}, "repair")]
+
+    monkeypatch.setattr(
+        pr_automation, "mirror_fork", lambda *a: {"original_pr": 7, "replacement_pr": 8}
+    )
+    assert main(["pr-automation", "mirror-fork", "--pr", "7"]) == 0
+    monkeypatch.setattr(pr_automation, "ensure_labels", lambda: calls.append("labels"))
+    assert main(["pr-automation", "ensure-labels"]) == 0
+    assert calls[-1] == "labels"
+
+
+@pytest.mark.parametrize("value", ("[]", "{bad"))
+def test_pr_automation_cli_rejects_bad_json(repo, capsys, value):
+    assert main(["pr-automation", "record-review", "--pr", "7", "--input", value]) == 1
+    assert "vibey-gh:" in capsys.readouterr().err
+
+
+def test_pr_automation_cli_reports_runtime_errors(repo, monkeypatch, capsys):
+    def boom(*args):
+        raise RuntimeError("offline")
+
+    monkeypatch.setattr(pr_automation, "evaluate_pr", boom)
+    assert main(["pr-automation", "evaluate", "--pr", "7", "--head-sha", "abc"]) == 1
+    assert "offline" in capsys.readouterr().err
+
+
+def test_merge_train_targets_one_pr(repo, monkeypatch):
+    requested = []
+    monkeypatch.setattr(
+        merge_train,
+        "open_pull_requests",
+        lambda cfg, number=None: requested.append(number) or [],
+    )
+    assert main(["merge-train", "--pr", "19"]) == 0
+    assert requested == [19]
+
+
+def test_github_release_cli(repo, monkeypatch, capsys):
+    result = github_release.ReleaseResult("v1.0.0", "abc", True, True)
+    monkeypatch.setattr(github_release, "publish", lambda *a, **k: result)
+    assert main(["github-release", "--target", "abc", "--version", "1.0.0"]) == 0
+    assert json.loads(capsys.readouterr().out)["tag"] == "v1.0.0"
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("tag conflict")
+
+    monkeypatch.setattr(github_release, "publish", boom)
+    assert main(["github-release", "--target", "abc"]) == 1
+    assert "tag conflict" in capsys.readouterr().err

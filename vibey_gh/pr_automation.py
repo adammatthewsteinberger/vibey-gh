@@ -1,0 +1,433 @@
+# Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger.
+"""Policy and durable state for event-driven pull-request automation.
+
+The workflow is intentionally thin.  It gathers GitHub data, asks this module for a
+decision, and dispatches an agent only for the explicit ``repair`` or ``review`` states.
+That keeps stale-SHA rejection, trust, retry limits, and check classification testable.
+"""
+
+from __future__ import annotations
+
+import json
+import re
+import subprocess
+from collections.abc import Sequence
+from dataclasses import asdict, dataclass, field
+from typing import Any, cast
+
+from vibey_gh.config import GhConfig, normalise_actor
+
+STATE_MARKER = "vibey-gh-pr-automation"
+EXTERNAL_REPAIR_LABEL = "vibey-gh:external-repair"
+REPAIRING_LABEL = "vibey-gh:repairing"
+EXHAUSTED_LABEL = "vibey-gh:repair-exhausted"
+BLOCKED_LABEL = "vibey-gh:automation-blocked"
+AUTOMATION_LABELS = (EXTERNAL_REPAIR_LABEL, REPAIRING_LABEL, EXHAUSTED_LABEL, BLOCKED_LABEL)
+PASSING = {"SUCCESS", "NEUTRAL", "SKIPPED"}
+FAILING = {"FAILURE", "TIMED_OUT", "STARTUP_FAILURE", "ACTION_REQUIRED"}
+OPERATIONAL = {"CANCELLED", "STALE"}
+_STATE_RE = re.compile(r"<!-- " + STATE_MARKER + r":(\{.*?\}) -->", re.DOTALL)
+
+
+@dataclass(frozen=True)
+class Check:
+    name: str
+    status: str
+    conclusion: str | None
+    url: str = ""
+
+
+@dataclass
+class AutomationState:
+    lineage_sha: str
+    current_sha: str
+    attempts: int = 0
+    review_sha: str | None = None
+    review_passed: bool | None = None
+    replacement_pr: int | None = None
+    history: list[dict[str, Any]] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class Evaluation:
+    pr: int
+    head_sha: str
+    base: str
+    author: str
+    trusted: bool
+    state: str
+    pending_checks: tuple[str, ...] = ()
+    failed_checks: tuple[str, ...] = ()
+    repair_attempt: int = 0
+    repair_branch: str | None = None
+    reason: str = ""
+
+    def to_json(self) -> str:
+        payload = asdict(self)
+        payload["pending_checks"] = list(self.pending_checks)
+        payload["failed_checks"] = list(self.failed_checks)
+        return json.dumps(payload, sort_keys=True)
+
+
+def _check(raw: dict[str, Any]) -> Check:
+    return Check(
+        name=str(raw.get("name") or raw.get("context") or "unnamed check"),
+        status=str(raw.get("status") or "COMPLETED").upper(),
+        conclusion=(str(raw["conclusion"]).upper() if raw.get("conclusion") else None),
+        url=str(raw.get("detailsUrl") or raw.get("targetUrl") or ""),
+    )
+
+
+def parse_state(comments: Sequence[dict[str, Any] | str]) -> AutomationState | None:
+    """Return the newest valid state marker, ignoring ordinary or malformed comments."""
+    for item in reversed(comments):
+        body = item if isinstance(item, str) else str(item.get("body", ""))
+        match = _STATE_RE.search(body)
+        if not match:
+            continue
+        try:
+            data = json.loads(match.group(1))
+            return AutomationState(
+                lineage_sha=str(data["lineage_sha"]),
+                current_sha=str(data["current_sha"]),
+                attempts=int(data.get("attempts", 0)),
+                review_sha=data.get("review_sha"),
+                review_passed=data.get("review_passed"),
+                replacement_pr=data.get("replacement_pr"),
+                history=list(data.get("history", [])),
+            )
+        except (KeyError, TypeError, ValueError, json.JSONDecodeError):
+            continue
+    return None
+
+
+def state_body(state: AutomationState, summary: str) -> str:
+    encoded = json.dumps(asdict(state), sort_keys=True, separators=(",", ":"))
+    return f"<!-- {STATE_MARKER}:{encoded} -->\n## Vibey GH PR automation\n\n{summary.strip()}\n"
+
+
+def _labels(pr: dict[str, Any]) -> set[str]:
+    return {
+        str(label.get("name", "")) if isinstance(label, dict) else str(label)
+        for label in pr.get("labels") or []
+    }
+
+
+def repair_refspec(branch: str) -> str:
+    """Build an update-only refspec; deletion refspecs have an empty source before `:`."""
+    if not branch or ":" in branch or branch.startswith("-"):
+        raise ValueError(f"unsafe repair branch {branch!r}")
+    return f"HEAD:refs/heads/{branch}"
+
+
+def _trusted(pr: dict[str, Any], cfg: GhConfig) -> bool:
+    if EXTERNAL_REPAIR_LABEL in _labels(pr):
+        return False
+    actor = normalise_actor(str((pr.get("author") or {}).get("login", "")))
+    trusted = {normalise_actor(value) for value in cfg.trusted_authors}
+    if cfg.owner:
+        trusted.add(normalise_actor(cfg.owner))
+    return actor in trusted
+
+
+def evaluate(
+    pr: dict[str, Any],
+    cfg: GhConfig,
+    *,
+    expected_sha: str,
+    stored: AutomationState | None = None,
+) -> Evaluation:
+    """Classify one exact PR head without mutating GitHub."""
+    number = int(pr["number"])
+    head = str(pr.get("headRefOid") or "")
+    base = str(pr.get("baseRefName") or cfg.integration_branch)
+    author = str((pr.get("author") or {}).get("login", ""))
+    trusted = _trusted(pr, cfg)
+
+    def result(state: str, reason: str, **kw: Any) -> Evaluation:
+        return Evaluation(number, head, base, author, trusted, state, reason=reason, **kw)
+
+    if head != expected_sha:
+        return result("blocked", f"stale event for {expected_sha}; current head is {head}")
+    if pr.get("state", "OPEN") != "OPEN":
+        return result("blocked", "pull request is not open")
+    if pr.get("isDraft"):
+        return result("blocked", "pull request is a draft")
+    if pr.get("mergeable") == "CONFLICTING":
+        return result("blocked", f"conflicts with {base}")
+    if pr.get("reviewDecision") == "CHANGES_REQUESTED":
+        return result("blocked", "a human requested changes")
+
+    labels = _labels(pr)
+    if BLOCKED_LABEL in labels:
+        return result("blocked", "automation is blocked pending operator action")
+    if EXHAUSTED_LABEL in labels:
+        return result("blocked", "repair budget is exhausted")
+
+    state = stored
+    if state is None or state.current_sha != head:
+        state = AutomationState(lineage_sha=head, current_sha=head)
+
+    ignored = set(cfg.pr_automation.ignored_checks) | {
+        "PR automation / gate",
+        "Merge train / merge",
+    }
+    checks = [_check(item) for item in pr.get("statusCheckRollup") or []]
+    checks = [item for item in checks if item.name not in ignored]
+    if not checks:
+        return result("pending", "no current-head scan results are available")
+    pending = tuple(item.name for item in checks if item.status != "COMPLETED")
+    if pending:
+        return result("pending", "checks are still running", pending_checks=pending)
+
+    operational = tuple(item.name for item in checks if item.conclusion in OPERATIONAL)
+    if operational:
+        return result(
+            "blocked",
+            "cancelled or stale checks require a rerun",
+            failed_checks=operational,
+        )
+
+    failed = tuple(item.name for item in checks if item.conclusion in FAILING)
+    if failed:
+        if state.attempts >= cfg.pr_automation.max_repair_attempts:
+            return result(
+                "blocked",
+                "repair budget is exhausted",
+                failed_checks=failed,
+                repair_attempt=state.attempts,
+            )
+        if not trusted and not cfg.pr_automation.repair_untrusted_authors:
+            return result(
+                "blocked", "repairs for untrusted authors are disabled", failed_checks=failed
+            )
+        return result(
+            "repair",
+            "completed checks are failing",
+            failed_checks=failed,
+            repair_attempt=state.attempts + 1,
+        )
+
+    if not trusted and cfg.pr_automation.review_untrusted_authors:
+        if state.review_sha != head:
+            return result("review", "current head requires automated review")
+        if state.review_passed is not True:
+            if state.attempts >= cfg.pr_automation.max_repair_attempts:
+                return result(
+                    "blocked", "review repair budget is exhausted", repair_attempt=state.attempts
+                )
+            return result(
+                "repair",
+                "automated review has actionable findings",
+                failed_checks=("Automated review",),
+                repair_attempt=state.attempts + 1,
+            )
+
+    return result("ready", "all scans and applicable reviews passed")
+
+
+def _gh_json(*args: str) -> Any:
+    run = subprocess.run(["gh", *args], capture_output=True, text=True, check=False)
+    if run.returncode:
+        raise RuntimeError(f"gh {' '.join(args)}: {run.stderr.strip()}")
+    return json.loads(run.stdout or "null")
+
+
+def fetch_pr(number: int) -> dict[str, Any]:
+    return cast(
+        dict[str, Any],
+        _gh_json(
+            "pr",
+            "view",
+            str(number),
+            "--json",
+            "number,title,state,isDraft,mergeable,mergeStateStatus,reviewDecision,"
+            "statusCheckRollup,author,labels,comments,headRefOid,headRefName,headRepository,"
+            "headRepositoryOwner,baseRefName,body",
+        ),
+    )
+
+
+def evaluate_pr(number: int, head_sha: str, cfg: GhConfig) -> Evaluation:
+    pr = fetch_pr(number)
+    return evaluate(pr, cfg, expected_sha=head_sha, stored=parse_state(pr.get("comments") or []))
+
+
+def updated_state(
+    pr: dict[str, Any],
+    payload: dict[str, Any],
+    *,
+    kind: str,
+) -> AutomationState:
+    current = parse_state(pr.get("comments") or [])
+    head = str(payload.get("head_sha") or pr.get("headRefOid") or "")
+    state = current or AutomationState(lineage_sha=head, current_sha=head)
+    if kind == "review":
+        state.review_sha = head
+        state.review_passed = bool(payload.get("pass"))
+    elif kind == "repair":
+        if payload.get("fixable") is not False:
+            state.attempts += 1
+        state.current_sha = head
+        state.review_sha = None
+        state.review_passed = None
+    else:
+        raise ValueError(f"unknown record kind: {kind}")
+    state.history.append({"kind": kind, **payload})
+    return state
+
+
+def upsert_state(
+    number: int, state: AutomationState, summary: str, comments: list[dict[str, Any]]
+) -> None:
+    body = state_body(state, summary)
+    existing: dict[str, Any] | None = None
+    for comment in reversed(comments):
+        if _STATE_RE.search(str(comment.get("body", ""))):
+            existing = comment
+            break
+    if existing is None:
+        run = subprocess.run(
+            ["gh", "pr", "comment", str(number), "--body", body],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    else:
+        repository = _gh_json("repo", "view", "--json", "nameWithOwner")
+        comment_id = existing.get("databaseId") or existing.get("id")
+        run = subprocess.run(
+            [
+                "gh",
+                "api",
+                f"repos/{repository['nameWithOwner']}/issues/comments/{comment_id}",
+                "--method",
+                "PATCH",
+                "--field",
+                f"body={body}",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    if run.returncode:
+        raise RuntimeError(f"could not persist PR automation state: {run.stderr.strip()}")
+
+
+def record(number: int, payload: dict[str, Any], kind: str) -> AutomationState:
+    pr = fetch_pr(number)
+    state = updated_state(pr, payload, kind=kind)
+    summary = str(payload.get("summary") or f"Recorded {kind} for `{state.current_sha}`.")
+    upsert_state(number, state, summary, list(pr.get("comments") or []))
+    return state
+
+
+def ensure_labels() -> None:
+    definitions = {
+        EXTERNAL_REPAIR_LABEL: ("5319E7", "Repository-owned continuation of a fork PR"),
+        REPAIRING_LABEL: ("FBCA04", "Automated scan repair is in progress"),
+        EXHAUSTED_LABEL: ("D93F0B", "Automated repair budget is exhausted"),
+        BLOCKED_LABEL: ("B60205", "Automation requires repository-operator action"),
+    }
+    for name, (colour, description) in definitions.items():
+        subprocess.run(
+            [
+                "gh",
+                "label",
+                "create",
+                name,
+                "--color",
+                colour,
+                "--description",
+                description,
+                "--force",
+            ],
+            capture_output=True,
+            check=False,
+        )
+
+
+def mirror_fork(number: int, cfg: GhConfig) -> dict[str, Any]:
+    """Mirror an exact fork head and open a repository-owned replacement PR."""
+    pr = fetch_pr(number)
+    head = str(pr["headRefOid"])
+    short = head[:12]
+    branch = f"vibey-gh/repair/pr-{number}-{short}"
+    refspec = repair_refspec(branch)
+    owner = str((pr.get("headRepositoryOwner") or {}).get("login", ""))
+    repo = str((pr.get("headRepository") or {}).get("name", ""))
+    if not owner or not repo:
+        raise RuntimeError("pull request does not expose a fork repository")
+    fetch = subprocess.run(
+        ["git", "fetch", "--quiet", f"https://github.com/{owner}/{repo}.git", head],
+        cwd=cfg.root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if fetch.returncode:
+        raise RuntimeError(f"could not fetch fork head: {fetch.stderr.strip()}")
+    push = subprocess.run(
+        ["git", "push", "origin", refspec.replace("HEAD", head, 1)],
+        cwd=cfg.root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if push.returncode:
+        raise RuntimeError(f"could not publish repair branch: {push.stderr.strip()}")
+    body = (
+        f"Repository-owned repair continuation of #{number} from @{(pr.get('author') or {}).get('login', '')}.\n\n"
+        f"Original head: `{head}`. The original contributor retains attribution; this branch "
+        "exists only because privileged automation cannot write to a contributor fork."
+    )
+    create = subprocess.run(
+        [
+            "gh",
+            "pr",
+            "create",
+            "--base",
+            str(pr["baseRefName"]),
+            "--head",
+            branch,
+            "--title",
+            f"Repair #{number}: {pr.get('title', '')}",
+            "--body",
+            body,
+        ],
+        cwd=cfg.root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if create.returncode:
+        raise RuntimeError(f"could not open replacement pull request: {create.stderr.strip()}")
+    replacement = int(re.sub(r"\D", "", create.stdout.rsplit("/", 1)[-1]))
+    subprocess.run(
+        ["gh", "pr", "edit", str(replacement), "--add-label", EXTERNAL_REPAIR_LABEL],
+        cwd=cfg.root,
+        capture_output=True,
+        check=False,
+    )
+    subprocess.run(
+        [
+            "gh",
+            "pr",
+            "comment",
+            str(number),
+            "--body",
+            f"Repairs continue in #{replacement}; closing this fork PR only after preserving its exact head and attribution.",
+        ],
+        cwd=cfg.root,
+        capture_output=True,
+        check=False,
+    )
+    subprocess.run(
+        ["gh", "pr", "close", str(number)], cwd=cfg.root, capture_output=True, check=False
+    )
+    return {
+        "original_pr": number,
+        "replacement_pr": replacement,
+        "branch": branch,
+        "head_sha": head,
+    }

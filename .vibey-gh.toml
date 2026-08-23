@@ -19,3 +19,19 @@ release     = "main"
 [merge_train]
 owner           = "adammatthewsteinberger"
 trusted_authors = ["adammatthewsteinberger", "claude[bot]", "github-actions[bot]", "vibey[bot]"]
+
+[pr_automation]
+enabled = true
+scan_workflows = ["CI", "Provenance", "CodeQL", "Docs", "API drift (Cloud Agents OpenAPI)"]
+ignored_checks = ["PR automation / gate", "Merge train / merge"]
+max_repair_attempts = 3
+model = "claude-sonnet-5"
+review_untrusted_authors = true
+repair_untrusted_authors = true
+replace_fork_prs = true
+retain_schedule_backstop = true
+
+[github_release]
+enabled = true
+tag_prefix = "v"
+generate_notes = true
