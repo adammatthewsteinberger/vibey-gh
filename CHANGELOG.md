@@ -14,6 +14,12 @@ This file follows Keep a Changelog and semantic versioning conventions.
   that is missing.
 - Treat concurrent PR-head advances during repair or conflict publication as stale no-ops
   while preserving ordinary non-fast-forward protection and never force-pushing.
+- Check operator-block and budget-exhausted labels before conflict-resolution eligibility,
+  so a blocked or exhausted PR no longer triggers automated conflict resolution.
+- Stop flagging a marketplace plugin whose source is the repository root (`.`) as an unsafe
+  external source.
+- Rewrite the release-channel navigation "Home" link to the correct Pages root instead of
+  leaving its `href` unset.
 - Replace the placeholder GitHub automation README with a comprehensive operator guide
   and enforce its required sections, minimum depth, and exact provenance deterministically.
 - Fix GraphQL-only PR-state comment updates, synchronize package version metadata,

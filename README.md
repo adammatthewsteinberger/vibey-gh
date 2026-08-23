@@ -220,7 +220,7 @@ request bytes for HMAC verification; see [the CLI and adapter reference](docs/cl
 
 | Command | Human purpose |
 |---|---|
-| `vibey-gh check [--apply] [--commits RANGE] [--ci]` | Verify installed assets, file fingerprints, commit trailers, traceable branch logging, documentation, marketplace structure, and interface parity; optionally repair missing source headers. |
+| `vibey-gh check [--apply] [--commits RANGE] [--ci]` | Verify installed assets, file fingerprints, commit trailers, traceable branch logging, documentation, marketplace structure, and interface parity; optionally add a missing source header or collapse a header duplicated within a file. |
 | `vibey-gh install` | Render configured workflows, install/chains hooks, and install release-site assets. |
 | `vibey-gh version [--since REF] [--dev BUILD] [--apply] [--explain]` | Derive, explain, print, or apply the next release version. |
 | `vibey-gh trailer` / `trailer-key` | Print the configured provenance trailer or its key for scripts and workflows. |
@@ -256,7 +256,7 @@ file cannot be.
 
 ```bash
 vibey-gh check                 # are the hooks installed and the fingerprints intact?
-vibey-gh check --apply         # add the missing file headers
+vibey-gh check --apply         # add missing file headers and dedupe a repeated header
 vibey-gh check --commits main..HEAD    # and every commit trailer in a range
 ```
 

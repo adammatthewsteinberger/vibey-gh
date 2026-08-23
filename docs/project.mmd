@@ -108,6 +108,8 @@ flowchart TB
   Review --> MergeTrain
   Maintainer -->|explicit admin authorization| Bootstrap
   CI --> Bootstrap
+  CodeQL --> Bootstrap
+  APIDrift --> Bootstrap
   Docs --> Bootstrap
   Provenance --> Bootstrap
   Bootstrap -->|admin squash merge bypasses PRAutomation and Guard| Develop

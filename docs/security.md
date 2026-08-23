@@ -64,6 +64,16 @@ normalizer entirely. Provenance still checks the complete repository state, but 
 re-audit or rewrite historical subjects already admitted to the protected integration
 branch.
 
+The automation-bootstrap workflow is a second guarded exception: a manually dispatched,
+admin-only squash merge that bypasses the ordinary PR-automation review because privileged
+workflow code is loaded from the trusted base branch and a PR cannot self-repair it. It
+requires administrator permission on the actor, an open non-draft PR that exactly matches
+the dispatched head SHA and targets `develop`, changed files confined to workflow,
+template, or automation-core paths, and every non-gate check run on that exact SHA —
+including CodeQL, API drift, documentation, provenance, build, and lint — completed
+successfully before the `--match-head-commit` merge runs. It never deletes a permanent
+branch. See [Threat model](threat-model.md) for the full rationale.
+
 Webhook receivers must use a strong `VIBEY_GH_WEBHOOK_SECRET`, verify HMAC over the exact
 raw body, and place `VIBEY_GH_WEBHOOK_STATE_DIR` on access-controlled durable storage.
 Accepted IDs use atomic mode-0600 marker creation, preventing replay across restarts and
