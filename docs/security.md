@@ -6,6 +6,15 @@ content but cannot execute it. AI tools edit only named scopes; trusted shell st
 paths and publish one commit. Secrets never enter prompts or artifacts. The merge train
 rechecks exact-head gates immediately before mutation.
 
+Advanced branch diagnostics are opt-in and metadata-only. Events exclude application
+values, exception text, arguments, locals, environment values, and secrets. Each JSONL
+record carries invocation and GitHub correlation, a monotonic sequence, and the preceding
+record's SHA-256 digest; recomputing the chain detects truncation, reordering, or mutation
+within the retained stream. Operators must protect and expire `VIBEY_GH_DEBUG_LOG` like
+other diagnostic telemetry. The hash chain is tamper-evident, not a digital signature;
+ship it to append-only or independently authenticated storage when adversarial log writers
+are in scope.
+
 The managed CodeQL workflow analyzes Python changes on both delivery branches and their
 pull requests. The API-drift workflow independently verifies that every canonical
 capability remains available through MCP, API, CLI, SDK, and webhook boundaries.
@@ -36,6 +45,15 @@ is treated as untrusted input, capped at 200,000 bytes, and read-only to the dia
 repository code is still never executed in the privileged job. This avoids speculative
 repairs when optional CI MCP tools are unavailable without granting Claude shell access.
 
+Repair and conflict-resolution publication never trusts the head it evaluated. The trusted
+publisher re-reads the PR's current head immediately before committing and again after any
+non-fast-forward push rejection. A mismatch means a human or another bot advanced the PR
+concurrently, so the run is discarded as a stale no-op: it never force-pushes, never
+overwrites the newer commit, never consumes a repair attempt, and never mutates a permanent
+branch from an obsolete checkout. This applies even when `develop` or `main` is itself the
+PR head during a promotion, which is exactly when clobbering unreviewed newer content would
+be most damaging. See [Workflows](workflows.md) for the exact recheck points.
+
 The Conventional Commits job is the sole guarded exception that may force-update history.
 It can act only on a same-repository topic branch, only from an exact checked SHA, only on
 linear history, and only with `--force-with-lease`. Permanent branches are rejected by
@@ -45,6 +63,16 @@ Promotion PRs from the integration branch to the release branch skip that histor
 normalizer entirely. Provenance still checks the complete repository state, but does not
 re-audit or rewrite historical subjects already admitted to the protected integration
 branch.
+
+The automation-bootstrap workflow is a second guarded exception: a manually dispatched,
+admin-only squash merge that bypasses the ordinary PR-automation review because privileged
+workflow code is loaded from the trusted base branch and a PR cannot self-repair it. It
+requires administrator permission on the actor, an open non-draft PR that exactly matches
+the dispatched head SHA and targets `develop`, changed files confined to workflow,
+template, or automation-core paths, and every non-gate check run on that exact SHA —
+including CodeQL, API drift, documentation, provenance, build, and lint — completed
+successfully before the `--match-head-commit` merge runs. It never deletes a permanent
+branch. See [Threat model](threat-model.md) for the full rationale.
 
 Webhook receivers must use a strong `VIBEY_GH_WEBHOOK_SECRET`, verify HMAC over the exact
 raw body, and place `VIBEY_GH_WEBHOOK_STATE_DIR` on access-controlled durable storage.

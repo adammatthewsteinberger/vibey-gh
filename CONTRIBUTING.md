@@ -19,7 +19,7 @@ uv run mypy --strict vibey_gh
 uv run vibey-gh check --ci
 ```
 
-Tests belong under `test/`. Maintain 100% line coverage, add branch-focused tests for new
+Tests belong under `test/`. Maintain 100% line and branch coverage and add focused tests for new
 decisions, and do not weaken checks. Update README, reference docs, changelog, security
 guidance, agent instructions, and configuration examples when behavior changes.
 

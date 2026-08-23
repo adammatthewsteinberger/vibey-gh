@@ -228,6 +228,46 @@ def test_automation_bootstrap_is_explicit_exact_head_and_permanent_branch_safe()
     assert "--delete-branch" not in text
 
 
+def test_automation_bootstrap_scope_check_rejects_files_outside_automation_core():
+    import subprocess
+
+    text = (WORKFLOWS / "automation-bootstrap.yml").read_text(encoding="utf-8")
+    match = re.search(
+        r"if grep -Ev '([^']+)' changed-files\.txt; then\n"
+        r"\s*echo \"::error::changed files are not confined to automation-core paths\" >&2\n"
+        r"\s*exit 1\n"
+        r"\s*fi",
+        text,
+    )
+    assert match, "expected a fail-closed scope check in automation-bootstrap.yml"
+    pattern = match.group(1)
+
+    in_scope_only = (
+        "vibey_gh/templates/workflows/automation-bootstrap.yml\ntest/test_templates.py\n"
+    )
+    mixed_scope = in_scope_only + "vibey_gh/versioning.py\n"
+
+    def confinement_check_passes(changed_files: str) -> bool:
+        # Mirrors the workflow's own gate: `if grep -Ev ...; then <fail>; fi` fails the
+        # step when grep finds an out-of-scope line (exit 0), and passes when grep finds
+        # none (exit 1, no matches).
+        script = f"grep -Ev '{pattern}' <<'EOF'\n{changed_files}EOF\n"
+        result = subprocess.run(["sh", "-c", script], capture_output=True, text=True, check=False)
+        return result.returncode != 0
+
+    assert confinement_check_passes(in_scope_only)
+    assert not confinement_check_passes(mixed_scope)
+
+
+def test_pr_review_requires_verified_repository_paths():
+    text = (WORKFLOWS / "pr-automation.yml").read_text(encoding="utf-8")
+
+    assert "Inspect target/ with Read, Glob, and Grep only" in text
+    assert "verify its path exists under target/ with Read or Glob" in text
+    assert "Never return schema" in text
+    assert "fail the review action so infrastructure recovery can retry it" in text
+
+
 def test_properdocs_theme_is_channel_aware_and_accessible():
     root = Path(__file__).resolve().parent.parent
     config = (root / "properdocs.yml").read_text(encoding="utf-8")
@@ -253,6 +293,7 @@ def test_properdocs_theme_is_channel_aware_and_accessible():
     assert "https://hire.adam.matthewsteinberger.com" in script
     assert "https://github.com/adammatthewsteinberger/" in script
     assert "__PAGES_ROOT__" in script
+    assert "link.href = pagesRoot" in script
     assert '["__PRODUCTION_LABEL__", "main"]' in script
     assert '["__PREVIEW_LABEL__", "develop"]' in script
     assert "Release channels: release-channels.md" not in config
@@ -369,6 +410,12 @@ def test_privileged_agent_cannot_mutate_git_or_execute_pr_code():
     assert 'git -C target push origin "HEAD:refs/heads/${HEAD_REF}"' in text
     assert "resolver edited non-conflict path" in text
     assert text.count("secrets.AUTOMERGE_TOKEN || github.token") >= 3
+    assert "Skipping stale repair: expected $EXPECTED_SHA, found $current" in text
+    assert "Discarding stale repair after concurrent update to $current" in text
+    assert "Skipping stale conflict resolution: expected $EXPECTED_SHA, found $current" in text
+    assert "Discarding stale conflict resolution after concurrent update to $current" in text
+    assert "if: steps.publish.outputs.stale != 'true'" in text
+    assert "git -C target push --force" not in text
 
 
 def test_ai_state_persistence_uses_the_native_github_token():

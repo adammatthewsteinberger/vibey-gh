@@ -62,7 +62,12 @@ include = [
 
 [tool.pytest.ini_options]
 testpaths = ["test"]
-addopts = ["--cov=vibey_gh", "--cov-report=term-missing", "--cov-fail-under=100"]
+addopts = [
+    "--cov=vibey_gh",
+    "--cov-branch",
+    "--cov-report=term-missing",
+    "--cov-fail-under=100",
+]
 
 [tool.coverage.run]
 source = ["vibey_gh"]

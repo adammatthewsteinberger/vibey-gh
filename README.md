@@ -19,7 +19,8 @@ that adopts it, so a dependency it grows is a dependency all of them grow.
 - **Installing it?** Follow [Requirements](#requirements), [Quick start](#quick-start),
   and [Adoption checklist](#adoption-checklist).
 - **Operating it?** Keep [Workflows](#workflows), [Failure and recovery model](#failure-and-recovery-model),
-  and [Troubleshooting](#troubleshooting) nearby.
+  [Troubleshooting](#troubleshooting), and [.github/README.md](.github/README.md) (workflow
+  inventory, AI trust boundary, and admin recovery paths) nearby.
 - **Extending it?** Begin with [Architecture](#architecture),
   [Security model](#security-model), and [CONTRIBUTING.md](CONTRIBUTING.md).
 
@@ -199,6 +200,12 @@ PR CI validates resulting commits. Managed automation never sends a deletion ref
 `main` or `develop`, and automatic branch deletion stays disabled because `develop` is
 itself the head of production promotion PRs. See [SECURITY.md](SECURITY.md).
 
+Repair and conflict publication recheck the PR's exact head immediately before committing
+and again after any non-fast-forward push rejection; a concurrent human or bot update is
+discarded as a stale no-op rather than force-pushed over, consumes no repair attempt, and
+never mutates a permanent branch from an obsolete checkout—including when `develop` or
+`main` is itself the PR head during a promotion. See [docs/security.md](docs/security.md).
+
 The sole history-rewrite exception is Conventional Commits self-healing: only a
 same-repository linear topic branch may be normalized and pushed with an exact-head
 `--force-with-lease`. Forks, stale heads, merge commits, `develop`, and `main` fail closed,
@@ -213,7 +220,7 @@ request bytes for HMAC verification; see [the CLI and adapter reference](docs/cl
 
 | Command | Human purpose |
 |---|---|
-| `vibey-gh check [--apply] [--commits RANGE] [--ci]` | Verify installed assets, file fingerprints, commit trailers, documentation, marketplace structure, and interface parity; optionally repair missing source headers. |
+| `vibey-gh check [--apply] [--commits RANGE] [--ci]` | Verify installed assets, file fingerprints, commit trailers, traceable branch logging, documentation, marketplace structure, and interface parity; optionally add a missing source header or collapse a header duplicated within a file. |
 | `vibey-gh install` | Render configured workflows, install/chains hooks, and install release-site assets. |
 | `vibey-gh version [--since REF] [--dev BUILD] [--apply] [--explain]` | Derive, explain, print, or apply the next release version. |
 | `vibey-gh trailer` / `trailer-key` | Print the configured provenance trailer or its key for scripts and workflows. |
@@ -249,7 +256,7 @@ file cannot be.
 
 ```bash
 vibey-gh check                 # are the hooks installed and the fingerprints intact?
-vibey-gh check --apply         # add the missing file headers
+vibey-gh check --apply         # add missing file headers and dedupe a repeated header
 vibey-gh check --commits main..HEAD    # and every commit trailer in a range
 ```
 
@@ -257,6 +264,31 @@ The `pre-push` hook refuses the push if either half is missing, to any branch, l
 remote. `git push --no-verify` still works, because a hook that cannot be bypassed in an
 emergency gets uninstalled instead; CI applies the same rule server-side, so skipping it
 locally defers the failure rather than avoiding it.
+
+### Advanced, fully traceable branch diagnostics
+
+Every configured Python source is compiled during `vibey-gh check`, and every control-flow
+opcode must be supported by the package-wide branch tracer. Enable it only when diagnosing
+a run; normal commands remain quiet:
+
+```bash
+VIBEY_GH_DEBUG=1 vibey-gh check
+VIBEY_GH_DEBUG=1 VIBEY_GH_DEBUG_LOG=.vibey-gh/branch-trace.jsonl vibey-gh merge-train
+```
+
+The JSONL stream records each branch evaluation and, when CPython exposes the successor,
+its taken or fallthrough outcome. Every event includes a schema version, trace ID,
+monotonic sequence, UTC and monotonic timestamps, PID, thread ID, source, function, line,
+bytecode offset/opcode/target, GitHub run/attempt/SHA correlation, the previous event hash,
+and its own SHA-256 hash. That produces an ordered, tamper-evident chain that can be joined
+back to a CI invocation. It records control-flow metadata only—never locals, arguments,
+return values, exception messages, environment values, or secrets. Set
+`VIBEY_GH_TRACE_ID` to propagate an existing correlation ID; otherwise a UUID is generated.
+
+`vibey-gh` itself only ever instruments its own installed package: `VIBEY_GH_DEBUG` traces
+`vibey_gh`'s internals, not a consuming project's source tree. Projects embedding
+`vibey_gh.debugging.enable(roots=(your_package_dir,))` directly get branch tracing scoped
+to their own code instead.
 
 ### Versions derived, not remembered
 
@@ -661,6 +693,7 @@ creating an unbounded comment stream.
 | Local development and verification | [docs/development.md](docs/development.md) and [docs/testing.md](docs/testing.md) |
 | Common failures | [docs/troubleshooting.md](docs/troubleshooting.md) |
 | Governance, support, and conduct | [docs/governance.md](docs/governance.md), [SUPPORT.md](SUPPORT.md), and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) |
+| GitHub Actions workflow reference and admin recovery paths | [.github/README.md](.github/README.md) |
 | Agent instructions and skills | [AGENTS.md](AGENTS.md), [CLAUDE.md](CLAUDE.md), [GEMINI.md](GEMINI.md), `.cursor/`, `.agent/`, `.agents/`, and `.claude/` |
 | Architectural decisions | [docs/adr/README.md](docs/adr/README.md) |
 

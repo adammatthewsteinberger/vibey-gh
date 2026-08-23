@@ -16,6 +16,7 @@ import pytest
 from vibey_gh import github_release, merge_train, pr_automation
 from vibey_gh import realign as realign_mod
 from vibey_gh.cli import main
+from vibey_gh.config import load_config
 from vibey_gh.merge_train import Verdict
 
 
@@ -70,6 +71,14 @@ def test_check_reports_missing_documentation(repo, capsys):
     assert "documentation:" in capsys.readouterr().err
 
 
+def test_check_reports_a_duplicate_header(repo, capsys):
+    cfg = load_config(repo)
+    target = repo / "src" / "__init__.py"
+    target.write_text(f"{cfg.header}\n{cfg.header}\n" + target.read_text())
+    assert main(["check", "--ci"]) == 1
+    assert "more than once" in capsys.readouterr().err
+
+
 def test_check_reports_a_missing_commit_trailer(repo, capsys):
     main(["check", "--ci", "--apply"])
     # --no-verify, because `install` puts in the commit-msg hook that would add the
@@ -103,6 +112,16 @@ def test_version_bumps_minor_and_can_apply(repo, capsys):
     assert capsys.readouterr().out.strip() == "1.1.0"
     assert '__version__ = "1.1.0"' in (repo / "src" / "__init__.py").read_text()
     assert json.loads((repo / "manifest.json").read_text())["metadata"]["version"] == "1.1.0"
+
+
+def test_version_bumps_without_explanation_or_apply(repo, capsys):
+    subprocess.run(["git", "branch", "-q", "base"], cwd=repo, check=True)
+    (repo / "content" / "a.md").write_text("changed\n")
+    subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-qm", "content"], cwd=repo, check=True)
+
+    assert main(["version", "--since", "base"]) == 0
+    assert capsys.readouterr().out.strip() == "1.1.0"
 
 
 def test_version_dev_builds(repo, capsys):
@@ -408,6 +427,25 @@ def test_pr_automation_cli_surfaces(repo, monkeypatch, tmp_path, capsys):
     monkeypatch.setattr(pr_automation, "ensure_labels", lambda: calls.append("labels"))
     assert main(["pr-automation", "ensure-labels"]) == 0
     assert calls[-1] == "labels"
+
+
+def test_api_and_mcp_surface_failures_return_nonzero(repo, monkeypatch, capsys):
+    from vibey_gh import surfaces
+
+    monkeypatch.setattr(surfaces, "api_dispatch", lambda *a: (404, {"error": "missing"}))
+    assert main(["api", "check"]) == 1
+    assert json.loads(capsys.readouterr().out) == {"error": "missing"}
+
+    monkeypatch.setattr(surfaces, "mcp_dispatch", lambda *a: {"error": {"code": -1}})
+    assert main(["mcp", "check"]) == 1
+    assert "error" in json.loads(capsys.readouterr().out)
+
+
+def test_check_reports_untraceable_debug_branches(repo, capsys):
+    bad = repo / "src" / "bad.py"
+    bad.write_text(load_config().header + "\nif:\n")
+    assert main(["check"]) == 1
+    assert "debug logging:" in capsys.readouterr().err
 
 
 @pytest.mark.parametrize("value", ("[]", "{bad"))

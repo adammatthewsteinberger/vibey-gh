@@ -54,6 +54,13 @@ def cfg_for(root: Path, **kw) -> GhConfig:
     return GhConfig(**base)
 
 
+def test_sources_deduplicate_overlapping_patterns(tmp_path):
+    source = tmp_path / "module.py"
+    source.write_text("pass\n")
+    cfg = cfg_for(tmp_path, sources=("*.py", "module.py"))
+    assert fingerprints.sources(cfg) == [source]
+
+
 # --------------------------------------------------------------------------- config
 
 
@@ -99,6 +106,30 @@ def test_header_is_detected_and_inserted(repo):
 
     fingerprints.check(cfg, apply=True)
     assert fingerprints.check(cfg).ok
+
+
+def test_duplicate_header_is_detected_and_deduped(repo):
+    cfg = cfg_for(repo)
+    target = repo / "src" / "__init__.py"
+    target.write_text(f"{cfg.header}\n{cfg.header}\n" + target.read_text())
+
+    report = fingerprints.check(cfg)
+    assert [p.name for p in report.duplicate_header] == ["__init__.py"]
+    assert not report.ok
+
+    fingerprints.check(cfg, apply=True)
+    lines = target.read_text().splitlines()
+    assert lines.count(cfg.header) == 1
+    assert fingerprints.check(cfg).ok
+
+
+def test_has_header_reports_presence(repo):
+    cfg = cfg_for(repo)
+    target = repo / "src" / "__init__.py"
+    assert not fingerprints.has_header(target.read_text(), cfg)
+
+    fingerprints.check(cfg, apply=True)
+    assert fingerprints.has_header(target.read_text(), cfg)
 
 
 def test_header_goes_after_a_shebang(repo):

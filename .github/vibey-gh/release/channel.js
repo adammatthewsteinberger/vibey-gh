@@ -17,10 +17,14 @@
 
   const primaryNav = document.querySelector("#navbar-collapse .navbar-nav");
   if (primaryNav) {
-    primaryNav.querySelectorAll("a.nav-link").forEach((link) => {
-      if (link.textContent.trim() !== "Home") link.closest("li")?.remove();
-    });
     const pagesRoot = "__PAGES_ROOT__";
+    primaryNav.querySelectorAll("a.nav-link").forEach((link) => {
+      if (link.textContent.trim() === "Home") {
+        link.href = pagesRoot;
+      } else {
+        link.closest("li")?.remove();
+      }
+    });
     for (const [label, target] of [["__PRODUCTION_LABEL__", "main"], ["__PREVIEW_LABEL__", "develop"]]) {
       const item = document.createElement("li");
       item.className = "nav-item";
