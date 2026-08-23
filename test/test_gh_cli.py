@@ -390,6 +390,32 @@ def test_pr_automation_cli_rejects_bad_json(repo, capsys, value):
     assert "vibey-gh:" in capsys.readouterr().err
 
 
+def test_pr_automation_cli_accepts_inline_json_longer_than_filename_limit(repo, monkeypatch):
+    payload = {"pass": False, "summary": "incomplete " * 1024}
+    recorded = []
+    state = pr_automation.AutomationState("abc", "abc")
+    monkeypatch.setattr(
+        pr_automation,
+        "record",
+        lambda number, value, kind: recorded.append((number, value, kind)) or state,
+    )
+
+    assert (
+        main(
+            [
+                "pr-automation",
+                "record-review",
+                "--pr",
+                "7",
+                "--input",
+                json.dumps(payload),
+            ]
+        )
+        == 0
+    )
+    assert recorded == [(7, payload, "review")]
+
+
 def test_pr_automation_cli_reports_runtime_errors(repo, monkeypatch, capsys):
     def boom(*args):
         raise RuntimeError("offline")

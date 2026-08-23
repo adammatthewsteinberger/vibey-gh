@@ -134,6 +134,8 @@ def test_pr_gate_requires_exact_head_semantic_documentation_review_for_every_aut
     assert "needs.evaluate.outputs.state == 'ready'" in text
     assert "repository-wide semantic documentation audit" in text
     assert "complete, approachable guide" in text
+    assert "--disallowedTools Agent" in text
+    assert "Do not spawn subagents" in text
     for field in (
         "complete",
         "accurate",
