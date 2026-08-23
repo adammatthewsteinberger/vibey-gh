@@ -106,15 +106,19 @@ def hold_for_review(verdict: Verdict, cfg: GhConfig, label: str = NEEDS_REVIEW_L
 def judge(pr: dict, cfg: GhConfig) -> Verdict:
     author = (pr.get("author") or {}).get("login", "")
     rollup = pr.get("statusCheckRollup") or []
+    ignored = set(cfg.pr_automation.ignored_checks) | {"gate"}
+    policy_rollup = [check for check in rollup if check.get("name") not in ignored]
     review = pr.get("reviewDecision") or ""
     labels = {
         label.get("name", "") if isinstance(label, dict) else str(label)
         for label in pr.get("labels") or []
     }
 
-    pending = [c for c in rollup if c.get("status") not in (None, "COMPLETED")]
+    pending = [c for c in policy_rollup if c.get("status") not in (None, "COMPLETED")]
     failing = [
-        c for c in rollup if c.get("conclusion") not in (None, "SUCCESS", "NEUTRAL", "SKIPPED")
+        c
+        for c in policy_rollup
+        if c.get("conclusion") not in (None, "SUCCESS", "NEUTRAL", "SKIPPED")
     ]
 
     reason = None

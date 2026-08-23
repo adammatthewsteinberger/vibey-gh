@@ -248,6 +248,32 @@ def test_readiness_gate(tmp_path, pr, ready, fragment):
         assert fragment in verdict.reason
 
 
+def test_merge_train_ignores_internal_draft_gate_after_public_gate_passes(tmp_path):
+    cfg = cfg_for(
+        tmp_path,
+        owner="owner",
+        trusted_authors=("owner",),
+        pr_automation=PrAutomationConfig(enabled=True),
+    )
+    pr = _pr(
+        statusCheckRollup=[
+            {"name": "gate", "status": "COMPLETED", "conclusion": "FAILURE"},
+            {
+                "name": "PR automation / gate",
+                "status": "COMPLETED",
+                "conclusion": "FAILURE",
+            },
+            {
+                "name": "PR automation / gate",
+                "status": "COMPLETED",
+                "conclusion": "SUCCESS",
+            },
+            {"name": "CI", "status": "COMPLETED", "conclusion": "SUCCESS"},
+        ]
+    )
+    assert merge_train.judge(pr, cfg).ready
+
+
 def test_pull_request_recovers_fresh_exact_head_gate(monkeypatch):
     calls = []
 
