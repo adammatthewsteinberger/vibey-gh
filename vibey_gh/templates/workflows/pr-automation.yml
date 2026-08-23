@@ -97,10 +97,11 @@ jobs:
           REPO: ${{ github.repository }}
           INPUT_PR: ${{ inputs.pr }}
           INPUT_SHA: ${{ inputs.head_sha }}
+          EVENT_PR: ${{ github.event.workflow_run.pull_requests[0].number }}
           EVENT_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
           set -euo pipefail
-          number="${INPUT_PR:-}"
+          number="${INPUT_PR:-${EVENT_PR:-}}"
           sha="${INPUT_SHA:-${EVENT_SHA:-}}"
           if [ -z "$number" ]; then
             number=$(gh api "repos/${REPO}/commits/${sha}/pulls" \

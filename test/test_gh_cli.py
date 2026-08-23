@@ -140,6 +140,22 @@ def test_merge_train_reports_a_refused_merge(repo, capsys, monkeypatch):
     assert "could not be merged" in capsys.readouterr().out
 
 
+@pytest.mark.parametrize(
+    "deleted,fragment",
+    [(True, "deleted merged topic branch"), (False, "topic-branch cleanup failed")],
+)
+def test_merge_train_cleans_only_eligible_topic_branches(
+    repo, capsys, monkeypatch, deleted, fragment
+):
+    pr = {"number": 9, "headRefName": "fix/thing"}
+    monkeypatch.setattr(merge_train, "open_pull_requests", lambda cfg: [pr])
+    monkeypatch.setattr(merge_train, "judge", lambda pr, cfg: Verdict(9, "t", "owner", None))
+    monkeypatch.setattr(merge_train, "merge", lambda n, m: (True, False))
+    monkeypatch.setattr(merge_train, "delete_head_branch", lambda value: deleted)
+    assert main(["merge-train"]) == 0
+    assert fragment in capsys.readouterr().out
+
+
 def test_realign_success_and_failure(repo, capsys, monkeypatch):
     monkeypatch.setattr(realign_mod, "realign", lambda cfg: (True, "converged"))
     assert main(["realign"]) == 0
