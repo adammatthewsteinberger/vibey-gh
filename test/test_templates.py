@@ -145,6 +145,14 @@ def test_pr_gate_requires_exact_head_semantic_documentation_review_for_every_aut
     assert "TRUSTED: ${{ needs.evaluate.outputs.trusted }}" not in text
     assert '[ "$STATE" = ready ] || [ "$STATE" = review ]' in text
     assert '[ "$REVIEW_PASSED" = true ]' in text
+    assert "full_claude_output:" in text
+    assert "Validate diagnostic output policy" in text
+    assert "github.event.repository.visibility == 'private'" in text
+    assert text.count("track_progress: __VIBEY_GH_SANITIZED_PROGRESS__") == 3
+    assert text.count("show_full_output:") == 3
+    assert text.count("__VIBEY_GH_ALLOW_PRIVATE_FULL_OUTPUT__") == 4
+    assert text.count("__VIBEY_GH_ARCHIVE_EXECUTION_FILE__") == 3
+    assert "Full Claude output is disabled or unsafe" in text
     for field in (
         "complete",
         "accurate",

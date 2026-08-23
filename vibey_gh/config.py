@@ -74,6 +74,13 @@ DEFAULT_DOCUMENTATION_FILES = (
 
 
 @dataclass(frozen=True)
+class PrAutomationObservabilityConfig:
+    sanitized_progress: bool = True
+    archive_execution_file: bool = True
+    allow_private_full_output: bool = False
+
+
+@dataclass(frozen=True)
 class PrAutomationConfig:
     enabled: bool = True
     scan_workflows: tuple[str, ...] = DEFAULT_SCAN_WORKFLOWS
@@ -84,6 +91,7 @@ class PrAutomationConfig:
     repair_untrusted_authors: bool = True
     replace_fork_prs: bool = True
     retain_schedule_backstop: bool = True
+    observability: PrAutomationObservabilityConfig = PrAutomationObservabilityConfig()
 
     def __post_init__(self) -> None:
         _unique_nonempty("pr_automation.scan_workflows", self.scan_workflows)
@@ -241,6 +249,7 @@ def load_config(root: Path | None = None) -> GhConfig:
     tr = data.get("merge_train", {})
     inst = data.get("install", {})
     auto = data.get("pr_automation", {})
+    observability = auto.get("observability", {})
     release = data.get("github_release", {})
     profile = data.get("repository_profile", {})
     documentation = data.get("documentation", {})
@@ -254,6 +263,11 @@ def load_config(root: Path | None = None) -> GhConfig:
         repair_untrusted_authors=auto.get("repair_untrusted_authors", True),
         replace_fork_prs=auto.get("replace_fork_prs", True),
         retain_schedule_backstop=auto.get("retain_schedule_backstop", True),
+        observability=PrAutomationObservabilityConfig(
+            sanitized_progress=observability.get("sanitized_progress", True),
+            archive_execution_file=observability.get("archive_execution_file", True),
+            allow_private_full_output=observability.get("allow_private_full_output", False),
+        ),
     )
     return GhConfig(
         root=root,

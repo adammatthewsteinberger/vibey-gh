@@ -43,6 +43,18 @@ defaults below. Paths are repository-relative unless stated otherwise.
 | `replace_fork_prs` | boolean / `true` | Repair forks through linked repository-owned PRs. |
 | `retain_schedule_backstop` | boolean / `true` | Retain scheduled recovery beside event triggers. |
 
+### `[pr_automation.observability]`
+
+| Field | Type / default | Meaning |
+|---|---|---|
+| `sanitized_progress` | boolean / `true` | Request safe progress reporting without raw model or tool payloads. |
+| `archive_execution_file` | boolean / `true` | Retain each Claude execution record as a 90-day workflow artifact. |
+| `allow_private_full_output` | boolean / `false` | Permit an explicit manual diagnostic run to emit raw Claude JSON, but only in a private repository. |
+
+Raw output additionally requires a manual `workflow_dispatch` with
+`full_claude_output = true`. Event-triggered runs can never enable it, and the workflow
+fails closed when repository visibility is not private.
+
 ## `[github_release]`
 
 | Field | Type / default | Meaning |
