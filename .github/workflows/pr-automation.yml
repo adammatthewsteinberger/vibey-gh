@@ -497,9 +497,11 @@ jobs:
           rm -f .git
           rm -rf .claude-git-context
       - name: Publish one guarded repair commit
+        id: publish
         if: fromJSON(steps.claude.outputs.structured_output).fixable == true
         env:
           HEAD_REF: ${{ needs.evaluate.outputs.head_ref }}
+          EXPECTED_SHA: ${{ needs.evaluate.outputs.head_sha }}
           GH_TOKEN: ${{ secrets.AUTOMERGE_TOKEN || github.token }}
           REPO: ${{ github.repository }}
         run: |
@@ -510,6 +512,14 @@ jobs:
               exit 1
               ;;
           esac
+          echo "stale=false" >> "$GITHUB_OUTPUT"
+          current=$(gh pr view "${{ needs.evaluate.outputs.pr }}" --repo "$REPO" \
+            --json headRefOid --jq .headRefOid)
+          if [ "$current" != "$EXPECTED_SHA" ]; then
+            echo "stale=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::Skipping stale repair: expected $EXPECTED_SHA, found $current"
+            exit 0
+          fi
           if git -C target diff --quiet && git -C target diff --cached --quiet; then
             echo "No repair changes were produced"
             exit 0
@@ -523,9 +533,20 @@ jobs:
           git -C target remote set-url origin "https://github.com/${REPO}.git"
           # A non-empty source makes this an update refspec. Never use a deletion
           # option or an empty-source ':branch' refspec here.
-          git -C target push origin "HEAD:refs/heads/${HEAD_REF}"
+          if ! push_output=$(git -C target push origin "HEAD:refs/heads/${HEAD_REF}" 2>&1); then
+            current=$(gh pr view "${{ needs.evaluate.outputs.pr }}" --repo "$REPO" \
+              --json headRefOid --jq .headRefOid)
+            if [ "$current" != "$EXPECTED_SHA" ]; then
+              echo "stale=true" >> "$GITHUB_OUTPUT"
+              echo "::notice::Discarding stale repair after concurrent update to $current"
+              exit 0
+            fi
+            printf '%s\n' "$push_output" >&2
+            exit 1
+          fi
       - name: Persist repair state and classify operator blocks
         id: result
+        if: steps.publish.outputs.stale != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ needs.evaluate.outputs.pr }}
@@ -659,8 +680,8 @@ jobs:
           esac
           current=$(gh pr view "$PR" --repo "$REPO" --json headRefOid --jq .headRefOid)
           if [ "$current" != "$EXPECTED_SHA" ]; then
-            echo "::error::stale conflict resolution: expected $EXPECTED_SHA, found $current"
-            exit 1
+            echo "::notice::Skipping stale conflict resolution: expected $EXPECTED_SHA, found $current"
+            exit 0
           fi
           unresolved=$(git -C target diff --name-only --diff-filter=U)
           if [ -n "$unresolved" ]; then
@@ -681,7 +702,15 @@ jobs:
             -m "Made-With: Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), Developed by [Adam Matthew Steinberger](https://hire.adam.matthewsteinberger.com/) ([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/))."
           gh auth setup-git
           git -C target remote set-url origin "https://github.com/${REPO}.git"
-          git -C target push origin "HEAD:refs/heads/${HEAD_REF}"
+          if ! push_output=$(git -C target push origin "HEAD:refs/heads/${HEAD_REF}" 2>&1); then
+            current=$(gh pr view "$PR" --repo "$REPO" --json headRefOid --jq .headRefOid)
+            if [ "$current" != "$EXPECTED_SHA" ]; then
+              echo "::notice::Discarding stale conflict resolution after concurrent update to $current"
+              exit 0
+            fi
+            printf '%s\n' "$push_output" >&2
+            exit 1
+          fi
           python -m pip install --quiet ./automation
           new_sha=$(git -C target rev-parse HEAD)
           payload=$(jq -c --arg head_sha "$new_sha" \

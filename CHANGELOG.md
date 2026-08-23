@@ -5,6 +5,8 @@ This file follows Keep a Changelog and semantic versioning conventions.
 
 ## Unreleased
 
+- Treat concurrent PR-head advances during repair or conflict publication as stale no-ops
+  while preserving ordinary non-fast-forward protection and never force-pushing.
 - Replace the placeholder GitHub automation README with a comprehensive operator guide
   and enforce its required sections, minimum depth, and exact provenance deterministically.
 - Fix GraphQL-only PR-state comment updates, synchronize package version metadata,

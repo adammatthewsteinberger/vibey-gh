@@ -369,6 +369,12 @@ def test_privileged_agent_cannot_mutate_git_or_execute_pr_code():
     assert 'git -C target push origin "HEAD:refs/heads/${HEAD_REF}"' in text
     assert "resolver edited non-conflict path" in text
     assert text.count("secrets.AUTOMERGE_TOKEN || github.token") >= 3
+    assert "Skipping stale repair: expected $EXPECTED_SHA, found $current" in text
+    assert "Discarding stale repair after concurrent update to $current" in text
+    assert "Skipping stale conflict resolution: expected $EXPECTED_SHA, found $current" in text
+    assert "Discarding stale conflict resolution after concurrent update to $current" in text
+    assert "if: steps.publish.outputs.stale != 'true'" in text
+    assert "git -C target push --force" not in text
 
 
 def test_ai_state_persistence_uses_the_native_github_token():
