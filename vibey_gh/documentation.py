@@ -28,6 +28,16 @@ README_SECTIONS = (
     "## Contributing",
     "## Licence",
 )
+GITHUB_README_SECTIONS = (
+    "## Delivery model",
+    "## Workflow inventory",
+    "## Exact-head PR automation",
+    "## AI trust boundary",
+    "## Credentials and settings",
+    "## Permanent-branch safety",
+    "## Failure recovery",
+    "## Changing workflows",
+)
 MERMAID_REQUIRED_TERMS = (
     "flowchart",
     "CLI",
@@ -105,6 +115,20 @@ def check(cfg: GhConfig) -> DocumentationReport:
                 problems.append(f"README.md is missing human documentation section: {heading}")
         if not text.rstrip().endswith(README_PROVENANCE):
             problems.append("README.md must end with the exact Vibey provenance sentence")
+    github_readme = cfg.root / ".github/README.md"
+    if github_readme.is_file():
+        text = github_readme.read_text(encoding="utf-8")
+        for heading in GITHUB_README_SECTIONS:
+            if heading not in text:
+                problems.append(
+                    f".github/README.md is missing automation documentation section: {heading}"
+                )
+        if len(text.split()) < 500:
+            problems.append(
+                ".github/README.md is not comprehensive enough: expected at least 500 words"
+            )
+        if not text.rstrip().endswith(README_PROVENANCE):
+            problems.append(".github/README.md must end with the exact Vibey provenance sentence")
     diagram = cfg.root / "docs/project.mmd"
     if diagram.is_file():
         text = diagram.read_text(encoding="utf-8")

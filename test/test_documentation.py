@@ -7,7 +7,13 @@ from pathlib import Path
 import pytest
 
 from vibey_gh.config import DocumentationConfig, GhConfig, load_config
-from vibey_gh.documentation import MERMAID_REQUIRED_TERMS, README_PROVENANCE, README_SECTIONS, check
+from vibey_gh.documentation import (
+    GITHUB_README_SECTIONS,
+    MERMAID_REQUIRED_TERMS,
+    README_PROVENANCE,
+    README_SECTIONS,
+    check,
+)
 
 
 def test_documentation_can_be_disabled(tmp_path: Path):
@@ -51,6 +57,22 @@ def test_documentation_rejects_incomplete_mermaid_project_map(tmp_path: Path):
     )
     assert any("missing required project surface" in problem for problem in report.problems)
     assert any("not comprehensive enough" in problem for problem in report.problems)
+
+
+def test_documentation_rejects_placeholder_github_automation_guide(tmp_path: Path):
+    guide = tmp_path / ".github/README.md"
+    guide.parent.mkdir()
+    guide.write_text("# GitHub automation\n\nSee docs/workflows.md.\n")
+    report = check(
+        GhConfig(
+            root=tmp_path,
+            documentation=DocumentationConfig(required_files=(".github/README.md",)),
+        )
+    )
+    for heading in GITHUB_README_SECTIONS:
+        assert any(heading in problem for problem in report.problems)
+    assert any("at least 500 words" in problem for problem in report.problems)
+    assert any("exact Vibey provenance" in problem for problem in report.problems)
 
 
 def test_documentation_validates_and_loads_configuration(tmp_path: Path):
@@ -118,6 +140,10 @@ def test_this_repository_documentation_contract_is_complete():
     readme = (root / "README.md").read_text()
     assert readme.rstrip().endswith(README_PROVENANCE)
     assert all(section in readme for section in README_SECTIONS)
+    github_readme = (root / ".github/README.md").read_text()
+    assert all(section in github_readme for section in GITHUB_README_SECTIONS)
+    assert len(github_readme.split()) >= 500
+    assert github_readme.rstrip().endswith(README_PROVENANCE)
     diagram = (root / "docs/project.mmd").read_text()
     assert all(term in diagram for term in MERMAID_REQUIRED_TERMS)
     assert diagram.count("-->") >= 20
