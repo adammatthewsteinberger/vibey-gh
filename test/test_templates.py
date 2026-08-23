@@ -62,7 +62,8 @@ def test_release_surfaces_preserve_both_docs_channels_and_publish_oci_packages()
     assert "channel=develop" in text and "channel=main" in text
     assert "pages/${CHANNEL}" in text
     assert "pages/${OTHER_CHANNEL}" in text
-    assert '--branch "$OTHER_BRANCH"' in text
+    assert "while read -r other_run" in text
+    assert '--name "docs-${OTHER_CHANNEL}"' in text
     assert "docs-${OTHER_CHANNEL}" in text
     assert "properdocs==1.6.7" in text
     assert "properdocs-theme-mkdocs==1.6.7" in text
@@ -72,6 +73,10 @@ def test_release_surfaces_preserve_both_docs_channels_and_publish_oci_packages()
     assert 'oras tag "${package}:${VERSION}" "$CHANNEL" "sha-${RELEASE_SHA}"' in text
     assert 'oras tag "${package}:${VERSION}" latest' in text
     assert "--delete" not in text
+    assert "Build boldly." in text
+    assert "prefers-reduced-motion" in text
+    assert "Documentation channels" in text
+    assert "color-scheme: dark" in text
 
 
 def test_failed_permanent_branch_scans_use_a_guarded_repair_pr():
