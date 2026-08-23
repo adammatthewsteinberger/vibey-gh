@@ -55,8 +55,7 @@ def _check(args) -> int:
     print(f"\n  header:  {cfg.header}", file=sys.stderr)
     print(f"  trailer: {cfg.trailer}", file=sys.stderr)
     print(
-        "\n  `vibey-gh check --apply` adds missing headers; "
-        "`vibey-gh install` installs the hooks.",
+        "\n  `vibey-gh check --apply` adds missing headers; `vibey-gh install` installs the hooks.",
         file=sys.stderr,
     )
     return 1
@@ -163,7 +162,13 @@ def _read_json(value: str) -> dict:
         raw = sys.stdin.read()
     else:
         path = Path(value)
-        raw = path.read_text(encoding="utf-8") if path.is_file() else value
+        try:
+            is_file = path.is_file()
+        except OSError:
+            # Inline JSON may exceed the platform's filename length limit.
+            # A failed path probe must not prevent parsing the value itself.
+            is_file = False
+        raw = path.read_text(encoding="utf-8") if is_file else value
     parsed = json.loads(raw)
     if not isinstance(parsed, dict):
         raise TypeError("input JSON must be an object")
