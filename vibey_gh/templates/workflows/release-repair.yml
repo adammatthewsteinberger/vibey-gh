@@ -73,6 +73,13 @@ jobs:
           path: target
           fetch-depth: 0
           token: ${{ secrets.AUTOMERGE_TOKEN || github.token }}
+      - name: Expose failed checkout to Claude git setup
+        if: steps.context.outputs.stale == 'false'
+        run: |
+          set -euo pipefail
+          test ! -e .git
+          git -C target config core.worktree "$GITHUB_WORKSPACE/target"
+          echo "gitdir: $GITHUB_WORKSPACE/target/.git" > .git
       - name: Diagnose and repair without executing repository code
         if: steps.context.outputs.stale == 'false'
         id: claude
@@ -116,6 +123,11 @@ jobs:
             For a fixable failure, edit files only. Do not commit, push, merge, create,
             rename, or delete any branch. A separate trusted step publishes one commit
             to a new repository-owned repair branch and opens a normal pull request.
+      - name: Remove Claude git setup bridge
+        if: always() && steps.context.outputs.stale == 'false'
+        run: |
+          rm -f .git
+          git -C target config --unset core.worktree || true
       - name: Publish one guarded repair PR
         if: >-
           steps.context.outputs.stale == 'false' &&

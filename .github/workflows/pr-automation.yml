@@ -203,6 +203,12 @@ jobs:
           ref: ${{ needs.evaluate.outputs.head_sha }}
           path: target
           persist-credentials: false
+      - name: Expose exact checkout to Claude git setup
+        run: |
+          set -euo pipefail
+          test ! -e .git
+          git -C target config core.worktree "$GITHUB_WORKSPACE/target"
+          echo "gitdir: $GITHUB_WORKSPACE/target/.git" > .git
       - name: Run constrained review
         id: claude
         uses: anthropics/claude-code-action@8569a83495a3f6f0c50a90e46351d3816fed1a75 # v1
@@ -255,6 +261,11 @@ jobs:
             comments for actionable findings. Return pass=true only when every required
             boolean is true and there are zero actionable findings. Do not approve, merge,
             push, edit, or resolve comments.
+      - name: Remove Claude git setup bridge
+        if: always()
+        run: |
+          rm -f .git
+          git -C target config --unset core.worktree || true
       - name: Persist review state
         id: result
         env:
@@ -362,6 +373,12 @@ jobs:
           python -m pip install --quiet ./automation
           vibey-gh pr-automation ensure-labels
           gh pr edit "$PR" --add-label vibey-gh:repairing
+      - name: Expose repair checkout to Claude git setup
+        run: |
+          set -euo pipefail
+          test ! -e .git
+          git -C target config core.worktree "$GITHUB_WORKSPACE/target"
+          echo "gitdir: $GITHUB_WORKSPACE/target/.git" > .git
       - name: Diagnose and repair without executing PR code
         id: claude
         uses: anthropics/claude-code-action@8569a83495a3f6f0c50a90e46351d3816fed1a75 # v1
@@ -407,6 +424,11 @@ jobs:
 
             For a fixable failure, edit files only. Do not commit, push, create, rename,
             or delete any branch. A separate trusted step publishes at most one commit.
+      - name: Remove Claude git setup bridge
+        if: always()
+        run: |
+          rm -f .git
+          git -C target config --unset core.worktree || true
       - name: Publish one guarded repair commit
         if: fromJSON(steps.claude.outputs.structured_output).fixable == true
         env:
@@ -502,6 +524,12 @@ jobs:
             printf '%s\n' "$files"
             echo EOF
           } >> "$GITHUB_OUTPUT"
+      - name: Expose conflict checkout to Claude git setup
+        run: |
+          set -euo pipefail
+          test ! -e .git
+          git -C target config core.worktree "$GITHUB_WORKSPACE/target"
+          echo "gitdir: $GITHUB_WORKSPACE/target/.git" > .git
       - name: Resolve only the materialized conflict set
         id: claude
         uses: anthropics/claude-code-action@8569a83495a3f6f0c50a90e46351d3816fed1a75 # v1
@@ -532,6 +560,11 @@ jobs:
             files. Do not execute commands, tests, builds, scripts, or package managers.
             Do not commit, push, create, rename, or delete branches. Return resolved=false
             if a correct resolution cannot be determined from the repository evidence.
+      - name: Remove Claude git setup bridge
+        if: always()
+        run: |
+          rm -f .git
+          git -C target config --unset core.worktree || true
       - name: Publish one guarded conflict-resolution commit
         if: fromJSON(steps.claude.outputs.structured_output).resolved == true
         env:
