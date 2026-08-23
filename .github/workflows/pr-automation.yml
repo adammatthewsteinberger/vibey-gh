@@ -255,7 +255,7 @@ jobs:
       - name: Persist review state
         id: result
         env:
-          GH_TOKEN: ${{ steps.claude.outputs.github_token || github.token }}
+          GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           PR: ${{ needs.evaluate.outputs.pr }}
           HEAD_SHA: ${{ needs.evaluate.outputs.head_sha }}
@@ -428,7 +428,7 @@ jobs:
       - name: Persist repair state and classify operator blocks
         id: result
         env:
-          GH_TOKEN: ${{ steps.claude.outputs.github_token || github.token }}
+          GH_TOKEN: ${{ github.token }}
           PR: ${{ needs.evaluate.outputs.pr }}
           STRUCTURED: ${{ steps.claude.outputs.structured_output }}
           REPO: ${{ github.repository }}

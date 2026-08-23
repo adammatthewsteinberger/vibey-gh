@@ -294,6 +294,12 @@ def test_privileged_agent_cannot_mutate_git_or_execute_pr_code():
     assert text.count("secrets.AUTOMERGE_TOKEN || github.token") >= 3
 
 
+def test_ai_state_persistence_uses_the_native_github_token():
+    text = (WORKFLOWS / "pr-automation.yml").read_text(encoding="utf-8")
+    assert "steps.claude.outputs.github_token" not in text
+    assert text.count("GH_TOKEN: ${{ github.token }}") >= 6
+
+
 def test_cancelled_or_pending_evaluations_cannot_publish_a_gate():
     text = (WORKFLOWS / "pr-automation.yml").read_text(encoding="utf-8")
     assert "pull_request_target:" in text
