@@ -110,6 +110,16 @@ def test_documentation_validates_complete_marketplace_shape(tmp_path: Path):
     assert any("has no skills" in problem for problem in problems)
 
 
+def test_documentation_treats_repo_root_source_as_safe(tmp_path: Path):
+    marketplace = tmp_path / ".claude-plugin/marketplace.json"
+    marketplace.parent.mkdir()
+    required = (".claude-plugin/marketplace.json",)
+    cfg = GhConfig(root=tmp_path, documentation=DocumentationConfig(required_files=required))
+    marketplace.write_text('{"plugins":[{"source":"."}]}')
+    problems = check(cfg).problems
+    assert not any("unsafe source" in problem for problem in problems)
+
+
 @pytest.mark.parametrize(
     "kwargs",
     [

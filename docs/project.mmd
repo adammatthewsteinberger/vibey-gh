@@ -43,6 +43,7 @@ flowchart TB
     RawOutput[Manual private-only raw Claude diagnostics]
     Diagnostics[Bounded exact-head failed-check evidence]
     Guard[Exact SHA, branch, lease, and policy guards]
+    Bootstrap[Admin-authorized automation bootstrap]
   end
 
   subgraph Delivery["Event-driven delivery"]
@@ -105,6 +106,11 @@ flowchart TB
   Diagnostics --> Sandbox
   Guard --> PullRequest
   Review --> MergeTrain
+  Maintainer -->|explicit admin authorization| Bootstrap
+  CI --> Bootstrap
+  Docs --> Bootstrap
+  Provenance --> Bootstrap
+  Bootstrap -->|admin squash merge bypasses PRAutomation and Guard| Develop
   MergeTrain --> Develop
   Develop --> Promotion
   Promotion --> PullRequest

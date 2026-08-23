@@ -237,6 +237,17 @@ def test_conflict_resolution_uses_and_enforces_repair_budget(tmp_path):
     assert "conflict resolution budget" in result.reason
 
 
+def test_operator_block_takes_precedence_over_conflict(tmp_path):
+    blocked_and_conflicting = pr(
+        mergeable="CONFLICTING",
+        labels=[pa.BLOCKED_LABEL],
+        statusCheckRollup=[check()],
+    )
+    result = pa.evaluate(blocked_and_conflicting, cfg(tmp_path), expected_sha="abc")
+    assert result.state == "blocked"
+    assert "operator" in result.reason
+
+
 def test_external_repair_is_untrusted_even_for_owner(tmp_path):
     result = pa.evaluate(
         pr(labels=[pa.EXTERNAL_REPAIR_LABEL], statusCheckRollup=[check()]),
