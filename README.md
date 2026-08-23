@@ -183,6 +183,11 @@ PR CI validates resulting commits. Managed automation never sends a deletion ref
 `main` or `develop`, and automatic branch deletion stays disabled because `develop` is
 itself the head of production promotion PRs. See [SECURITY.md](SECURITY.md).
 
+The sole history-rewrite exception is Conventional Commits self-healing: only a
+same-repository linear topic branch may be normalized and pushed with an exact-head
+`--force-with-lease`. Forks, stale heads, merge commits, `develop`, and `main` fail closed,
+and contributor-controlled code is never executed by that privileged job.
+
 ## Commands
 
 | Command | Human purpose |
@@ -215,7 +220,9 @@ were important.
 ### Provenance, enforced in two places
 
 Every code change carries a fingerprint. Source files get a header comment; **every commit
-gets a trailer**. The trailer is what makes the rule total — a change to a Markdown file or
+gets a Conventional Commit subject and a trailer**. The local hook normalizes the subject
+before appending provenance, and CI audits the complete PR range. The trailer is what makes
+the rule total — a change to a Markdown file or
 a JSON manifest still arrives as a commit, and the commit is fingerprinted even when the
 file cannot be.
 
@@ -516,6 +523,7 @@ trusted_authors = ["your-login", "dependabot[bot]"]
 | Workflow | Responsibility |
 |---|---|
 | Branch intake | Turns a new topic branch into one reusable draft PR. |
+| Conventional Commits | Normalizes guarded same-repository topic history and republishes it with an exact-head lease. |
 | CI / Provenance / Docs | Validate code, history, human docs, agent docs, plugins, and interfaces. |
 | PR automation | Aggregates exact-head scans; reviews, repairs, resolves conflicts, and gates. |
 | Merge train | Squash-merges into `develop` and rebase-merges promotions into `main`. |
@@ -547,6 +555,11 @@ unprivileged PR scans execute the repaired code. This separation is why a repair
 always followed by a new scan rather than being treated as proof of correctness.
 
 ## Day-two operations
+
+If Conventional Commits rewrites your topic branch, preserve unpushed work, run
+`git fetch origin`, and rebase it onto the new explicit `origin/<topic-branch>` head. With
+no unpushed work, reset only that local topic branch to its remote counterpart. Never
+reset or force-push `develop` or `main`.
 
 ### Upgrade vibey-gh
 

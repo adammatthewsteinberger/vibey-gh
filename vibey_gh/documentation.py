@@ -42,6 +42,7 @@ MERMAID_REQUIRED_TERMS = (
     "PyPI",
     "GitHub Pages",
     "Provenance",
+    "Realign",
     "Security Boundary",
 )
 

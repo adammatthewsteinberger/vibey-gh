@@ -28,6 +28,7 @@ flowchart TB
     Versioning[Versioning]
     Release[GitHub releases]
     Surfaces[Release surfaces]
+    Realign[Realign released branches]
   end
 
   subgraph Security["Security Boundary"]
@@ -83,6 +84,8 @@ flowchart TB
   MergeTrain --> Main
   Develop --> TestPyPI
   Main --> PyPI
+  Main --> Realign
+  Realign --> Develop
   Develop --> Packages
   Main --> Packages
   Develop --> Pages

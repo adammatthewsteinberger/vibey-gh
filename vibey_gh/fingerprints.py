@@ -49,14 +49,14 @@ def conventional_subject(subject: str) -> bool:
 
 def normalize_commit_message(message: str) -> str:
     """Return a Conventional Commit message without disturbing its body or trailers."""
-    lines = message.splitlines()
-    if not lines:
+    if not message:
         return message
-    subject = lines[0].strip()
+    subject_line, separator, rest = message.partition("\n")
+    carriage_return = "\r" if subject_line.endswith("\r") else ""
+    subject = subject_line.removesuffix("\r").strip()
     if subject and not conventional_subject(subject):
-        lines[0] = f"chore: {subject}"
-    suffix = "\n" if message.endswith("\n") else ""
-    return "\n".join(lines) + suffix
+        return f"chore: {subject}{carriage_return}{separator}{rest}"
+    return message
 
 
 def commits_with_invalid_subject(rev_range: str, cfg: GhConfig) -> list[str]:

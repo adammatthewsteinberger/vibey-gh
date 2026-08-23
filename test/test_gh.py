@@ -130,6 +130,14 @@ def test_conventional_commit_subject_validation_and_normalization():
         "chore: Add repair command\n\nDetails\n\nMade-With: Vibey\n"
     )
     assert fingerprints.normalize_commit_message("") == ""
+    crlf = "Bad subject\r\nBody\r\nMade-With: Vibey\r\n"
+    assert fingerprints.normalize_commit_message(crlf) == (
+        "chore: Bad subject\r\nBody\r\nMade-With: Vibey\r\n"
+    )
+    unicode_body = "Bad subject\nBody\u2028still body\n"
+    assert fingerprints.normalize_commit_message(unicode_body) == (
+        "chore: Bad subject\nBody\u2028still body\n"
+    )
 
 
 def test_nonconventional_commit_is_reported(repo):
