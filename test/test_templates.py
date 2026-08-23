@@ -259,6 +259,15 @@ def test_automation_bootstrap_scope_check_rejects_files_outside_automation_core(
     assert not confinement_check_passes(mixed_scope)
 
 
+def test_pr_review_requires_verified_repository_paths():
+    text = (WORKFLOWS / "pr-automation.yml").read_text(encoding="utf-8")
+
+    assert "Inspect target/ with Read, Glob, and Grep only" in text
+    assert "verify its path exists under target/ with Read or Glob" in text
+    assert "Never return schema" in text
+    assert "fail the review action so infrastructure recovery can retry it" in text
+
+
 def test_properdocs_theme_is_channel_aware_and_accessible():
     root = Path(__file__).resolve().parent.parent
     config = (root / "properdocs.yml").read_text(encoding="utf-8")
