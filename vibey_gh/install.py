@@ -78,6 +78,18 @@ def render_workflow(source: Path, cfg: GhConfig) -> str:
     wanted = wanted.replace("__VIBEY_GH_INTEGRATION_BRANCH__", cfg.integration_branch)
     wanted = wanted.replace("__VIBEY_GH_RELEASE_BRANCH__", cfg.release_branch)
     wanted = wanted.replace("__VIBEY_GH_MODEL__", cfg.pr_automation.model)
+    wanted = wanted.replace(
+        "__VIBEY_GH_PROFILE_ENABLED__",
+        "true" if cfg.repository_profile.enabled else "false",
+    )
+    wanted = wanted.replace(
+        "__VIBEY_GH_PROFILE_DESCRIPTION__",
+        json.dumps(cfg.repository_profile.description),
+    )
+    wanted = wanted.replace(
+        "__VIBEY_GH_PROFILE_TOPICS__",
+        json.dumps({"names": list(cfg.repository_profile.topics)}, separators=(",", ":")),
+    )
     if source.name != "pr-automation.yml":
         return wanted
     workflows = json.dumps(list(cfg.pr_automation.scan_workflows))

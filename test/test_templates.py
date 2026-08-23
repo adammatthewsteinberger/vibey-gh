@@ -103,6 +103,21 @@ def test_properdocs_theme_is_channel_aware_and_accessible():
     assert "__RELEASE_CHANNEL__" in script
 
 
+def test_repository_profile_is_configurable_and_never_mutates_branches():
+    text = (WORKFLOWS / "repository-profile.yml").read_text(encoding="utf-8")
+    assert 'workflows: ["Release surfaces"]' in text
+    assert "__VIBEY_GH_PROFILE_DESCRIPTION__" in text
+    assert "__VIBEY_GH_PROFILE_TOPICS__" in text
+    assert 'homepage="$pages_url"' in text
+    assert "repos/${REPO}/topics" in text
+    assert "repos/${REPO}/pages" in text
+    assert "repos/${REPO}/releases?per_page=1" in text
+    assert "repos/${REPO}/deployments?per_page=1" in text
+    assert "package_type=container" in text
+    assert "git push" not in text
+    assert "--delete" not in text
+
+
 def test_failed_permanent_branch_scans_use_a_guarded_repair_pr():
     text = (WORKFLOWS / "release-repair.yml").read_text(encoding="utf-8")
     assert (

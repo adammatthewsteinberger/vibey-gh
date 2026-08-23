@@ -92,6 +92,28 @@ class GithubReleaseConfig:
 
 
 @dataclass(frozen=True)
+class RepositoryProfileConfig:
+    enabled: bool = True
+    description: str = ""
+    topics: tuple[str, ...] = (
+        "automation",
+        "continuous-delivery",
+        "documentation",
+        "github-actions",
+        "release-automation",
+    )
+
+    def __post_init__(self) -> None:
+        if len(self.description) > 350:
+            raise ValueError("repository_profile.description must be at most 350 characters")
+        _unique_nonempty("repository_profile.topics", self.topics)
+        if len(self.topics) > 20:
+            raise ValueError("repository_profile.topics must contain at most 20 entries")
+        if any(topic != topic.lower() or " " in topic for topic in self.topics):
+            raise ValueError("repository_profile.topics must be lowercase and contain no spaces")
+
+
+@dataclass(frozen=True)
 class GhConfig:
     root: Path
     text: str = DEFAULT_TEXT
@@ -106,6 +128,7 @@ class GhConfig:
     trusted_authors: tuple[str, ...] = ()
     pr_automation: PrAutomationConfig = PrAutomationConfig()
     github_release: GithubReleaseConfig = GithubReleaseConfig()
+    repository_profile: RepositoryProfileConfig = RepositoryProfileConfig()
     # Which bundled workflow templates this repository wants installed and kept current.
     # None means all of them, which is the right default for a repository adopting the
     # whole thing. A repository with its own richer workflows sets `workflows = []` and
@@ -146,6 +169,7 @@ def load_config(root: Path | None = None) -> GhConfig:
     inst = data.get("install", {})
     auto = data.get("pr_automation", {})
     release = data.get("github_release", {})
+    profile = data.get("repository_profile", {})
     automation = PrAutomationConfig(
         enabled=auto.get("enabled", True),
         scan_workflows=tuple(auto.get("scan_workflows", DEFAULT_SCAN_WORKFLOWS)),
@@ -175,6 +199,11 @@ def load_config(root: Path | None = None) -> GhConfig:
             enabled=release.get("enabled", True),
             tag_prefix=release.get("tag_prefix", "v"),
             generate_notes=release.get("generate_notes", True),
+        ),
+        repository_profile=RepositoryProfileConfig(
+            enabled=profile.get("enabled", True),
+            description=profile.get("description", ""),
+            topics=tuple(profile.get("topics", RepositoryProfileConfig().topics)),
         ),
     )
 
