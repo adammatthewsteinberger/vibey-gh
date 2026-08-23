@@ -13,6 +13,22 @@ commit subjects; exact-head, linear-history, repository-ownership, and permanent
 guards all precede it. A fork, merge commit, stale event, or concurrent push fails closed.
 Operators must protect repository secrets and review ruleset changes.
 
+Fork PR heads are a distinct adversary-controlled asset: the fork owner controls the head
+commit but never receives privileged credentials. When a fork PR needs a repair it cannot
+receive directly, the `mirror-fork` job (`contents: write`, `issues: write`,
+`pull-requests: write`, gated on `needs.evaluate.outputs.fork == 'true'`) calls
+`vibey_gh.pr_automation.mirror_fork()` to open a repository-owned replacement PR that
+mirrors the exact fork head with attribution; the original fork branch is never pushed to,
+and the replacement PR carries the `vibey-gh:external-repair` label and re-enters ordinary
+`PRAutomation`/`Guard` review from there. Same-repository merge conflicts take a narrower
+path: the `resolve-conflict` job checks out the exact conflicting head with
+`persist-credentials: false`, materializes only the paths Git reports as unresolved, runs
+the model against that bounded set with edits restricted to those paths and no command
+execution, then independently re-verifies the resolved diff touches only the materialized
+conflict paths and that the PR head still matches the expected exact SHA before pushing one
+guarded resolution commit — the same optimistic-concurrency recheck used elsewhere converts
+a concurrent update into a no-op rather than an overwrite.
+
 The second narrow exception is the manually dispatched automation-bootstrap admin merge,
 used only to recover from a broken privileged workflow that a normal PR cannot repair
 because privileged workflow code is loaded from the trusted base branch, not the PR head.
