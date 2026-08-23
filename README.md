@@ -1,7 +1,8 @@
 # vibey-gh
 
 Release automation for a GitHub repository: provenance fingerprints, derived version
-bumps, a merge train, and post-release branch realignment.
+bumps, exact-head AI review and repair, a merge train, dual-channel releases, comprehensive
+documentation maintenance, and post-release branch realignment.
 
 **No dependencies.** Everything is stdlib. This runs in every CI job of every repository
 that adopts it, so a dependency it grows is a dependency all of them grow.
@@ -180,7 +181,59 @@ generate_notes = true
 enabled = true
 description = "A configurable repository description"
 topics = ["automation", "documentation", "github-actions"]
+
+[documentation]
+enabled = true
+ai_maintenance = true
+model = "claude-sonnet-5"
+production_label = "Production"
+preview_label = "Preview"
+production_indexing = true
+preview_indexing = false
+generate_robots = true
+generate_sitemap_index = true
+generate_llms_txt = true
+generate_llms_full_txt = true
+generate_json_ld = true
 ```
+
+### Comprehensive documentation and AI maintenance
+
+The `Docs` workflow enforces the complete FOSS and multi-agent documentation contract on
+every push and pull request. A scheduled or manually dispatched privileged maintenance job
+then performs a repository-wide semantic refresh: it reads source, tests, configuration,
+packaging, workflows, and releases; creates missing documentation; repairs stale claims;
+and opens a guarded documentation PR. It never executes repository code in the privileged
+job, never commits application changes, and never mutates a permanent branch directly.
+
+The required suite includes `README`, changelog, license, conduct, contribution, security,
+support, architecture, operations, testing, release, governance, accessibility, dependency,
+threat-model, troubleshooting, ADR, GitHub, hooks, Claude, Cursor, Gemini, Codex/Agents, and
+generic-agent documentation. The repository also contains a Claude-standard plugin
+marketplace at `.claude-plugin/marketplace.json` with development, documentation,
+release-security, and PR-automation plugins. Each plugin ships manifests, skills, commands,
+specialist agents, and supporting references; `.claude/settings.json` registers and enables
+the marketplace for project sessions.
+
+The Pages build emits production and preview sitemaps, a root sitemap index, `robots.txt`,
+`llms.txt`, `llms-full.txt`, canonical links, indexing policy, Open Graph/Twitter metadata,
+Schema.org JSON-LD, and repository/revision provenance. Repository identity and URLs are
+derived at build time, so adopting repositories never inherit `vibey-gh` metadata.
+
+### Five-surface capability parity
+
+Every canonical capability is exposed and tested through all five supported surfaces:
+
+- Python SDK: `vibey_gh.surfaces.invoke(...)`
+- CLI: the native command and the `sdk`, `api`, `mcp`, and `webhook` projections
+- JSON API: `api_dispatch` and `/v1/capabilities/<name>`
+- MCP: `initialize`, `tools/list`, and `tools/call`
+- Webhook: HMAC-SHA256 authenticated, delivery-ID replay-safe dispatch
+
+The parity contract enumerates every capability from one registry, invokes every adapter,
+and fails CI if any surface is absent or divergent. Because `Docs` is a configured scan,
+missing documentation or interface parity blocks the exact-head PR gate and enters the
+bounded repair loop before merge.
 
 After the configured `Release` workflow succeeds on `main`, the managed
 `github-release.yml` workflow tags that exact commit and creates a generated-notes GitHub

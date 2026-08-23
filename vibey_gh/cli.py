@@ -11,6 +11,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 from vibey_gh import (
+    documentation,
     fingerprints,
     github_release,
     install,
@@ -18,6 +19,7 @@ from vibey_gh import (
     pr_automation,
     promote,
     realign,
+    surfaces,
     versioning,
 )
 from vibey_gh.config import load_config
@@ -27,9 +29,10 @@ def _check(args) -> int:
     cfg = load_config()
     ok, problems = install.installed(cfg, local=not args.ci)
     report = fingerprints.check(cfg, rev_range=args.commits, apply=args.apply)
+    docs = documentation.check(cfg)
 
     if args.quiet:
-        return 0 if (ok and report.ok) else 1
+        return 0 if (ok and report.ok and docs.ok) else 1
 
     for problem in problems:
         print(f"  hooks: {problem}", file=sys.stderr)
@@ -37,8 +40,10 @@ def _check(args) -> int:
         print(f"  {path.relative_to(cfg.root)}: missing the fingerprint header", file=sys.stderr)
     for commit in report.missing_trailer:
         print(f"  commit {commit}: missing the `{cfg.trailer_key}:` trailer", file=sys.stderr)
+    for problem in docs.problems:
+        print(f"  documentation: {problem}", file=sys.stderr)
 
-    if ok and report.ok:
+    if ok and report.ok and docs.ok:
         scope = f"{report.checked_files} source file(s)"
         if args.commits:
             scope += f" and every commit in {args.commits}"
@@ -245,6 +250,47 @@ def _realign(args) -> int:
     return 0
 
 
+def _surface(args) -> int:
+    try:
+        arguments = json.loads(args.arguments)
+        if not isinstance(arguments, list):
+            raise TypeError("arguments must be a JSON array")
+        if args.cmd == "api":
+            status, payload = surfaces.api_dispatch(
+                "POST",
+                f"/v1/capabilities/{args.capability}",
+                json.dumps({"arguments": arguments}).encode(),
+            )
+        elif args.cmd == "mcp":
+            payload = surfaces.mcp_dispatch(
+                {
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "tools/call",
+                    "params": {"name": args.capability, "arguments": {"arguments": arguments}},
+                }
+            )
+            status = 200 if "result" in payload else 400
+        elif args.cmd == "sdk":
+            result = surfaces.invoke(args.capability, arguments)
+            status, payload = 200, result.as_dict()
+        else:
+            secret = os.environ.get("VIBEY_GH_WEBHOOK_SECRET", "").encode()
+            body = json.dumps({"capability": args.capability, "arguments": arguments}).encode()
+            signature = (
+                "sha256="
+                + __import__("hmac").new(secret, body, __import__("hashlib").sha256).hexdigest()
+            )
+            status, payload = surfaces.WebhookDispatcher(secret).dispatch(
+                args.delivery, signature, body
+            )
+    except (json.JSONDecodeError, TypeError, ValueError) as exc:
+        print(f"vibey-gh: {exc}", file=sys.stderr)
+        return 1
+    print(json.dumps(payload, sort_keys=True))
+    return 0 if status == 200 else 1
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="vibey-gh", description=__doc__)
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -349,6 +395,14 @@ def main(argv: list[str] | None = None) -> int:
 
     r = sub.add_parser("realign", help="realign the integration branch with the release branch")
     r.set_defaults(func=_realign)
+
+    for surface in ("api", "mcp", "sdk", "webhook"):
+        adapter = sub.add_parser(surface, help=f"invoke a capability through the {surface} adapter")
+        adapter.add_argument("capability", choices=surfaces.CAPABILITIES)
+        adapter.add_argument("--arguments", default="[]", help="JSON array of capability arguments")
+        if surface == "webhook":
+            adapter.add_argument("--delivery", required=True, help="unique webhook delivery ID")
+        adapter.set_defaults(func=_surface)
 
     args = parser.parse_args(argv)
     return int(args.func(args))

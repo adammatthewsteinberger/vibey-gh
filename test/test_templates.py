@@ -85,6 +85,27 @@ def test_release_surfaces_preserve_both_docs_channels_and_publish_oci_packages()
     assert "Made with ❤️ by" in text
     assert "https://adammatthewsteinberger.github.io/vibey/" in text
     assert "https://hire.adam.matthewsteinberger.com" in text
+    assert "pages/robots.txt" in text
+    assert "pages/sitemap.xml" in text
+    assert "pages/llms.txt" in text and "pages/llms-full.txt" in text
+    assert 'rel="canonical"' in text
+    assert "application/ld+json" in text
+    assert "noindex,nofollow" in text
+
+
+def test_documentation_workflow_authors_guarded_refresh_prs():
+    text = (WORKFLOWS / "documentation.yml").read_text(encoding="utf-8")
+    assert "name: Docs" in text
+    assert "vibey-gh check --ci" in text
+    assert "anthropics/claude-code-action@8569a83495a3f6f0c50a90e46351d3816fed1a75" in text
+    assert "This is an authoring" in text
+    assert "--allowedTools Read,Glob,Grep,Edit,Write" in text
+    assert 'branch="vibey-gh/docs/refresh-${RUN_ID}"' in text
+    assert 'git push origin "HEAD:refs/heads/${BRANCH}"' in text
+    assert "gh pr create" in text
+    assert "Never execute repository code" in text
+    assert "git push --delete" not in text
+    assert "--force" not in text
 
 
 def test_properdocs_theme_is_channel_aware_and_accessible():
@@ -111,8 +132,8 @@ def test_properdocs_theme_is_channel_aware_and_accessible():
     assert "https://adammatthewsteinberger.github.io/vibey/" in script
     assert "https://hire.adam.matthewsteinberger.com" in script
     assert "__PAGES_ROOT__" in script
-    assert '["Production", "main"]' in script
-    assert '["Preview", "develop"]' in script
+    assert '["__PRODUCTION_LABEL__", "main"]' in script
+    assert '["__PREVIEW_LABEL__", "develop"]' in script
     assert "Release channels: release-channels.md" not in config
     index = (root / "docs/index.md").read_text(encoding="utf-8")
     assert 'data-release-target="main"' in index

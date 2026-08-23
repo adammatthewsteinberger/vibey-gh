@@ -52,7 +52,13 @@ packages = ["vibey_gh"]
 "docs/javascripts/channel.js" = "vibey_gh/templates/release/channel.js"
 
 [tool.hatch.build.targets.sdist]
-include = ["vibey_gh", "docs", "test", "README.md", "LICENSE", "pyproject.toml"]
+include = [
+    "vibey_gh", "docs", "test", "plugins", ".claude-plugin", ".claude",
+    ".agents", ".agent", ".cursor", ".githooks", ".github",
+    "AGENTS.md", "CHANGELOG.md", "CLAUDE.md", "CODE_OF_CONDUCT.md",
+    "CONTRIBUTING.md", "GEMINI.md", "LICENSE", "NOTICE.md", "README.md",
+    "SECURITY.md", "SUPPORT.md", "properdocs.yml", ".vibey-gh.toml", "pyproject.toml",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["test"]

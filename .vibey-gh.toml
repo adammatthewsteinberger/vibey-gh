@@ -40,3 +40,19 @@ generate_notes = true
 enabled = true
 description = "Event-driven GitHub automation for reviews, repairs, releases, provenance, and beautiful dual-channel documentation."
 topics = ["automation", "continuous-delivery", "documentation", "github-actions", "release-automation"]
+
+[documentation]
+enabled = true
+ai_maintenance = true
+model = "claude-sonnet-5"
+production_label = "Production"
+preview_label = "Preview"
+production_indexing = true
+preview_indexing = false
+generate_robots = true
+generate_sitemap_index = true
+generate_llms_txt = true
+generate_llms_full_txt = true
+generate_json_ld = true
+author_name = "Adam Matthew Steinberger"
+author_url = "https://hire.adam.matthewsteinberger.com"

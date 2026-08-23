@@ -90,6 +90,27 @@ def render_workflow(source: Path, cfg: GhConfig) -> str:
         "__VIBEY_GH_PROFILE_TOPICS__",
         json.dumps({"names": list(cfg.repository_profile.topics)}, separators=(",", ":")),
     )
+    wanted = wanted.replace(
+        "__VIBEY_GH_DOCUMENTATION_AI__",
+        "true" if cfg.documentation.ai_maintenance else "false",
+    )
+    wanted = wanted.replace("__VIBEY_GH_DOCUMENTATION_MODEL__", cfg.documentation.model)
+    wanted = wanted.replace("__VIBEY_GH_DOC_PRODUCTION_LABEL__", cfg.documentation.production_label)
+    wanted = wanted.replace("__VIBEY_GH_DOC_PREVIEW_LABEL__", cfg.documentation.preview_label)
+    wanted = wanted.replace(
+        "__VIBEY_GH_DOCUMENTATION_FILES__",
+        json.dumps(list(cfg.documentation.required_files)),
+    )
+    for marker, enabled in (
+        ("__VIBEY_GH_DOC_ROBOTS__", cfg.documentation.generate_robots),
+        ("__VIBEY_GH_DOC_SITEMAP_INDEX__", cfg.documentation.generate_sitemap_index),
+        ("__VIBEY_GH_DOC_LLMS__", cfg.documentation.generate_llms_txt),
+        ("__VIBEY_GH_DOC_LLMS_FULL__", cfg.documentation.generate_llms_full_txt),
+        ("__VIBEY_GH_DOC_JSON_LD__", cfg.documentation.generate_json_ld),
+        ("__VIBEY_GH_DOC_PRODUCTION_INDEX__", cfg.documentation.production_indexing),
+        ("__VIBEY_GH_DOC_PREVIEW_INDEX__", cfg.documentation.preview_indexing),
+    ):
+        wanted = wanted.replace(marker, "true" if enabled else "false")
     if source.name != "pr-automation.yml":
         return wanted
     workflows = json.dumps(list(cfg.pr_automation.scan_workflows))

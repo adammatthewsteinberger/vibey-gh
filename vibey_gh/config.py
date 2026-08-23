@@ -46,6 +46,27 @@ DEFAULT_SCAN_WORKFLOWS = (
     "API drift (Cloud Agents OpenAPI)",
 )
 DEFAULT_IGNORED_CHECKS = ("PR automation / gate", "Merge train / merge")
+DEFAULT_DOCUMENTATION_FILES = (
+    ".claude-plugin/marketplace.json",
+    ".claude/settings.json",
+    ".claude/skills/README.md",
+    ".cursor/rules/project.mdc",
+    ".agents/skills/README.md",
+    ".agent/rules/project.md",
+    ".githooks/README.md",
+    ".github/README.md",
+    "docs/index.md",
+    "AGENTS.md",
+    "CHANGELOG.md",
+    "CLAUDE.md",
+    "CODE_OF_CONDUCT.md",
+    "CONTRIBUTING.md",
+    "GEMINI.md",
+    "LICENSE",
+    "README.md",
+    "SECURITY.md",
+    "SUPPORT.md",
+)
 
 
 @dataclass(frozen=True)
@@ -114,6 +135,41 @@ class RepositoryProfileConfig:
 
 
 @dataclass(frozen=True)
+class DocumentationConfig:
+    enabled: bool = True
+    ai_maintenance: bool = True
+    model: str = "claude-sonnet-5"
+    required_files: tuple[str, ...] = DEFAULT_DOCUMENTATION_FILES
+    production_label: str = "Production"
+    preview_label: str = "Preview"
+    production_indexing: bool = True
+    preview_indexing: bool = False
+    generate_robots: bool = True
+    generate_sitemap_index: bool = True
+    generate_llms_txt: bool = True
+    generate_llms_full_txt: bool = True
+    generate_json_ld: bool = True
+    author_name: str = "Adam Matthew Steinberger"
+    author_url: str = "https://hire.adam.matthewsteinberger.com"
+
+    def __post_init__(self) -> None:
+        _unique_nonempty("documentation.required_files", self.required_files)
+        if any(
+            Path(value).is_absolute() or ".." in Path(value).parts for value in self.required_files
+        ):
+            raise ValueError("documentation.required_files must be repository-relative paths")
+        for name, value in (
+            ("model", self.model),
+            ("production_label", self.production_label),
+            ("preview_label", self.preview_label),
+            ("author_name", self.author_name),
+            ("author_url", self.author_url),
+        ):
+            if not value.strip():
+                raise ValueError(f"documentation.{name} must not be empty")
+
+
+@dataclass(frozen=True)
 class GhConfig:
     root: Path
     text: str = DEFAULT_TEXT
@@ -129,6 +185,7 @@ class GhConfig:
     pr_automation: PrAutomationConfig = PrAutomationConfig()
     github_release: GithubReleaseConfig = GithubReleaseConfig()
     repository_profile: RepositoryProfileConfig = RepositoryProfileConfig()
+    documentation: DocumentationConfig = DocumentationConfig()
     # Which bundled workflow templates this repository wants installed and kept current.
     # None means all of them, which is the right default for a repository adopting the
     # whole thing. A repository with its own richer workflows sets `workflows = []` and
@@ -170,6 +227,7 @@ def load_config(root: Path | None = None) -> GhConfig:
     auto = data.get("pr_automation", {})
     release = data.get("github_release", {})
     profile = data.get("repository_profile", {})
+    documentation = data.get("documentation", {})
     automation = PrAutomationConfig(
         enabled=auto.get("enabled", True),
         scan_workflows=tuple(auto.get("scan_workflows", DEFAULT_SCAN_WORKFLOWS)),
@@ -204,6 +262,23 @@ def load_config(root: Path | None = None) -> GhConfig:
             enabled=profile.get("enabled", True),
             description=profile.get("description", ""),
             topics=tuple(profile.get("topics", RepositoryProfileConfig().topics)),
+        ),
+        documentation=DocumentationConfig(
+            enabled=documentation.get("enabled", True),
+            ai_maintenance=documentation.get("ai_maintenance", True),
+            model=documentation.get("model", "claude-sonnet-5"),
+            required_files=tuple(documentation.get("required_files", DEFAULT_DOCUMENTATION_FILES)),
+            production_label=documentation.get("production_label", "Production"),
+            preview_label=documentation.get("preview_label", "Preview"),
+            production_indexing=documentation.get("production_indexing", True),
+            preview_indexing=documentation.get("preview_indexing", False),
+            generate_robots=documentation.get("generate_robots", True),
+            generate_sitemap_index=documentation.get("generate_sitemap_index", True),
+            generate_llms_txt=documentation.get("generate_llms_txt", True),
+            generate_llms_full_txt=documentation.get("generate_llms_full_txt", True),
+            generate_json_ld=documentation.get("generate_json_ld", True),
+            author_name=documentation.get("author_name", "Adam Matthew Steinberger"),
+            author_url=documentation.get("author_url", "https://hire.adam.matthewsteinberger.com"),
         ),
     )
 
