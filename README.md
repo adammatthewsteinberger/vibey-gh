@@ -188,6 +188,11 @@ same-repository linear topic branch may be normalized and pushed with an exact-h
 `--force-with-lease`. Forks, stale heads, merge commits, `develop`, and `main` fail closed,
 and contributor-controlled code is never executed by that privileged job.
 
+Webhook delivery IDs are claimed atomically in a persistent local state directory, so
+replay rejection survives CLI process restarts and concurrent receivers. Deployments must
+place `VIBEY_GH_WEBHOOK_STATE_DIR` on durable, access-controlled storage and retain the raw
+request bytes for HMAC verification; see [the CLI and adapter reference](docs/cli.md).
+
 ## Commands
 
 | Command | Human purpose |
@@ -450,6 +455,12 @@ Every canonical capability is exposed and tested through all five supported surf
 - JSON API: `api_dispatch` and `/v1/capabilities/<name>`
 - MCP: `initialize`, `tools/list`, and `tools/call`
 - Webhook: HMAC-SHA256 authenticated, delivery-ID replay-safe dispatch
+
+The two Conventional Commit commands are deliberately outside this canonical registry:
+they are local git-hook/CI helpers that consume stdin, commit-message files, or revision
+ranges. Exposing those host-specific mutation primitives through a remote API, MCP tool, or
+webhook would expand privilege without adding an automation capability. Every repository
+automation capability in `surfaces.CAPABILITIES` remains available through all five forms.
 
 The parity contract enumerates every capability from one registry, invokes every adapter,
 and fails CI if any surface is absent or divergent. Because `Docs` is a configured scan,

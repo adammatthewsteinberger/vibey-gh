@@ -11,3 +11,9 @@ It can act only on a same-repository topic branch, only from an exact checked SH
 linear history, and only with `--force-with-lease`. Permanent branches are rejected by
 both configured and literal names. The job executes the trusted normalizer, never PR code,
 and a concurrent contributor push makes the lease fail closed.
+
+Webhook receivers must use a strong `VIBEY_GH_WEBHOOK_SECRET`, verify HMAC over the exact
+raw body, and place `VIBEY_GH_WEBHOOK_STATE_DIR` on access-controlled durable storage.
+Accepted IDs use atomic mode-0600 marker creation, preventing replay across restarts and
+concurrent CLI processes. Operators own TLS, rate limits, request-size limits, backups,
+retention, and safe pruning of expired claims.

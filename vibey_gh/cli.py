@@ -305,7 +305,13 @@ def _surface(args) -> int:
                 "sha256="
                 + __import__("hmac").new(secret, body, __import__("hashlib").sha256).hexdigest()
             )
-            status, payload = surfaces.WebhookDispatcher(secret).dispatch(
+            state_dir = Path(
+                os.environ.get(
+                    "VIBEY_GH_WEBHOOK_STATE_DIR",
+                    str(load_config().root / ".vibey-gh" / "webhook-deliveries"),
+                )
+            )
+            status, payload = surfaces.WebhookDispatcher(secret, delivery_dir=state_dir).dispatch(
                 args.delivery, signature, body
             )
     except (json.JSONDecodeError, TypeError, ValueError) as exc:
