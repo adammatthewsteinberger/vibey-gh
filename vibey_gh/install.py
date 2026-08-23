@@ -54,6 +54,7 @@ def render_workflow(source: Path, cfg: GhConfig) -> str:
     wanted = source.read_text(encoding="utf-8")
     wanted = wanted.replace("__VIBEY_GH_INTEGRATION_BRANCH__", cfg.integration_branch)
     wanted = wanted.replace("__VIBEY_GH_RELEASE_BRANCH__", cfg.release_branch)
+    wanted = wanted.replace("__VIBEY_GH_MODEL__", cfg.pr_automation.model)
     if source.name != "pr-automation.yml":
         return wanted
     workflows = json.dumps(list(cfg.pr_automation.scan_workflows))
@@ -62,10 +63,8 @@ def render_workflow(source: Path, cfg: GhConfig) -> str:
         if cfg.pr_automation.retain_schedule_backstop
         else "  # schedule backstop disabled by .vibey-gh.toml"
     )
-    return (
-        wanted.replace("__VIBEY_GH_SCAN_WORKFLOWS__", workflows)
-        .replace("  # __VIBEY_GH_SCHEDULE__", schedule)
-        .replace("__VIBEY_GH_MODEL__", cfg.pr_automation.model)
+    return wanted.replace("__VIBEY_GH_SCAN_WORKFLOWS__", workflows).replace(
+        "  # __VIBEY_GH_SCHEDULE__", schedule
     )
 
 

@@ -197,6 +197,14 @@ and `sha-<commit>` tags, plus `develop` for test releases or `main` and `latest`
 production releases. The normal TestPyPI and PyPI uploads remain authoritative and are
 unchanged.
 
+If a trusted post-merge workflow fails on `develop` or `main`, `release-repair.yml`
+reviews its logs with the same constrained agent used for PR repair. A fixable problem is
+committed to a new `vibey-gh/repair/release-*` branch and returned through a normal PR,
+where all checks and the merge train apply. It never pushes a repair directly to—and can
+never delete—`develop` or `main`. Credential, billing, repository-setting, registry, and
+other operator-only failures are reported with an explicit required action instead of
+being disguised as code fixes.
+
 Everything project-specific lives in `.vibey-gh.toml`, so the logic beside it stays
 general. Every key has a default; a repository that agrees with them needs no file at all.
 
