@@ -136,6 +136,8 @@ def test_pr_gate_requires_exact_head_semantic_documentation_review_for_every_aut
     assert "complete, approachable guide" in text
     assert "--disallowedTools Agent" in text
     assert "Do not spawn subagents" in text
+    assert text.count("GH_REPO: ${{ github.repository }}") >= 2
+    assert "leaving the workspace root without a" in text
     for field in (
         "complete",
         "accurate",

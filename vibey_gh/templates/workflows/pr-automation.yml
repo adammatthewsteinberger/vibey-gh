@@ -34,6 +34,11 @@ permissions:
   contents: read
   pull-requests: read
 
+# Jobs use path-based trusted/untrusted checkouts, leaving the workspace root without a
+# .git directory. Give every `gh` invocation explicit repository context.
+env:
+  GH_REPO: ${{ github.repository }}
+
 concurrency:
   group: pr-automation-${{ github.repository }}-${{ inputs.pr || github.event.pull_request.number || github.event.workflow_run.head_sha || github.run_id }}
   cancel-in-progress: true
@@ -250,6 +255,7 @@ jobs:
         id: result
         env:
           GH_TOKEN: ${{ steps.claude.outputs.github_token || github.token }}
+          GH_REPO: ${{ github.repository }}
           PR: ${{ needs.evaluate.outputs.pr }}
           HEAD_SHA: ${{ needs.evaluate.outputs.head_sha }}
           STRUCTURED: ${{ steps.claude.outputs.structured_output }}
