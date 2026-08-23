@@ -158,6 +158,7 @@ def test_evaluation_ignores_own_checks_and_accepts_context_shape(tmp_path):
         pr(
             statusCheckRollup=[
                 check("PR automation / gate", conclusion="FAILURE"),
+                check("gate", conclusion="FAILURE"),
                 {"context": "legacy", "conclusion": "NEUTRAL", "targetUrl": "u"},
                 {"name": "skip", "conclusion": "SKIPPED", "detailsUrl": "v"},
             ]

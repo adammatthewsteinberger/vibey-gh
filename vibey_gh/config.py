@@ -45,7 +45,7 @@ DEFAULT_SCAN_WORKFLOWS = (
     "Docs",
     "API drift (Cloud Agents OpenAPI)",
 )
-DEFAULT_IGNORED_CHECKS = ("PR automation / gate", "Merge train / merge")
+DEFAULT_IGNORED_CHECKS = ("PR automation / gate", "gate", "Merge train / merge")
 DEFAULT_DOCUMENTATION_FILES = (
     ".claude-plugin/marketplace.json",
     ".claude/settings.json",

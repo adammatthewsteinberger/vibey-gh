@@ -164,7 +164,7 @@ left alone and says so.
 [pr_automation]
 enabled = true
 scan_workflows = ["CI", "Provenance", "CodeQL", "Docs", "API drift (Cloud Agents OpenAPI)"]
-ignored_checks = ["PR automation / gate", "Merge train / merge"]
+ignored_checks = ["PR automation / gate", "gate", "Merge train / merge"]
 max_repair_attempts = 3
 model = "claude-sonnet-5"
 review_untrusted_authors = true
