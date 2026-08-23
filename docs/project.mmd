@@ -88,6 +88,8 @@ flowchart TB
   MergeTrain --> Develop
   Develop --> Promotion
   Promotion --> PullRequest
+  Promotion --> Conventional
+  Conventional -->|protected history: verify without rewrite| Promotion
   MergeTrain --> Main
   Develop --> TestPyPI
   Main --> PyPI
