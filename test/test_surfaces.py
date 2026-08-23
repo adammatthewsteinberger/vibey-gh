@@ -114,3 +114,15 @@ def test_cli_projects_api_mcp_sdk_and_webhook(monkeypatch, capsys, tmp_path):
     assert capsys.readouterr().out.count("version") == 4
     assert main(["api", "version", "--arguments", "{}"]) == 1
     assert "JSON array" in capsys.readouterr().err
+
+
+def test_cli_surface_adapters_propagate_capability_failures(monkeypatch, tmp_path):
+    def failed(capability, arguments):
+        return surfaces.Result(capability, 7, "", "failed")
+
+    monkeypatch.setattr(surfaces, "invoke", failed)
+    monkeypatch.setenv("VIBEY_GH_WEBHOOK_SECRET", "secret")
+    monkeypatch.setenv("VIBEY_GH_WEBHOOK_STATE_DIR", str(tmp_path / "deliveries"))
+    for name in ("api", "mcp", "sdk"):
+        assert main([name, "version"]) == 7
+    assert main(["webhook", "version", "--delivery", "failed-delivery"]) == 7

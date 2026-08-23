@@ -141,13 +141,13 @@ class WebhookDispatcher:
     def __init__(
         self,
         secret: bytes,
-        executor: Callable[[str, list[str]], Result] = invoke,
+        executor: Callable[[str, list[str]], Result] | None = None,
         delivery_dir: Path | None = None,
     ):
         if not secret:
             raise ValueError("webhook secret must not be empty")
         self._secret = secret
-        self._executor = executor
+        self._executor = executor or invoke
         self._deliveries: set[str] = set()
         self._delivery_dir = delivery_dir
 

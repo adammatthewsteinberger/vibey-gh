@@ -279,12 +279,15 @@ def _surface(args) -> int:
         arguments = json.loads(args.arguments)
         if not isinstance(arguments, list):
             raise TypeError("arguments must be a JSON array")
+        capability_exit = 0
         if args.cmd == "api":
             status, payload = surfaces.api_dispatch(
                 "POST",
                 f"/v1/capabilities/{args.capability}",
                 json.dumps({"arguments": arguments}).encode(),
             )
+            if status == 200:
+                capability_exit = int(payload["exit_code"])
         elif args.cmd == "mcp":
             payload = surfaces.mcp_dispatch(
                 {
@@ -295,9 +298,13 @@ def _surface(args) -> int:
                 }
             )
             status = 200 if "result" in payload else 400
+            if status == 200:
+                result_text = payload["result"]["content"][0]["text"]
+                capability_exit = int(json.loads(result_text)["exit_code"])
         elif args.cmd == "sdk":
             result = surfaces.invoke(args.capability, arguments)
             status, payload = 200, result.as_dict()
+            capability_exit = result.exit_code
         else:
             secret = os.environ.get("VIBEY_GH_WEBHOOK_SECRET", "").encode()
             body = json.dumps({"capability": args.capability, "arguments": arguments}).encode()
@@ -314,11 +321,13 @@ def _surface(args) -> int:
             status, payload = surfaces.WebhookDispatcher(secret, delivery_dir=state_dir).dispatch(
                 args.delivery, signature, body
             )
+            if status == 200:
+                capability_exit = int(payload["exit_code"])
     except (json.JSONDecodeError, TypeError, ValueError) as exc:
         print(f"vibey-gh: {exc}", file=sys.stderr)
         return 1
     print(json.dumps(payload, sort_keys=True))
-    return 0 if status == 200 else 1
+    return capability_exit if status == 200 else 1
 
 
 def main(argv: list[str] | None = None) -> int:
