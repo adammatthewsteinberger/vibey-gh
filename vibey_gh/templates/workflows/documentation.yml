@@ -1,4 +1,4 @@
-# Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger.
+# Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), Developed by [Adam Matthew Steinberger](https://hire.adam.matthewsteinberger.com/) ([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/)).
 name: Docs
 
 on:
@@ -114,7 +114,7 @@ jobs:
           git config user.email 'adam@matthewsteinberger.com'
           git add -- . ':!vibey_gh/**' ':!test/**'
           git commit -m 'Refresh comprehensive project documentation' \
-            -m 'Made-With: Vibey, the auto-vibecoding machine by Adam Matthew Steinberger'
+            -m 'Made-With: Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), Developed by [Adam Matthew Steinberger](https://hire.adam.matthewsteinberger.com/) ([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/)).'
           git push origin "HEAD:refs/heads/${BRANCH}"
           body=$(jq -r '.summary + "\n\nRemaining gaps:\n" + ((.gaps_remaining // []) | map("- " + .) | join("\n"))' <<<"$STRUCTURED")
           gh pr create --repo "$REPO" --base __VIBEY_GH_INTEGRATION_BRANCH__ \

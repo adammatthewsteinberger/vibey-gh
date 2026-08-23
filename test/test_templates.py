@@ -1,4 +1,4 @@
-# Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger.
+# Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), Developed by [Adam Matthew Steinberger](https://hire.adam.matthewsteinberger.com/) ([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/)).
 """The shipped templates are product, so they get tested like product.
 
 A workflow template that does not parse installs cleanly and then fails in the consuming
@@ -131,6 +131,7 @@ def test_properdocs_theme_is_channel_aware_and_accessible():
     assert "Made with ❤️ by" in script
     assert "https://adammatthewsteinberger.github.io/vibey/" in script
     assert "https://hire.adam.matthewsteinberger.com" in script
+    assert "https://github.com/adammatthewsteinberger/" in script
     assert "__PAGES_ROOT__" in script
     assert '["__PRODUCTION_LABEL__", "main"]' in script
     assert '["__PREVIEW_LABEL__", "develop"]' in script
@@ -146,8 +147,13 @@ def test_repository_profile_is_configurable_and_never_mutates_branches():
     assert 'workflows: ["Release surfaces"]' in text
     assert "__VIBEY_GH_PROFILE_DESCRIPTION__" in text
     assert "__VIBEY_GH_PROFILE_TOPICS__" in text
-    assert 'homepage="$pages_url"' in text
+    assert '--arg homepage "$pages_url"' in text
     assert "repos/${REPO}/topics" in text
+    assert "__VIBEY_GH_PROFILE_SETTINGS__" in text
+    assert "vulnerability-alerts" in text
+    assert "automated-security-fixes" in text
+    assert "branches/${branch}" in text
+    assert "--jq .protected" in text
     assert "https://${OWNER}.github.io/${REPO_NAME}/" in text
     assert "curl --fail --silent --show-error" in text
     assert "repos/${REPO}/releases?per_page=1" in text
