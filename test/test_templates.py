@@ -119,7 +119,7 @@ def test_repository_profile_is_configurable_and_never_mutates_branches():
     assert "__VIBEY_GH_PROFILE_TOPICS__" in text
     assert 'homepage="$pages_url"' in text
     assert "repos/${REPO}/topics" in text
-    assert 'https://${OWNER}.github.io/${REPO_NAME}/' in text
+    assert "https://${OWNER}.github.io/${REPO_NAME}/" in text
     assert "curl --fail --silent --show-error" in text
     assert "repos/${REPO}/releases?per_page=1" in text
     assert "repos/${REPO}/deployments?per_page=1" in text
