@@ -24,6 +24,22 @@ key off a `workflow_run` named `Release` (and `release-repair.yml` also watches 
 version --apply`, builds, and publishes through the `testpypi`/`pypi` trusted-publishing
 environments is what the rest of this reference assumes exists.
 
+## CodeQL
+
+`CodeQL` runs on push and pull request against `develop` and `main`, plus a weekly Monday
+schedule as a backstop. With `security-events: write` and read-only `contents: read`, it
+runs the immutably pinned `github/codeql-action` initializer and analyzer against the
+Python codebase. It is one of the required `scan_workflows` entries PR automation
+aggregates before publishing the merge gate.
+
+## API drift
+
+`API drift` (workflow name `API drift (Cloud Agents OpenAPI)`) runs on the same push and
+pull-request events as CodeQL, with read-only `contents: read` permission. It installs the
+package and calls `vibey_gh.surfaces.parity()` to prove every canonical capability is
+exposed through all five surfaces — MCP, API, CLI, SDK, and webhook — failing the run on
+any drift between them. It is also a required `scan_workflows` entry.
+
 ## Conventional Commits
 
 `Conventional Commits` runs from trusted base-branch workflow code on PR open, reopen,
@@ -34,3 +50,19 @@ rewritten history with an exact-SHA `--force-with-lease`. It refuses forks, merg
 stale heads, and any branch named by the configured integration or release branch; the
 literal `develop` and `main` names are denied independently as defense in depth. It never
 deletes a branch. The resulting synchronize event reruns all ordinary scans.
+
+## Automation bootstrap
+
+`Automation bootstrap` is a manual `workflow_dispatch` with three required inputs: the PR
+number, the exact reviewed head SHA, and an explicit `authorize` boolean. It exists only for
+the case where privileged workflow code itself is broken and a PR therefore cannot repair
+its own gate. With `contents: write`, `pull-requests: write`, and `checks: read`, the job
+verifies that the dispatching actor holds administrator permission; that the PR is open,
+non-draft, targets `develop`, and exactly matches the dispatched head SHA; that changed
+files are confined to workflow, template, or automation-core paths; and that every non-gate
+check run on that exact SHA — including CodeQL, API drift, the Documentation contract,
+Provenance, Build, and Lint — completed successfully. Only then does it perform an
+admin `--match-head-commit` squash merge into `develop`, bypassing ordinary PR automation
+review, and delete the source branch, and only when that branch is same-repository and not
+a configured or literal permanent branch. See [Security](security.md) and
+[Threat model](threat-model.md) for the full rationale.
