@@ -98,6 +98,9 @@ def test_properdocs_theme_is_channel_aware_and_accessible():
     assert 'body[data-release-channel="main"]' in css
     assert 'body[data-release-channel="develop"]' in css
     assert "prefers-reduced-motion" in css
+    assert "padding-top: 0" in css
+    assert "position: sticky" in css
+    assert "top: 0" in css
     assert 'dataset.bsTheme = "dark"' in script
     assert 'segments.includes("develop")' in script
     assert "/edit/${channel}/" in script
@@ -116,7 +119,8 @@ def test_repository_profile_is_configurable_and_never_mutates_branches():
     assert "__VIBEY_GH_PROFILE_TOPICS__" in text
     assert 'homepage="$pages_url"' in text
     assert "repos/${REPO}/topics" in text
-    assert "repos/${REPO}/pages" in text
+    assert "https://${OWNER}.github.io/${REPO_NAME}/" in text
+    assert "curl --fail --silent --show-error" in text
     assert "repos/${REPO}/releases?per_page=1" in text
     assert "repos/${REPO}/deployments?per_page=1" in text
     assert "package_type=container" in text

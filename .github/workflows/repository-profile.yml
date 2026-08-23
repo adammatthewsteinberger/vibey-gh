@@ -44,7 +44,7 @@ jobs:
 
       - name: Verify public release surfaces
         env:
-          GH_TOKEN: ${{ secrets.AUTOMERGE_TOKEN || github.token }}
+          GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           OWNER: ${{ github.repository_owner }}
           OWNER_TYPE: ${{ github.event.repository.owner.type }}
@@ -52,7 +52,8 @@ jobs:
           PACKAGE_NAMES_QUERY: ".[].name"
         run: |
           set -euo pipefail
-          gh api "repos/${REPO}/pages" --jq '.html_url' >/dev/null
+          curl --fail --silent --show-error --location --retry 5 \
+            "https://${OWNER}.github.io/${REPO_NAME}/" >/dev/null
           test "$(gh api "repos/${REPO}/releases?per_page=1" --jq 'length')" -gt 0
           test "$(gh api "repos/${REPO}/deployments?per_page=1" --jq 'length')" -gt 0
           package_owner=users
