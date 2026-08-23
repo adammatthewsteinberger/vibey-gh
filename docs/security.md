@@ -6,6 +6,13 @@ content but cannot execute it. AI tools edit only named scopes; trusted shell st
 paths and publish one commit. Secrets never enter prompts or artifacts. The merge train
 rechecks exact-head gates immediately before mutation.
 
+Claude Code Action requires a Git repository at the workspace root for its own setup.
+Managed workflows satisfy that contract with a disposable repository that has no remote,
+source checkout, or persisted credential. Untrusted source remains under `target/`, checked
+out with `persist-credentials: false`. The disposable context is removed with `always()`
+before trusted persistence or publishing. Only the later trusted publish step attaches
+`GH_TOKEN` through `gh auth setup-git`; no Claude step can read that authenticated context.
+
 The Conventional Commits job is the sole guarded exception that may force-update history.
 It can act only on a same-repository topic branch, only from an exact checked SHA, only on
 linear history, and only with `--force-with-lease`. Permanent branches are rejected by

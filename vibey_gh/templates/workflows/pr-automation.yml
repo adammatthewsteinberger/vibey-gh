@@ -34,8 +34,8 @@ permissions:
   contents: read
   pull-requests: read
 
-# Jobs use path-based trusted/untrusted checkouts, leaving the workspace root without a
-# .git directory. Give every `gh` invocation explicit repository context.
+# Jobs use path-based trusted/untrusted checkouts. Claude receives an isolated temporary
+# Git context with no remote or credentials; every `gh` invocation gets explicit context.
 env:
   GH_REPO: ${{ github.repository }}
 
@@ -202,12 +202,12 @@ jobs:
           ref: ${{ needs.evaluate.outputs.head_sha }}
           path: target
           persist-credentials: false
-      - name: Expose exact checkout to Claude git setup
+      - name: Create credential-free Claude git context
         run: |
           set -euo pipefail
           test ! -e .git
-          git -C target config core.worktree "$GITHUB_WORKSPACE/target"
-          echo "gitdir: $GITHUB_WORKSPACE/target/.git" > .git
+          git init --quiet .claude-git-context
+          echo "gitdir: $GITHUB_WORKSPACE/.claude-git-context/.git" > .git
       - name: Run constrained review
         id: claude
         uses: anthropics/claude-code-action@8569a83495a3f6f0c50a90e46351d3816fed1a75 # v1
@@ -260,11 +260,11 @@ jobs:
             comments for actionable findings. Return pass=true only when every required
             boolean is true and there are zero actionable findings. Do not approve, merge,
             push, edit, or resolve comments.
-      - name: Remove Claude git setup bridge
+      - name: Remove credential-free Claude git context
         if: always()
         run: |
           rm -f .git
-          git -C target config --unset core.worktree || true
+          rm -rf .claude-git-context
       - name: Persist review state
         id: result
         env:
@@ -363,6 +363,7 @@ jobs:
           ref: ${{ needs.evaluate.outputs.head_ref }}
           path: target
           fetch-depth: 0
+          persist-credentials: false
           token: ${{ secrets.AUTOMERGE_TOKEN || github.token }}
       - name: Mark repair in progress
         env:
@@ -372,12 +373,12 @@ jobs:
           python -m pip install --quiet ./automation
           vibey-gh pr-automation ensure-labels
           gh pr edit "$PR" --add-label vibey-gh:repairing
-      - name: Expose repair checkout to Claude git setup
+      - name: Create credential-free Claude git context
         run: |
           set -euo pipefail
           test ! -e .git
-          git -C target config core.worktree "$GITHUB_WORKSPACE/target"
-          echo "gitdir: $GITHUB_WORKSPACE/target/.git" > .git
+          git init --quiet .claude-git-context
+          echo "gitdir: $GITHUB_WORKSPACE/.claude-git-context/.git" > .git
       - name: Diagnose and repair without executing PR code
         id: claude
         uses: anthropics/claude-code-action@8569a83495a3f6f0c50a90e46351d3816fed1a75 # v1
@@ -423,15 +424,17 @@ jobs:
 
             For a fixable failure, edit files only. Do not commit, push, create, rename,
             or delete any branch. A separate trusted step publishes at most one commit.
-      - name: Remove Claude git setup bridge
+      - name: Remove credential-free Claude git context
         if: always()
         run: |
           rm -f .git
-          git -C target config --unset core.worktree || true
+          rm -rf .claude-git-context
       - name: Publish one guarded repair commit
         if: fromJSON(steps.claude.outputs.structured_output).fixable == true
         env:
           HEAD_REF: ${{ needs.evaluate.outputs.head_ref }}
+          GH_TOKEN: ${{ secrets.AUTOMERGE_TOKEN || github.token }}
+          REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
           case "$HEAD_REF" in
@@ -449,6 +452,8 @@ jobs:
           git -C target add -A
           git -C target commit -m "fix: repair PR #${{ needs.evaluate.outputs.pr }} (attempt ${{ needs.evaluate.outputs.repair_attempt }})" \
             -m "Made-With: Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), Developed by [Adam Matthew Steinberger](https://hire.adam.matthewsteinberger.com/) ([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/))."
+          gh auth setup-git
+          git -C target remote set-url origin "https://github.com/${REPO}.git"
           # A non-empty source makes this an update refspec. Never use a deletion
           # option or an empty-source ':branch' refspec here.
           git -C target push origin "HEAD:refs/heads/${HEAD_REF}"
@@ -502,6 +507,7 @@ jobs:
           ref: ${{ needs.evaluate.outputs.head_sha }}
           path: target
           fetch-depth: 0
+          persist-credentials: false
           token: ${{ secrets.AUTOMERGE_TOKEN || github.token }}
       - name: Materialize conflicts without executing repository code
         id: conflicts
@@ -523,12 +529,12 @@ jobs:
             printf '%s\n' "$files"
             echo EOF
           } >> "$GITHUB_OUTPUT"
-      - name: Expose conflict checkout to Claude git setup
+      - name: Create credential-free Claude git context
         run: |
           set -euo pipefail
           test ! -e .git
-          git -C target config core.worktree "$GITHUB_WORKSPACE/target"
-          echo "gitdir: $GITHUB_WORKSPACE/target/.git" > .git
+          git init --quiet .claude-git-context
+          echo "gitdir: $GITHUB_WORKSPACE/.claude-git-context/.git" > .git
       - name: Resolve only the materialized conflict set
         id: claude
         uses: anthropics/claude-code-action@8569a83495a3f6f0c50a90e46351d3816fed1a75 # v1
@@ -559,11 +565,11 @@ jobs:
             files. Do not execute commands, tests, builds, scripts, or package managers.
             Do not commit, push, create, rename, or delete branches. Return resolved=false
             if a correct resolution cannot be determined from the repository evidence.
-      - name: Remove Claude git setup bridge
+      - name: Remove credential-free Claude git context
         if: always()
         run: |
           rm -f .git
-          git -C target config --unset core.worktree || true
+          rm -rf .claude-git-context
       - name: Publish one guarded conflict-resolution commit
         if: fromJSON(steps.claude.outputs.structured_output).resolved == true
         env:
@@ -602,6 +608,8 @@ jobs:
           git -C target commit \
             -m "Resolve PR #${PR} conflicts with ${BASE_REF}" \
             -m "Made-With: Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), Developed by [Adam Matthew Steinberger](https://hire.adam.matthewsteinberger.com/) ([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/))."
+          gh auth setup-git
+          git -C target remote set-url origin "https://github.com/${REPO}.git"
           git -C target push origin "HEAD:refs/heads/${HEAD_REF}"
           python -m pip install --quiet ./automation
           new_sha=$(git -C target rev-parse HEAD)
@@ -675,12 +683,13 @@ jobs:
           HEAD_SHA: ${{ needs.evaluate.outputs.head_sha }}
           STATE: ${{ needs.evaluate.outputs.state }}
           REASON: ${{ needs.evaluate.outputs.reason }}
+          TRUSTED: ${{ needs.evaluate.outputs.trusted }}
           REVIEW_PASSED: ${{ needs.review.outputs.passed }}
         run: |
           set -euo pipefail
           conclusion=failure
-          if { [ "$STATE" = ready ] || [ "$STATE" = review ]; } && \
-             [ "$REVIEW_PASSED" = true ]; then
+          if [ "$STATE" = ready ] && \
+             { [ "$TRUSTED" = true ] || [ "$REVIEW_PASSED" = true ]; }; then
             conclusion=success
           fi
           gh api "repos/${REPO}/check-runs" --method POST \
@@ -693,5 +702,5 @@ jobs:
               --ref "${{ github.event.repository.default_branch }}" -f "pr=${PR}"
             exit 0
           fi
-          echo "PR is not ready: state=${STATE}, reason=${REASON}, review_passed=${REVIEW_PASSED}"
+          echo "PR is not ready: state=${STATE}, reason=${REASON}, trusted=${TRUSTED}, review_passed=${REVIEW_PASSED}"
           exit 1

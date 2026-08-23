@@ -137,7 +137,13 @@ def test_pr_gate_requires_exact_head_semantic_documentation_review_for_every_aut
     assert "--disallowedTools Agent" in text
     assert "Do not spawn subagents" in text
     assert text.count("GH_REPO: ${{ github.repository }}") >= 2
-    assert "leaving the workspace root without a" in text
+    assert "isolated temporary" in text
+    assert text.count("Create credential-free Claude git context") == 3
+    assert text.count("Remove credential-free Claude git context") == 3
+    assert text.count("persist-credentials: false") >= 3
+    assert "gitdir: $GITHUB_WORKSPACE/target/.git" not in text
+    assert "TRUSTED: ${{ needs.evaluate.outputs.trusted }}" in text
+    assert '[ "$TRUSTED" = true ] || [ "$REVIEW_PASSED" = true ]' in text
     for field in (
         "complete",
         "accurate",

@@ -10,6 +10,7 @@ That keeps stale-SHA rejection, trust, retry limits, and check classification te
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 from collections.abc import Sequence
@@ -324,6 +325,10 @@ def upsert_state(
     number: int, state: AutomationState, summary: str, comments: list[dict[str, Any]]
 ) -> None:
     body = state_body(state, summary)
+    repository_name = os.environ.get("GH_REPO")
+    if not repository_name:
+        repository = _gh_json("repo", "view", "--json", "nameWithOwner")
+        repository_name = str(repository["nameWithOwner"])
     existing: dict[str, Any] | None = None
     for comment in reversed(comments):
         if _STATE_RE.search(str(comment.get("body", ""))):
@@ -331,19 +336,18 @@ def upsert_state(
             break
     if existing is None:
         run = subprocess.run(
-            ["gh", "pr", "comment", str(number), "--body", body],
+            ["gh", "pr", "comment", str(number), "--repo", repository_name, "--body", body],
             capture_output=True,
             text=True,
             check=False,
         )
     else:
-        repository = _gh_json("repo", "view", "--json", "nameWithOwner")
         comment_id = existing.get("databaseId") or existing.get("id")
         run = subprocess.run(
             [
                 "gh",
                 "api",
-                f"repos/{repository['nameWithOwner']}/issues/comments/{comment_id}",
+                f"repos/{repository_name}/issues/comments/{comment_id}",
                 "--method",
                 "PATCH",
                 "--field",
