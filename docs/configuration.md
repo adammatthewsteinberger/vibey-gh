@@ -47,7 +47,7 @@ defaults below. Paths are repository-relative unless stated otherwise.
 
 | Field | Type / default | Meaning |
 |---|---|---|
-| `sanitized_progress` | boolean / `true` | Request safe progress reporting without raw model or tool payloads. |
+| `sanitized_progress` | boolean / `true` | Request safe action progress only for Claude-supported direct PR/issue events; automated workflow events retain phase-level job visibility. |
 | `archive_execution_file` | boolean / `true` | Retain each Claude execution record as a 90-day workflow artifact. |
 | `allow_private_full_output` | boolean / `false` | Permit an explicit manual diagnostic run to emit raw Claude JSON, but only in a private repository. |
 

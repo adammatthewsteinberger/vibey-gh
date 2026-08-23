@@ -17,7 +17,10 @@ removed with `always()` before trusted persistence or publishing. Only the later
 publish step attaches `GH_TOKEN` through `gh auth setup-git`; no Claude step can read that
 authenticated context.
 
-Claude observability is sanitized by default. Raw `show_full_output` logging can expose
+Claude observability is sanitized by default. The action's `track_progress` input is
+strictly gated to its supported direct PR/issue events; privileged automation events rely
+on job-phase visibility so an unsupported progress mode cannot fail the review itself.
+Raw `show_full_output` logging can expose
 assistant messages, tool results, repository contents, and CI material, so managed
 workflows accept it only from an explicit manual dispatch when configuration opts in and
 GitHub reports private repository visibility. Public and event-triggered runs fail closed.

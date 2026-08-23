@@ -21,6 +21,8 @@ This file follows Keep a Changelog and semantic versioning conventions.
   check metadata and available failed-job logs before they classify or edit anything.
 - Satisfy Claude Code Action's required `origin` through its token-free credential-helper
   path without authorizing non-write actors or persisting a token in Git configuration.
+- Gate Claude progress comments to the direct PR and issue event types supported by the
+  action, preserving phase-level visibility for automated workflow events.
 
 ## Historical releases
 

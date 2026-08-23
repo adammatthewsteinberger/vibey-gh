@@ -152,7 +152,9 @@ def test_pr_gate_requires_exact_head_semantic_documentation_review_for_every_aut
     assert "full_claude_output:" in text
     assert "Validate diagnostic output policy" in text
     assert "github.event.repository.visibility == 'private'" in text
-    assert text.count("track_progress: __VIBEY_GH_SANITIZED_PROGRESS__") == 3
+    assert text.count("track_progress: ${{ __VIBEY_GH_SANITIZED_PROGRESS__ &&") == 3
+    assert text.count("github.event_name == 'pull_request_review'") == 3
+    assert "github.event_name == 'workflow_dispatch') }}" not in text
     assert text.count("show_full_output:") == 3
     assert text.count("__VIBEY_GH_ALLOW_PRIVATE_FULL_OUTPUT__") == 4
     assert text.count("__VIBEY_GH_ARCHIVE_EXECUTION_FILE__") == 3
