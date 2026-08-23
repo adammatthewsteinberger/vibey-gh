@@ -132,8 +132,15 @@ def _merge_train(args) -> int:
         ok, bypassed = merge_train.merge(v.number, method)
         if ok:
             note = " (review requirement bypassed)" if bypassed else ""
-            print(f"  #{v.number} {method}-merged{note}")
-            rows.append((v.number, v.title, f"{method}-merged{note}"))
+            cleanup = ""
+            if merge_train.should_delete_head(pr, cfg):
+                cleanup = (
+                    "; deleted merged topic branch"
+                    if merge_train.delete_head_branch(pr)
+                    else "; topic-branch cleanup failed"
+                )
+            print(f"  #{v.number} {method}-merged{note}{cleanup}")
+            rows.append((v.number, v.title, f"{method}-merged{note}{cleanup}"))
             merged += 1
         else:
             print(f"  #{v.number} could not be merged — the ruleset refused it")
