@@ -74,7 +74,7 @@ fails closed when repository visibility is not private.
 | `has_wiki` | boolean / `false` | Enable the wiki. |
 | `allow_squash_merge`, `allow_rebase_merge`, `allow_auto_merge` | boolean / `true` | Allowed merge mechanisms. |
 | `allow_merge_commit` | boolean / `false` | Permit merge commits. |
-| `delete_branch_on_merge` | boolean / `false` | Automatic cleanup. Keep false because `develop` heads promotions. |
+| `delete_branch_on_merge` | boolean / `false` | GitHub's own blanket auto-delete-on-merge. Keep false because `develop` heads promotion PRs and would itself be deleted. This is independent of branch cleanup: the merge train and Automation bootstrap already delete a merged PR's head branch themselves, through a guarded API call, whenever it is not a permanent, integration, or release branch and not a fork — regardless of this setting. |
 | `web_commit_signoff_required` | boolean / `true` | Require web-editor signoff. |
 | `vulnerability_alerts`, `automated_security_fixes` | boolean / `true` | Enable dependency security services. |
 

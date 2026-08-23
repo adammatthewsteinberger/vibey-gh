@@ -19,7 +19,8 @@ that adopts it, so a dependency it grows is a dependency all of them grow.
 - **Installing it?** Follow [Requirements](#requirements), [Quick start](#quick-start),
   and [Adoption checklist](#adoption-checklist).
 - **Operating it?** Keep [Workflows](#workflows), [Failure and recovery model](#failure-and-recovery-model),
-  and [Troubleshooting](#troubleshooting) nearby.
+  [Troubleshooting](#troubleshooting), and [.github/README.md](.github/README.md) (workflow
+  inventory, AI trust boundary, and admin recovery paths) nearby.
 - **Extending it?** Begin with [Architecture](#architecture),
   [Security model](#security-model), and [CONTRIBUTING.md](CONTRIBUTING.md).
 
@@ -661,6 +662,7 @@ creating an unbounded comment stream.
 | Local development and verification | [docs/development.md](docs/development.md) and [docs/testing.md](docs/testing.md) |
 | Common failures | [docs/troubleshooting.md](docs/troubleshooting.md) |
 | Governance, support, and conduct | [docs/governance.md](docs/governance.md), [SUPPORT.md](SUPPORT.md), and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) |
+| GitHub Actions workflow reference and admin recovery paths | [.github/README.md](.github/README.md) |
 | Agent instructions and skills | [AGENTS.md](AGENTS.md), [CLAUDE.md](CLAUDE.md), [GEMINI.md](GEMINI.md), `.cursor/`, `.agent/`, `.agents/`, and `.claude/` |
 | Architectural decisions | [docs/adr/README.md](docs/adr/README.md) |
 
