@@ -80,6 +80,18 @@ def render_workflow(source: Path, cfg: GhConfig) -> str:
     wanted = wanted.replace("__VIBEY_GH_RELEASE_BRANCH__", cfg.release_branch)
     wanted = wanted.replace("__VIBEY_GH_MODEL__", cfg.pr_automation.model)
     wanted = wanted.replace(
+        "__VIBEY_GH_SANITIZED_PROGRESS__",
+        "true" if cfg.pr_automation.observability.sanitized_progress else "false",
+    )
+    wanted = wanted.replace(
+        "__VIBEY_GH_ARCHIVE_EXECUTION_FILE__",
+        "true" if cfg.pr_automation.observability.archive_execution_file else "false",
+    )
+    wanted = wanted.replace(
+        "__VIBEY_GH_ALLOW_PRIVATE_FULL_OUTPUT__",
+        "true" if cfg.pr_automation.observability.allow_private_full_output else "false",
+    )
+    wanted = wanted.replace(
         "__VIBEY_GH_PROFILE_ENABLED__",
         "true" if cfg.repository_profile.enabled else "false",
     )

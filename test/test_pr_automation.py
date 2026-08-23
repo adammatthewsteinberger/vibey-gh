@@ -10,7 +10,12 @@ from pathlib import Path
 import pytest
 
 from vibey_gh import pr_automation as pa
-from vibey_gh.config import GhConfig, PrAutomationConfig, load_config
+from vibey_gh.config import (
+    GhConfig,
+    PrAutomationConfig,
+    PrAutomationObservabilityConfig,
+    load_config,
+)
 from vibey_gh.install import installation_notices, render_workflow
 
 
@@ -74,6 +79,11 @@ review_untrusted_authors = false
 repair_untrusted_authors = false
 replace_fork_prs = false
 retain_schedule_backstop = false
+
+[pr_automation.observability]
+sanitized_progress = false
+archive_execution_file = false
+allow_private_full_output = true
 """)
     value = load_config(tmp_path).pr_automation
     assert value == PrAutomationConfig(
@@ -86,6 +96,11 @@ retain_schedule_backstop = false
         repair_untrusted_authors=False,
         replace_fork_prs=False,
         retain_schedule_backstop=False,
+        observability=PrAutomationObservabilityConfig(
+            sanitized_progress=False,
+            archive_execution_file=False,
+            allow_private_full_output=True,
+        ),
     )
 
 
@@ -98,11 +113,19 @@ def test_rendered_workflow_uses_config_and_is_valid_yaml_shape(tmp_path):
             scan_workflows=("CI: strict", "Docs"),
             model="chosen-model",
             retain_schedule_backstop=False,
+            observability=PrAutomationObservabilityConfig(
+                sanitized_progress=False,
+                archive_execution_file=False,
+                allow_private_full_output=True,
+            ),
         ),
     )
     assert 'workflows: ["CI: strict", "Docs"]' in rendered
     assert "--model chosen-model" in rendered
     assert "schedule backstop disabled" in rendered
+    assert "track_progress: false" in rendered
+    assert "&& true }}" in rendered
+    assert "execution_file != '' && false" in rendered
     assert "__VIBEY_GH_" not in rendered
 
     intake = source.with_name("branch-intake.yml")

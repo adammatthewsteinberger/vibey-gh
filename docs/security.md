@@ -7,17 +7,37 @@ paths and publish one commit. Secrets never enter prompts or artifacts. The merg
 rechecks exact-head gates immediately before mutation.
 
 Claude Code Action requires a Git repository at the workspace root for its own setup.
-Managed workflows satisfy that contract with a disposable repository that has no remote,
-source checkout, or persisted credential. Untrusted source remains under `target/`, checked
-out with `persist-credentials: false`. The disposable context is removed with `always()`
-before trusted persistence or publishing. Only the later trusted publish step attaches
-`GH_TOKEN` through `gh auth setup-git`; no Claude step can read that authenticated context.
+Managed workflows satisfy that contract with a disposable repository containing no source
+checkout or persisted credential. It has a clean repository URL as `origin` because the
+action requires that remote during setup. A deliberately nonmatching non-write-user sentinel
+forces the action's credential-helper and secret-scrubbing path, so the token is never
+embedded in `.git/config` and no additional actor is authorized. Untrusted source remains
+under `target/`, checked out with `persist-credentials: false`. The disposable context is
+removed with `always()` before trusted persistence or publishing. Only the later trusted
+publish step attaches `GH_TOKEN` through `gh auth setup-git`; no Claude step can read that
+authenticated context.
+
+Claude observability is sanitized by default. Raw `show_full_output` logging can expose
+assistant messages, tool results, repository contents, and CI material, so managed
+workflows accept it only from an explicit manual dispatch when configuration opts in and
+GitHub reports private repository visibility. Public and event-triggered runs fail closed.
+Execution logs may instead be retained as access-controlled 90-day workflow artifacts.
+
+Before a repair session, trusted automation downloads failed-check metadata and available
+failed-job logs for the exact PR head into a bounded local diagnostic bundle. The bundle
+is treated as untrusted input, capped at 200,000 bytes, and read-only to the diagnosis;
+repository code is still never executed in the privileged job. This avoids speculative
+repairs when optional CI MCP tools are unavailable without granting Claude shell access.
 
 The Conventional Commits job is the sole guarded exception that may force-update history.
 It can act only on a same-repository topic branch, only from an exact checked SHA, only on
 linear history, and only with `--force-with-lease`. Permanent branches are rejected by
 both configured and literal names. The job executes the trusted normalizer, never PR code,
 and a concurrent contributor push makes the lease fail closed.
+Promotion PRs from the integration branch to the release branch skip that history
+normalizer entirely. Provenance still checks the complete repository state, but does not
+re-audit or rewrite historical subjects already admitted to the protected integration
+branch.
 
 Webhook receivers must use a strong `VIBEY_GH_WEBHOOK_SECRET`, verify HMAC over the exact
 raw body, and place `VIBEY_GH_WEBHOOK_STATE_DIR` on access-controlled durable storage.

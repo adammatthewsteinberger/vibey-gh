@@ -36,6 +36,10 @@ flowchart TB
     Untrusted[Untrusted PR source and model output]
     Sandbox[Constrained read/edit tools]
     EphemeralGit[Credential-free ephemeral Git context]
+    CredentialHelper[Token-free action credential helper]
+    SafeProgress[Sanitized Claude progress and restricted artifacts]
+    RawOutput[Manual private-only raw Claude diagnostics]
+    Diagnostics[Bounded exact-head failed-check evidence]
     Guard[Exact SHA, branch, lease, and policy guards]
   end
 
@@ -79,11 +83,18 @@ flowchart TB
   Review --> Repair
   Repair --> Guard
   Trusted --> EphemeralGit
+  EphemeralGit --> CredentialHelper
+  Sandbox --> SafeProgress
+  Guard --> RawOutput
+  CI --> Diagnostics
+  Diagnostics --> Sandbox
   Guard --> PullRequest
   Review --> MergeTrain
   MergeTrain --> Develop
   Develop --> Promotion
   Promotion --> PullRequest
+  Promotion --> Conventional
+  Conventional -->|protected history: verify without rewrite| Promotion
   MergeTrain --> Main
   Develop --> TestPyPI
   Main --> PyPI

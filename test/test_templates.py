@@ -140,11 +140,29 @@ def test_pr_gate_requires_exact_head_semantic_documentation_review_for_every_aut
     assert "isolated temporary" in text
     assert text.count("Create credential-free Claude git context") == 3
     assert text.count("Remove credential-free Claude git context") == 3
+    assert (
+        text.count('git remote add origin "https://github.com/${{ github.repository }}.git"') == 3
+    )
+    assert text.count('allowed_non_write_users: "__vibey_gh_no_nonwrite_users__"') == 3
     assert text.count("persist-credentials: false") >= 3
     assert "gitdir: $GITHUB_WORKSPACE/target/.git" not in text
     assert "TRUSTED: ${{ needs.evaluate.outputs.trusted }}" not in text
     assert '[ "$STATE" = ready ] || [ "$STATE" = review ]' in text
     assert '[ "$REVIEW_PASSED" = true ]' in text
+    assert "full_claude_output:" in text
+    assert "Validate diagnostic output policy" in text
+    assert "github.event.repository.visibility == 'private'" in text
+    assert text.count("track_progress: __VIBEY_GH_SANITIZED_PROGRESS__") == 3
+    assert text.count("show_full_output:") == 3
+    assert text.count("__VIBEY_GH_ALLOW_PRIVATE_FULL_OUTPUT__") == 4
+    assert text.count("__VIBEY_GH_ARCHIVE_EXECUTION_FILE__") == 3
+    assert "Full Claude output is disabled or unsafe" in text
+    assert "Collect exact-head failed-check evidence" in text
+    assert "repos/${REPO}/commits/${HEAD_SHA}/check-runs" in text
+    assert "diagnostics/failed-checks.txt" in text
+    assert "--log-failed" in text
+    assert "diagnostic bundle truncated at 200000 bytes" in text
+    assert "Read that file before" in text
     for field in (
         "complete",
         "accurate",
@@ -262,6 +280,8 @@ def test_failed_permanent_branch_scans_use_a_guarded_repair_pr():
     assert "Never lower coverage" in text
     assert "Create credential-free Claude git context" in text
     assert "Remove credential-free Claude git context" in text
+    assert 'git remote add origin "https://github.com/${{ github.repository }}.git"' in text
+    assert 'allowed_non_write_users: "__vibey_gh_no_nonwrite_users__"' in text
     assert "persist-credentials: false" in text
     assert "gitdir: $GITHUB_WORKSPACE/target/.git" not in text
     assert 'repair_branch="vibey-gh/repair/release-' in text
@@ -296,10 +316,21 @@ def test_conventional_commits_self_heal_only_guarded_topic_history():
     assert '--force-with-lease="refs/heads/${HEAD_REF}:${HEAD_SHA}"' in text
     assert '"$INTEGRATION_BRANCH"|"$RELEASE_BRANCH"|develop|main' in text
     assert "permanent branch history is never rewritten" in text
+    assert "github.event.pull_request.head.ref != '__VIBEY_GH_INTEGRATION_BRANCH__'" in text
+    assert "github.event.pull_request.head.ref != '__VIBEY_GH_RELEASE_BRANCH__'" in text
     assert "Refusing automatic rewrite of merge commits" in text
     assert "./target" not in text
     assert "git push --delete" not in text
     assert "--delete-branch" not in text
+
+
+def test_promotion_checks_provenance_without_rewriting_or_reauditing_history():
+    text = (WORKFLOWS / "provenance.yml").read_text(encoding="utf-8")
+    assert 'if [ "$HEAD_REF" = "$INTEGRATION_BRANCH" ]' in text
+    assert '[ "$BASE_REF" = "$RELEASE_BRANCH" ]' in text
+    assert "Promotion PR: checking repository provenance" in text
+    assert "vibey-gh check --ci" in text
+    assert 'vibey-gh check --ci --commits "${BASE_SHA}..HEAD"' in text
 
 
 def test_every_managed_third_party_action_is_immutably_pinned():
