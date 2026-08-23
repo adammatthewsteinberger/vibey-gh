@@ -1,8 +1,9 @@
 # Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), Developed by [Adam Matthew Steinberger](https://hire.adam.matthewsteinberger.com/) ([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/)).
 name: Branch intake
 
-# A newly published topic branch gets one draft PR. Later pushes do not create duplicates;
-# scan-completion automation promotes the draft only when its exact head is stable.
+# A published topic branch without an open PR gets one draft PR. This intentionally runs
+# on every push: a branch name may be reused after its previous PR was merged, and a
+# historical closed PR must never suppress intake for the new exact-head lineage.
 on:
   push:
     branches-ignore:
@@ -21,7 +22,7 @@ concurrency:
 jobs:
   draft:
     name: Open draft pull request
-    if: github.event.created == true && !github.event.deleted
+    if: github.event.deleted != true
     runs-on: ubuntu-latest
     steps:
       - name: Create exactly one draft PR
@@ -36,7 +37,7 @@ jobs:
         run: |
           set -euo pipefail
           existing=$(gh pr list --repo "$REPO" --state open --head "$HEAD_REF" \
-            --json number --jq '.[0].number // empty')
+            --json number,headRefOid --jq '.[0].number // empty')
           if [ -n "$existing" ]; then
             echo "PR #${existing} already tracks ${HEAD_REF}; no-op"
             exit 0

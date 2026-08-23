@@ -157,6 +157,30 @@ def test_pr_gate_requires_exact_head_semantic_documentation_review_for_every_aut
     assert '[ "$REVIEW_PASSED" = true ]' in text
 
 
+def test_branch_intake_reopens_a_reused_branch_name_without_duplicating_open_prs():
+    text = (WORKFLOWS / "branch-intake.yml").read_text(encoding="utf-8")
+    assert "github.event.created == true" not in text
+    assert "github.event.deleted != true" in text
+    assert 'gh pr list --repo "$REPO" --state open --head "$HEAD_REF"' in text
+    assert "historical closed PR must never suppress intake" in text
+
+
+def test_automation_bootstrap_is_explicit_exact_head_and_permanent_branch_safe():
+    text = (WORKFLOWS / "automation-bootstrap.yml").read_text(encoding="utf-8")
+    assert "workflow_dispatch:" in text
+    assert "inputs.authorize == true" in text
+    assert 'test "$permission" = admin' in text
+    assert 'test "$(jq -r .headRefOid' in text
+    assert '--match-head-commit "$EXPECTED_SHA"' in text
+    for required in ("Documentation contract", "Provenance", "Build", "Lint"):
+        assert required in text
+    assert '[ "$head" != "$INTEGRATION_BRANCH" ]' in text
+    assert '[ "$head" != "$RELEASE_BRANCH" ]' in text
+    assert '[ "$head" != develop ]' in text
+    assert '[ "$head" != main ]' in text
+    assert "--delete-branch" not in text
+
+
 def test_properdocs_theme_is_channel_aware_and_accessible():
     root = Path(__file__).resolve().parent.parent
     config = (root / "properdocs.yml").read_text(encoding="utf-8")
@@ -286,7 +310,8 @@ def test_cancelled_or_pending_evaluations_cannot_publish_a_gate():
 
 def test_new_branch_intake_is_draft_idempotent_and_excludes_permanent_branches():
     text = (WORKFLOWS / "branch-intake.yml").read_text(encoding="utf-8")
-    assert "github.event.created == true" in text
+    assert "github.event.created == true" not in text
+    assert "github.event.deleted != true" in text
     assert "gh pr list" in text
     assert "gh pr create" in text and "--draft" in text
     assert "secrets.AUTOMERGE_TOKEN || github.token" in text
