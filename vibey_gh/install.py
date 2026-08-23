@@ -52,6 +52,7 @@ def _managed_workflows(cfg: GhConfig) -> list[Path]:
 
 def render_workflow(source: Path, cfg: GhConfig) -> str:
     wanted = source.read_text(encoding="utf-8")
+    wanted = wanted.replace("__VIBEY_GH_INTEGRATION_BRANCH__", cfg.integration_branch)
     wanted = wanted.replace("__VIBEY_GH_RELEASE_BRANCH__", cfg.release_branch)
     if source.name != "pr-automation.yml":
         return wanted

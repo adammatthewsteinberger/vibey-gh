@@ -62,6 +62,11 @@ jobs:
     name: Evaluate current head
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      checks: read
+      contents: read
+      pull-requests: write
     outputs:
       pr: ${{ steps.resolve.outputs.pr }}
       head_sha: ${{ steps.resolve.outputs.head_sha }}
@@ -126,6 +131,7 @@ jobs:
           HEAD_SHA: ${{ steps.resolve.outputs.head_sha }}
         run: |
           set -euo pipefail
+          vibey-gh pr-automation ready-draft --pr "$PR" --head-sha "$HEAD_SHA" | jq .
           result=$(vibey-gh pr-automation evaluate --pr "$PR" --head-sha "$HEAD_SHA")
           printf '%s\n' "$result" | jq .
           echo "state=$(jq -r .state <<<"$result")" >> "$GITHUB_OUTPUT"

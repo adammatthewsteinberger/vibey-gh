@@ -96,6 +96,16 @@ def test_cancelled_or_pending_evaluations_cannot_publish_a_gate():
     assert "github.event.workflow_run.pull_requests[0].number" in text
 
 
+def test_new_branch_intake_is_draft_idempotent_and_excludes_permanent_branches():
+    text = (WORKFLOWS / "branch-intake.yml").read_text(encoding="utf-8")
+    assert "github.event.created == true" in text
+    assert "gh pr list" in text
+    assert "gh pr create" in text and "--draft" in text
+    assert "__VIBEY_GH_INTEGRATION_BRANCH__" in text
+    assert "__VIBEY_GH_RELEASE_BRANCH__" in text
+    assert '"vibey-gh/repair/**"' in text
+
+
 @pytest.mark.parametrize("name", ["pre-push", "commit-msg"])
 def test_every_shipped_hook_is_valid_shell(name):
     import subprocess

@@ -169,6 +169,9 @@ def _pr_automation(args) -> int:
     try:
         if args.action == "evaluate":
             print(pr_automation.evaluate_pr(args.pr, args.head_sha, cfg).to_json())
+        elif args.action == "ready-draft":
+            result = pr_automation.ready_draft(args.pr, args.head_sha, cfg)
+            print(json.dumps(result, sort_keys=True))
         elif args.action in {"record-review", "record-repair"}:
             kind = args.action.removeprefix("record-")
             state = pr_automation.record(args.pr, _read_json(args.input), kind)
@@ -296,6 +299,12 @@ def main(argv: list[str] | None = None) -> int:
     evaluate.add_argument("--pr", type=int, required=True)
     evaluate.add_argument("--head-sha", required=True)
     evaluate.set_defaults(func=_pr_automation)
+    ready = automation_sub.add_parser(
+        "ready-draft", help="mark an exact stable draft head ready for review"
+    )
+    ready.add_argument("--pr", type=int, required=True)
+    ready.add_argument("--head-sha", required=True)
+    ready.set_defaults(func=_pr_automation)
     for command in ("record-review", "record-repair"):
         record = automation_sub.add_parser(command, help=f"persist a structured {command[7:]}")
         record.add_argument("--pr", type=int, required=True)
