@@ -46,6 +46,8 @@ flowchart TB
     Diagnostics[Bounded exact-head failed-check evidence]
     Guard[Exact SHA, branch, lease, and policy guards]
     Bootstrap[Admin-authorized automation bootstrap]
+    Fork[Untrusted fork PR head]
+    MirrorFork["Repository-owned replacement PR (mirror-fork)"]
   end
 
   subgraph Delivery["Event-driven delivery"]
@@ -66,6 +68,7 @@ flowchart TB
     Pages[GitHub Pages]
     RepositoryProfile[Repository profile]
     ReleaseRepair[Release repair]
+    Conflict[Guarded same-repository conflict resolution]
   end
 
   Maintainer --> CLI
@@ -110,6 +113,13 @@ flowchart TB
   Diagnostics --> Sandbox
   Guard --> PullRequest
   Review --> MergeTrain
+  PullRequest --> Fork
+  Fork --> Untrusted
+  PRAutomation -->|fork PR needs repair| MirrorFork
+  MirrorFork --> Guard
+  PRAutomation -->|same-repository merge conflict| Conflict
+  Sandbox --> Conflict
+  Conflict --> Guard
   Maintainer -->|explicit admin authorization| Bootstrap
   CI --> Bootstrap
   CodeQL --> Bootstrap
