@@ -101,6 +101,7 @@ def test_new_branch_intake_is_draft_idempotent_and_excludes_permanent_branches()
     assert "github.event.created == true" in text
     assert "gh pr list" in text
     assert "gh pr create" in text and "--draft" in text
+    assert "secrets.AUTOMERGE_TOKEN || github.token" in text
     assert "__VIBEY_GH_INTEGRATION_BRANCH__" in text
     assert "__VIBEY_GH_RELEASE_BRANCH__" in text
     assert '"vibey-gh/repair/**"' in text
