@@ -1,5 +1,4 @@
 # Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), Developed by [Adam Matthew Steinberger](https://hire.adam.matthewsteinberger.com/) ([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/)).
-# Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), Developed by [Adam Matthew Steinberger](https://hire.adam.matthewsteinberger.com/) ([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/)).
 """Deterministic documentation contract checks used locally and before AI maintenance."""
 
 from __future__ import annotations
@@ -94,7 +93,8 @@ def check(cfg: GhConfig) -> DocumentationReport:
             for plugin in plugins:
                 source = plugin.get("source", "") if isinstance(plugin, dict) else ""
                 root = (cfg.root / source).resolve()
-                if not source or cfg.root.resolve() not in root.parents:
+                repo_root = cfg.root.resolve()
+                if not source or (root != repo_root and repo_root not in root.parents):
                     problems.append(f"marketplace plugin has unsafe source: {source!r}")
                     continue
                 if not (root / ".claude-plugin/plugin.json").is_file():

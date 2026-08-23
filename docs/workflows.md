@@ -1,5 +1,11 @@
 # Workflow reference
 
+Repair and conflict publication are optimistic exact-head updates. Immediately before
+committing, and again after any non-fast-forward push rejection, the trusted publisher
+compares the PR head with the SHA that was evaluated. A concurrent update converts the old
+run into a successful stale no-op; it never force-pushes, overwrites newer work, consumes a
+repair attempt, or mutates a permanent branch from an obsolete checkout.
+
 Branch intake opens draft PRs. CI and provenance validate code. Documentation validates
 the complete docs contract and periodically authors guarded refresh PRs. PR automation
 aggregates exact-head scans, reviews outside contributions, repairs failures, and resolves

@@ -1,5 +1,4 @@
 # Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), Developed by [Adam Matthew Steinberger](https://hire.adam.matthewsteinberger.com/) ([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/)).
-# Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), Developed by [Adam Matthew Steinberger](https://hire.adam.matthewsteinberger.com/) ([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/)).
 """Enforce that every code change is attributable.
 
 Two places, because a change can be either:
@@ -23,6 +22,7 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+from vibey_gh import debugging
 from vibey_gh.config import GhConfig, load_config
 
 # How far into a file the header may sit: enough for a shebang and a blank line, not
@@ -34,13 +34,21 @@ CONVENTIONAL_SUBJECT = re.compile(r"^(?:[a-z][a-z0-9-]*)(?:\([a-z0-9][a-z0-9._/-
 @dataclass
 class Report:
     missing_header: list[Path]
+    duplicate_header: list[Path]
     missing_trailer: list[str]
     invalid_subject: list[str]
+    branch_logging: list[str]
     checked_files: int
 
     @property
     def ok(self) -> bool:
-        return not self.missing_header and not self.missing_trailer and not self.invalid_subject
+        return (
+            not self.missing_header
+            and not self.duplicate_header
+            and not self.missing_trailer
+            and not self.invalid_subject
+            and not self.branch_logging
+        )
 
 
 def conventional_subject(subject: str) -> bool:
@@ -86,8 +94,12 @@ def sources(cfg: GhConfig) -> list[Path]:
     return seen
 
 
+def header_occurrences(text: str, cfg: GhConfig) -> int:
+    return sum(1 for line in text.splitlines()[:HEAD_LINES] if line.strip() == cfg.header)
+
+
 def has_header(text: str, cfg: GhConfig) -> bool:
-    return any(line.strip() == cfg.header for line in text.splitlines()[:HEAD_LINES])
+    return header_occurrences(text, cfg) > 0
 
 
 def insert_header(text: str, cfg: GhConfig) -> str:
@@ -96,6 +108,20 @@ def insert_header(text: str, cfg: GhConfig) -> str:
     at = 1 if lines and lines[0].startswith("#!") else 0
     lines.insert(at, cfg.header + "\n")
     return "".join(lines)
+
+
+def dedupe_header(text: str, cfg: GhConfig) -> str:
+    """Collapse repeated header lines within the head window down to the first."""
+    lines = text.splitlines(keepends=True)
+    seen = False
+    kept = []
+    for index, line in enumerate(lines):
+        if index < HEAD_LINES and line.strip() == cfg.header:
+            if seen:
+                continue
+            seen = True
+        kept.append(line)
+    return "".join(kept)
 
 
 def commits_missing_trailer(rev_range: str, cfg: GhConfig) -> list[str]:
@@ -122,17 +148,25 @@ def check(cfg: GhConfig | None = None, rev_range: str | None = None, apply: bool
     cfg = cfg or load_config()
     files = sources(cfg)
 
-    missing = [p for p in files if not has_header(p.read_text(encoding="utf-8"), cfg)]
+    occurrences = {p: header_occurrences(p.read_text(encoding="utf-8"), cfg) for p in files}
+    missing = [p for p in files if occurrences[p] == 0]
+    duplicated = [p for p in files if occurrences[p] > 1]
     if apply:
         for path in missing:
             path.write_text(insert_header(path.read_text(encoding="utf-8"), cfg), encoding="utf-8")
+        for path in duplicated:
+            path.write_text(dedupe_header(path.read_text(encoding="utf-8"), cfg), encoding="utf-8")
         missing = []
+        duplicated = []
 
     trailers = commits_missing_trailer(rev_range, cfg) if rev_range else []
     subjects = commits_with_invalid_subject(rev_range, cfg) if rev_range else []
+    branch_logging = debugging.branch_logging_problems(files)
     return Report(
         missing_header=missing,
+        duplicate_header=duplicated,
         missing_trailer=trailers,
         invalid_subject=subjects,
+        branch_logging=branch_logging,
         checked_files=len(files),
     )

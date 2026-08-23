@@ -5,7 +5,7 @@ transport failure. Run `vibey-gh COMMAND --help` for argparse's generated refere
 
 | Command | Arguments and options | Behavior |
 |---|---|---|
-| `check` | `--apply`, `--commits RANGE`, `--quiet`, `--ci` | Verify assets, fingerprints, documentation, provenance, and optionally a commit range. `--apply` adds missing headers; `--ci` skips the local hooks-path check. |
+| `check` | `--apply`, `--commits RANGE`, `--quiet`, `--ci` | Verify assets, fingerprints, documentation, provenance, and optionally a commit range. `--apply` adds missing headers and collapses a header duplicated within a file; `--ci` skips the local hooks-path check. |
 | `install` | none | Render configured workflows, install/chains hooks, and install release-site assets. |
 | `version` | `--since REF` (default `origin/main`), `--dev BUILD`, `--apply`, `--explain` | Derive, explain, or write the semantic version. |
 | `trailer` / `trailer-key` | none | Print the configured provenance trailer or only its key. |

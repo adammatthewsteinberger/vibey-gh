@@ -237,6 +237,17 @@ def test_conflict_resolution_uses_and_enforces_repair_budget(tmp_path):
     assert "conflict resolution budget" in result.reason
 
 
+def test_operator_block_takes_precedence_over_conflict(tmp_path):
+    blocked_and_conflicting = pr(
+        mergeable="CONFLICTING",
+        labels=[pa.BLOCKED_LABEL],
+        statusCheckRollup=[check()],
+    )
+    result = pa.evaluate(blocked_and_conflicting, cfg(tmp_path), expected_sha="abc")
+    assert result.state == "blocked"
+    assert "operator" in result.reason
+
+
 def test_external_repair_is_untrusted_even_for_owner(tmp_path):
     result = pa.evaluate(
         pr(labels=[pa.EXTERNAL_REPAIR_LABEL], statusCheckRollup=[check()]),
@@ -297,6 +308,7 @@ def test_github_helpers_and_state_persistence(monkeypatch, tmp_path):
     assert pa._gh_json("repo", "view") == {"nameWithOwner": "o/r"}
     state = pa.AutomationState("a", "a")
     pa.upsert_state(1, state, "new", [])
+    pa.upsert_state(1, state, "new after ordinary comment", [{"body": "hello"}])
     pa.upsert_state(1, state, "edit", [{"body": pa.state_body(state, "x"), "databaseId": 9}])
     pa.upsert_state(
         1,
@@ -307,7 +319,6 @@ def test_github_helpers_and_state_persistence(monkeypatch, tmp_path):
     assert any(command[:3] == ["gh", "pr", "comment"] for command in calls)
     assert any("issues/comments/9" in " ".join(command) for command in calls)
     assert any(command[:3] == ["gh", "api", "graphql"] for command in calls)
-
     with pytest.raises(RuntimeError, match="comment has no ID"):
         pa.upsert_state(1, state, "bad", [{"body": pa.state_body(state, "x")}])
 
@@ -321,6 +332,11 @@ def test_github_helpers_and_state_persistence(monkeypatch, tmp_path):
         pa._gh_json("api", "x")
     with pytest.raises(RuntimeError, match="persist"):
         pa.upsert_state(1, state, "x", [])
+
+
+def test_trust_without_an_owner(tmp_path):
+    config = GhConfig(root=tmp_path, owner="", trusted_authors=("trusted",))
+    assert pa._trusted(pr(author={"login": "trusted"}), config)
 
 
 def test_fetch_evaluate_record_and_labels(monkeypatch, tmp_path):

@@ -1,5 +1,4 @@
 # Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), Developed by [Adam Matthew Steinberger](https://hire.adam.matthewsteinberger.com/) ([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/)).
-# Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), Developed by [Adam Matthew Steinberger](https://hire.adam.matthewsteinberger.com/) ([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/)).
 """Policy and durable state for event-driven pull-request automation.
 
 The workflow is intentionally thin.  It gathers GitHub data, asks this module for a
@@ -160,6 +159,13 @@ def evaluate(
     state = stored
     if state is None or state.current_sha != head:
         state = AutomationState(lineage_sha=head, current_sha=head)
+
+    labels = _labels(pr)
+    if BLOCKED_LABEL in labels:
+        return result("blocked", "automation is blocked pending operator action")
+    if EXHAUSTED_LABEL in labels:
+        return result("blocked", "repair budget is exhausted")
+
     if pr.get("mergeable") == "CONFLICTING":
         if state.attempts >= cfg.pr_automation.max_repair_attempts:
             return result(
@@ -175,12 +181,6 @@ def evaluate(
         )
     if pr.get("reviewDecision") == "CHANGES_REQUESTED":
         return result("blocked", "a human requested changes")
-
-    labels = _labels(pr)
-    if BLOCKED_LABEL in labels:
-        return result("blocked", "automation is blocked pending operator action")
-    if EXHAUSTED_LABEL in labels:
-        return result("blocked", "repair budget is exhausted")
 
     ignored = set(cfg.pr_automation.ignored_checks) | {
         "PR automation / gate",

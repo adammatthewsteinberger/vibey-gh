@@ -58,7 +58,11 @@ jobs:
           test "$(jq -r .baseRefName <<<"$pr")" = "$INTEGRATION_BRANCH"
 
           gh pr diff "$PR" --repo "$REPO" --name-only > changed-files.txt
-          grep -Eq '^(\.github/workflows/|vibey_gh/templates/workflows/|vibey_gh/(cli|install|merge_train|pr_automation)\.py$|test/)' changed-files.txt
+          test -s changed-files.txt
+          if grep -Ev '^(\.github/workflows/|vibey_gh/templates/workflows/|vibey_gh/(cli|install|merge_train|pr_automation)\.py$|test/)' changed-files.txt; then
+            echo "::error::changed files are not confined to automation-core paths" >&2
+            exit 1
+          fi
 
           checks=$(gh api "repos/${REPO}/commits/${EXPECTED_SHA}/check-runs?per_page=100")
           jq -e '

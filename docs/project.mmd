@@ -21,11 +21,13 @@ flowchart TB
     Config[Configuration and policy]
     Install[Installer and rendered templates]
     Fingerprints[Conventional Commits and Provenance]
+    Debugging["Debugging (opt-in, tamper-evident branch tracing)"]
     Documentation[Documentation contract]
     PRAutomation[PR Automation]
     MergeTrain[Merge train]
     Promotion[Promotion]
     Versioning[Versioning]
+    PublishRelease["Release (hand-authored PyPI/TestPyPI publish)"]
     Release[GitHub releases]
     CapabilitySurfaces["Capability surfaces (vibey_gh.surfaces)"]
     ReleaseSurfaces[Release surfaces publishing]
@@ -43,9 +45,11 @@ flowchart TB
     RawOutput[Manual private-only raw Claude diagnostics]
     Diagnostics[Bounded exact-head failed-check evidence]
     Guard[Exact SHA, branch, lease, and policy guards]
+    Bootstrap[Admin-authorized automation bootstrap]
   end
 
   subgraph Delivery["Event-driven delivery"]
+    BranchIntake[Branch intake]
     CI[CI, tests, lint, build]
     CodeQL[CodeQL security analysis]
     APIDrift[API drift and five-surface parity]
@@ -66,7 +70,8 @@ flowchart TB
 
   Maintainer --> CLI
   Contributor --> Push
-  Push --> PullRequest
+  Push --> BranchIntake
+  BranchIntake --> PullRequest
   CLI --> CapabilitySurfaces
   SDK --> CapabilitySurfaces
   API --> CapabilitySurfaces
@@ -105,14 +110,24 @@ flowchart TB
   Diagnostics --> Sandbox
   Guard --> PullRequest
   Review --> MergeTrain
+  Maintainer -->|explicit admin authorization| Bootstrap
+  CI --> Bootstrap
+  CodeQL --> Bootstrap
+  APIDrift --> Bootstrap
+  Docs --> Bootstrap
+  Provenance --> Bootstrap
+  Bootstrap -->|admin squash merge bypasses PRAutomation and Guard| Develop
   MergeTrain --> Develop
   Develop --> Promotion
   Promotion --> PullRequest
   Promotion --> Conventional
   Conventional -->|protected history: verify without rewrite| Promotion
   MergeTrain --> Main
-  Develop --> TestPyPI
-  Main --> PyPI
+  Develop --> PublishRelease
+  Main --> PublishRelease
+  PublishRelease --> TestPyPI
+  PublishRelease --> PyPI
+  PublishRelease --> Release
   Main --> Realign
   Realign --> Develop
   Develop --> Packages
@@ -120,16 +135,18 @@ flowchart TB
   Develop --> Pages
   Main --> Pages
   Versioning --> Promotion
-  Release --> PyPI
   ReleaseSurfaces --> Packages
   ReleaseSurfaces --> Pages
   TestPyPI --> ReleaseSurfaces
   PyPI --> ReleaseSurfaces
   ReleaseSurfaces --> RepositoryProfile
   CI --> ReleaseRepair
+  PublishRelease --> ReleaseRepair
   Release --> ReleaseRepair
   ReleaseSurfaces --> ReleaseRepair
   ReleaseRepair --> Guard
   Fingerprints --> CI
   Documentation --> Docs
   Guard --> Fingerprints
+  CLI --> Debugging
+  Debugging --> Fingerprints

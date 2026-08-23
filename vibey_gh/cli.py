@@ -1,5 +1,4 @@
 # Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), Developed by [Adam Matthew Steinberger](https://hire.adam.matthewsteinberger.com/) ([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/)).
-# Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), Developed by [Adam Matthew Steinberger](https://hire.adam.matthewsteinberger.com/) ([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/)).
 """`vibey-gh` — the command the hooks and the CI workflows call."""
 
 from __future__ import annotations
@@ -12,6 +11,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 from vibey_gh import (
+    debugging,
     documentation,
     fingerprints,
     github_release,
@@ -39,10 +39,17 @@ def _check(args) -> int:
         print(f"  hooks: {problem}", file=sys.stderr)
     for path in report.missing_header:
         print(f"  {path.relative_to(cfg.root)}: missing the fingerprint header", file=sys.stderr)
+    for path in report.duplicate_header:
+        print(
+            f"  {path.relative_to(cfg.root)}: fingerprint header appears more than once",
+            file=sys.stderr,
+        )
     for commit in report.missing_trailer:
         print(f"  commit {commit}: missing the `{cfg.trailer_key}:` trailer", file=sys.stderr)
     for commit in report.invalid_subject:
         print(f"  commit {commit}: subject is not a Conventional Commit", file=sys.stderr)
+    for problem in report.branch_logging:
+        print(f"  debug logging: {problem}", file=sys.stderr)
     for problem in docs.problems:
         print(f"  documentation: {problem}", file=sys.stderr)
 
@@ -331,6 +338,7 @@ def _surface(args) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    debugging.enable()
     parser = argparse.ArgumentParser(prog="vibey-gh", description=__doc__)
     sub = parser.add_subparsers(dest="cmd", required=True)
 

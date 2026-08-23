@@ -74,7 +74,7 @@ fails closed when repository visibility is not private.
 | `has_wiki` | boolean / `false` | Enable the wiki. |
 | `allow_squash_merge`, `allow_rebase_merge`, `allow_auto_merge` | boolean / `true` | Allowed merge mechanisms. |
 | `allow_merge_commit` | boolean / `false` | Permit merge commits. |
-| `delete_branch_on_merge` | boolean / `false` | Automatic cleanup. Keep false because `develop` heads promotions. |
+| `delete_branch_on_merge` | boolean / `false` | GitHub's own blanket auto-delete-on-merge. Keep false because `develop` heads promotion PRs and would itself be deleted. This is independent of branch cleanup: the merge train and Automation bootstrap already delete a merged PR's head branch themselves, through a guarded API call, whenever it is not a permanent, integration, or release branch and not a fork — regardless of this setting. |
 | `web_commit_signoff_required` | boolean / `true` | Require web-editor signoff. |
 | `vulnerability_alerts`, `automated_security_fixes` | boolean / `true` | Enable dependency security services. |
 
@@ -94,3 +94,20 @@ fails closed when repository visibility is not private.
 
 Run `vibey-gh install`, review and commit generated assets, then run
 `vibey-gh check --ci`. Identity and Pages URLs are derived at runtime.
+
+## Advanced debug environment
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `VIBEY_GH_DEBUG` | unset | Set to `1`, `true`, `yes`, or `on` to enable structured branch tracing. |
+| `VIBEY_GH_DEBUG_LOG` | stderr | Append JSONL trace events to this operator-controlled path. |
+| `VIBEY_GH_TRACE_ID` | generated UUID | Correlate the trace with a wider diagnostic session. |
+
+GitHub correlation is read from `GITHUB_RUN_ID`, `GITHUB_RUN_ATTEMPT`, and `GITHUB_SHA`.
+These controls affect diagnostics only; source validation always confirms that every
+configured Python control-flow opcode can be represented by the tracer.
+
+These environment variables only ever scope the tracer to `vibey_gh`'s own installed
+package directory; there is no CLI flag or environment variable to point it at a
+consuming project's source tree. A project embedding `vibey_gh.debugging` directly can
+call `enable(roots=(...))` with its own package directories to trace its own code instead.
