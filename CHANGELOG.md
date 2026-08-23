@@ -19,6 +19,8 @@ This file follows Keep a Changelog and semantic versioning conventions.
   permanent branches and verify repository provenance without re-auditing admitted history.
 - Give repair agents a bounded trusted diagnostic bundle containing exact-head failed
   check metadata and available failed-job logs before they classify or edit anything.
+- Satisfy Claude Code Action's required `origin` through its token-free credential-helper
+  path without authorizing non-write actors or persisting a token in Git configuration.
 
 ## Historical releases
 

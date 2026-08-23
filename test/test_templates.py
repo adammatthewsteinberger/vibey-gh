@@ -140,6 +140,10 @@ def test_pr_gate_requires_exact_head_semantic_documentation_review_for_every_aut
     assert "isolated temporary" in text
     assert text.count("Create credential-free Claude git context") == 3
     assert text.count("Remove credential-free Claude git context") == 3
+    assert (
+        text.count('git remote add origin "https://github.com/${{ github.repository }}.git"') == 3
+    )
+    assert text.count('allowed_non_write_users: "__vibey_gh_no_nonwrite_users__"') == 3
     assert text.count("persist-credentials: false") >= 3
     assert "gitdir: $GITHUB_WORKSPACE/target/.git" not in text
     assert "TRUSTED: ${{ needs.evaluate.outputs.trusted }}" not in text
@@ -276,6 +280,8 @@ def test_failed_permanent_branch_scans_use_a_guarded_repair_pr():
     assert "Never lower coverage" in text
     assert "Create credential-free Claude git context" in text
     assert "Remove credential-free Claude git context" in text
+    assert 'git remote add origin "https://github.com/${{ github.repository }}.git"' in text
+    assert 'allowed_non_write_users: "__vibey_gh_no_nonwrite_users__"' in text
     assert "persist-credentials: false" in text
     assert "gitdir: $GITHUB_WORKSPACE/target/.git" not in text
     assert 'repair_branch="vibey-gh/repair/release-' in text

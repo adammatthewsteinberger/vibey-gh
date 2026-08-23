@@ -11,8 +11,10 @@ linear-history, repository-ownership, and permanent-branch guards all precede it
 merge commit, stale event, or concurrent push fails closed. Operators must protect
 repository secrets and review ruleset changes.
 
-The AI action's Git-discovery requirement is isolated from source and credentials. During
-model execution, workspace-root `.git` points only to an ephemeral empty repository with
-no remote. Exact source is a separate `target/` checkout with persisted credentials
-disabled. The context is destroyed before trusted code authenticates and publishes. Tests
-require this ordering and fail if a Claude-facing target checkout persists credentials.
+The AI action's Git-discovery requirement is isolated from source and persisted credentials.
+During model execution, workspace-root `.git` points only to an ephemeral empty repository.
+Its clean `origin` satisfies action initialization, while a nonmatching actor sentinel selects
+the token-free credential-helper and secret-scrubbing path without authorizing anyone.
+Exact source is a separate `target/` checkout with persisted credentials disabled. The
+context is destroyed before trusted code authenticates and publishes. Tests require this
+ordering and fail if a Claude-facing target checkout persists credentials.

@@ -224,11 +224,15 @@ jobs:
           test ! -e .git
           git init --quiet .claude-git-context
           echo "gitdir: $GITHUB_WORKSPACE/.claude-git-context/.git" > .git
+          git remote add origin "https://github.com/${{ github.repository }}.git"
       - name: Run constrained review
         id: claude
         uses: anthropics/claude-code-action@8569a83495a3f6f0c50a90e46351d3816fed1a75 # v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # A nonmatching sentinel activates the action's token-free credential-helper
+          # path without authorizing any non-write actor.
+          allowed_non_write_users: "__vibey_gh_no_nonwrite_users__"
           track_progress: __VIBEY_GH_SANITIZED_PROGRESS__
           show_full_output: ${{ inputs.full_claude_output && github.event_name == 'workflow_dispatch' && github.event.repository.visibility == 'private' && __VIBEY_GH_ALLOW_PRIVATE_FULL_OUTPUT__ }}
           additional_permissions: |
@@ -431,11 +435,13 @@ jobs:
           test ! -e .git
           git init --quiet .claude-git-context
           echo "gitdir: $GITHUB_WORKSPACE/.claude-git-context/.git" > .git
+          git remote add origin "https://github.com/${{ github.repository }}.git"
       - name: Diagnose and repair without executing PR code
         id: claude
         uses: anthropics/claude-code-action@8569a83495a3f6f0c50a90e46351d3816fed1a75 # v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          allowed_non_write_users: "__vibey_gh_no_nonwrite_users__"
           track_progress: __VIBEY_GH_SANITIZED_PROGRESS__
           show_full_output: ${{ inputs.full_claude_output && github.event_name == 'workflow_dispatch' && github.event.repository.visibility == 'private' && __VIBEY_GH_ALLOW_PRIVATE_FULL_OUTPUT__ }}
           additional_permissions: |
@@ -595,11 +601,13 @@ jobs:
           test ! -e .git
           git init --quiet .claude-git-context
           echo "gitdir: $GITHUB_WORKSPACE/.claude-git-context/.git" > .git
+          git remote add origin "https://github.com/${{ github.repository }}.git"
       - name: Resolve only the materialized conflict set
         id: claude
         uses: anthropics/claude-code-action@8569a83495a3f6f0c50a90e46351d3816fed1a75 # v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          allowed_non_write_users: "__vibey_gh_no_nonwrite_users__"
           track_progress: __VIBEY_GH_SANITIZED_PROGRESS__
           show_full_output: ${{ inputs.full_claude_output && github.event_name == 'workflow_dispatch' && github.event.repository.visibility == 'private' && __VIBEY_GH_ALLOW_PRIVATE_FULL_OUTPUT__ }}
           plugin_marketplaces: |
