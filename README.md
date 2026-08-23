@@ -68,14 +68,43 @@ vibey-gh merge-train --dry-run
 vibey-gh merge-train --method squash
 ```
 
-Reviews every open pull request into the integration branch and merges the ready ones.
-"Ready" is mechanical and deliberately not a judgement of the code — that is a human's job
-and a ruleset's. It decides only whether a change may merge *unattended*: not a draft, no
-conflicts, checks green, nobody has asked for changes.
+The normal path is event-driven: the PR-automation gate dispatches
+`vibey-gh merge-train --pr NUMBER` as soon as the exact current head is green. The weekly
+and manual modes remain recovery backstops. A ready PR is open, current with its target,
+conflict-free, green, free of requested changes, and carries a successful exact-head
+`PR automation / gate` when an outside-author review is required.
 
-Who may merge unattended is the other half. A pull request from the owner or one of their
-own bots merges on a green build; from anyone else it additionally needs an approving
-review, because "CI passed" is not a review.
+Outside authors receive a fresh structured Claude review after scans pass. Findings feed
+the same bounded repair loop as failed scans. Forks are never mutated with privileged
+credentials; when a fork needs edits, automation preserves its exact head in a linked
+repository-owned replacement PR.
+
+### PR review and repair automation
+
+`pr-automation.yml` reacts to configured scan-workflow completions, re-reads the entire
+current-head check rollup, and publishes an explicit check run on that exact SHA. It waits
+for pending scans, separates cancelled infrastructure from actionable failures, and allows
+at most three repair commits per contributor lineage. A new contributor commit starts a
+new lineage; bot repair pushes do not reset the counter.
+
+Review and repair use the immutable-pinned Claude Code Action with selected `vibey-skills`.
+The privileged jobs may inspect source and CI logs but may not execute contributor package
+managers, tests, builds, scripts, or binaries. Ordinary PR CI validates every repair push.
+The agent has no Git mutation tool: one trusted publisher may push a non-empty source
+(`HEAD:refs/heads/<exact-pr-branch>`) only to the exact PR branch. This deliberately
+permits forward updates to `develop` or `main` when either is the PR head, while making a
+Git deletion refspec (`:branch`) structurally impossible. Managed merges automatically
+update `develop` and `main`, but no managed command uses `--delete`, `--delete-branch`, an
+empty-source refspec, or a branch-deletion API.
+Repositories must configure `ANTHROPIC_API_KEY`; `AUTOMERGE_TOKEN` is required where the
+default Actions token cannot push or merge through the repository ruleset. Installation
+does not create either secret.
+
+```bash
+vibey-gh pr-automation evaluate --pr 123 --head-sha HEAD_SHA
+vibey-gh pr-automation mirror-fork --pr 123
+vibey-gh merge-train --pr 123
+```
 
 ### The promotion
 
@@ -92,8 +121,10 @@ it gets right that a hand-written workflow usually does not:
   "ahead" even when the trees are identical. A diff is the only honest test.
 - **It derives the version before opening anything.** An upload with `skip-existing` turns
   an unbumped promotion into a green run that publishes nothing, silently.
-- **It waits for the checks.** A pull request opened seconds ago has no results yet, and
-  merging blind is how a red build reaches the release branch.
+- **It hands the PR to the same event gate as every other change.** `promote` no longer
+  holds a runner open with `gh pr checks --watch`; scans, automated review, and the
+  exact-head merge train finish the promotion asynchronously. `--wait` retains the legacy
+  synchronous mode for recovery.
 
 ### Realignment
 
@@ -112,6 +143,29 @@ discard work. If the integration branch has anything the release branch does not
 left alone and says so.
 
 ## Configuration
+
+```toml
+[pr_automation]
+enabled = true
+scan_workflows = ["CI", "Provenance", "CodeQL", "Docs", "API drift (Cloud Agents OpenAPI)"]
+ignored_checks = ["PR automation / gate", "Merge train / merge"]
+max_repair_attempts = 3
+model = "claude-sonnet-5"
+review_untrusted_authors = true
+repair_untrusted_authors = true
+replace_fork_prs = true
+retain_schedule_backstop = true
+
+[github_release]
+enabled = true
+tag_prefix = "v"
+generate_notes = true
+```
+
+After the configured `Release` workflow succeeds on `main`, the managed
+`github-release.yml` workflow tags that exact commit and creates a generated-notes GitHub
+Release. It is safe to rerun: an existing matching tag/release is reused, while an
+existing tag at a different SHA is never moved and fails loudly.
 
 Everything project-specific lives in `.vibey-gh.toml`, so the logic beside it stays
 general. Every key has a default; a repository that agrees with them needs no file at all.
