@@ -55,6 +55,25 @@ def test_release_environments_are_disjoint_by_branch():
     assert "verify" not in jobs
 
 
+def test_release_surfaces_preserve_both_docs_channels_and_publish_oci_packages():
+    text = (WORKFLOWS / "release-surfaces.yml").read_text(encoding="utf-8")
+    assert 'workflows: ["Release"]' in text
+    assert "github.event.workflow_run.conclusion == 'success'" in text
+    assert "channel=develop" in text and "channel=main" in text
+    assert "pages/${CHANNEL}" in text
+    assert "pages/${OTHER_CHANNEL}" in text
+    assert '--branch "$OTHER_BRANCH"' in text
+    assert "docs-${OTHER_CHANNEL}" in text
+    assert "properdocs==1.6.7" in text
+    assert "properdocs-theme-mkdocs==1.6.7" in text
+    assert "packages: write" in text
+    assert "ghcr.io/${GITHUB_REPOSITORY,,}/python" in text
+    assert "application/vnd.pypi.project.release.v1" in text
+    assert 'oras tag "${package}:${VERSION}" "$CHANNEL" "sha-${RELEASE_SHA}"' in text
+    assert 'oras tag "${package}:${VERSION}" latest' in text
+    assert "--delete" not in text
+
+
 def test_repository_dogfoods_the_exact_rendered_workflows_and_hooks():
     root = Path(__file__).resolve().parent.parent
     ok, problems = installed(load_config(root), local=False)
