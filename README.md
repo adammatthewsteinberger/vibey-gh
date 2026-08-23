@@ -435,6 +435,11 @@ generate_llms_full_txt = true
 generate_json_ld = true
 ```
 
+`CodeQL` is a real managed Python security-analysis workflow using an immutably pinned
+official action. `API drift (Cloud Agents OpenAPI)` executes the capability registry and
+requires identical coverage through MCP, API, CLI, SDK, and webhook adapters. The scan
+names above therefore map to concrete required checks rather than advisory placeholders.
+
 Sanitized progress is the safe default. Claude's progress-comment mode is enabled only for
 the direct PR/issue events the action supports; `workflow_run`, `workflow_dispatch`, and
 `pull_request_target` retain safe phase-level job visibility without requesting that

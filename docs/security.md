@@ -6,6 +6,10 @@ content but cannot execute it. AI tools edit only named scopes; trusted shell st
 paths and publish one commit. Secrets never enter prompts or artifacts. The merge train
 rechecks exact-head gates immediately before mutation.
 
+The managed CodeQL workflow analyzes Python changes on both delivery branches and their
+pull requests. The API-drift workflow independently verifies that every canonical
+capability remains available through MCP, API, CLI, SDK, and webhook boundaries.
+
 Claude Code Action requires a Git repository at the workspace root for its own setup.
 Managed workflows satisfy that contract with a disposable repository containing no source
 checkout or persisted credential. It has a clean repository URL as `origin` because the

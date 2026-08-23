@@ -298,8 +298,18 @@ def test_github_helpers_and_state_persistence(monkeypatch, tmp_path):
     state = pa.AutomationState("a", "a")
     pa.upsert_state(1, state, "new", [])
     pa.upsert_state(1, state, "edit", [{"body": pa.state_body(state, "x"), "databaseId": 9}])
+    pa.upsert_state(
+        1,
+        state,
+        "graphql edit",
+        [{"body": pa.state_body(state, "x"), "databaseId": None, "id": "IC_node"}],
+    )
     assert any(command[:3] == ["gh", "pr", "comment"] for command in calls)
     assert any("issues/comments/9" in " ".join(command) for command in calls)
+    assert any(command[:3] == ["gh", "api", "graphql"] for command in calls)
+
+    with pytest.raises(RuntimeError, match="comment has no ID"):
+        pa.upsert_state(1, state, "bad", [{"body": pa.state_body(state, "x")}])
 
     monkeypatch.setenv("GH_REPO", "explicit/repository")
     calls.clear()

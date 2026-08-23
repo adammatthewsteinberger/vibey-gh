@@ -341,8 +341,8 @@ def upsert_state(
             text=True,
             check=False,
         )
-    else:
-        comment_id = existing.get("databaseId") or existing.get("id")
+    elif existing.get("databaseId") is not None:
+        comment_id = existing["databaseId"]
         run = subprocess.run(
             [
                 "gh",
@@ -350,6 +350,32 @@ def upsert_state(
                 f"repos/{repository_name}/issues/comments/{comment_id}",
                 "--method",
                 "PATCH",
+                "--field",
+                f"body={body}",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    else:
+        # GraphQL comments sometimes expose only an opaque `IC_...` node ID. Passing
+        # that value to the REST issues/comments endpoint produces a misleading 404.
+        comment_id = existing.get("id")
+        if not comment_id:
+            raise RuntimeError("could not persist PR automation state: comment has no ID")
+        mutation = (
+            "mutation($id:ID!,$body:String!){updateIssueComment(input:{id:$id,body:$body})"
+            "{issueComment{id}}}"
+        )
+        run = subprocess.run(
+            [
+                "gh",
+                "api",
+                "graphql",
+                "--field",
+                f"query={mutation}",
+                "--field",
+                f"id={comment_id}",
                 "--field",
                 f"body={body}",
             ],
