@@ -200,6 +200,12 @@ PR CI validates resulting commits. Managed automation never sends a deletion ref
 `main` or `develop`, and automatic branch deletion stays disabled because `develop` is
 itself the head of production promotion PRs. See [SECURITY.md](SECURITY.md).
 
+Repair and conflict publication recheck the PR's exact head immediately before committing
+and again after any non-fast-forward push rejection; a concurrent human or bot update is
+discarded as a stale no-op rather than force-pushed over, consumes no repair attempt, and
+never mutates a permanent branch from an obsolete checkout—including when `develop` or
+`main` is itself the PR head during a promotion. See [docs/security.md](docs/security.md).
+
 The sole history-rewrite exception is Conventional Commits self-healing: only a
 same-repository linear topic branch may be normalized and pushed with an exact-head
 `--force-with-lease`. Forks, stale heads, merge commits, `develop`, and `main` fail closed,

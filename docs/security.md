@@ -36,6 +36,15 @@ is treated as untrusted input, capped at 200,000 bytes, and read-only to the dia
 repository code is still never executed in the privileged job. This avoids speculative
 repairs when optional CI MCP tools are unavailable without granting Claude shell access.
 
+Repair and conflict-resolution publication never trusts the head it evaluated. The trusted
+publisher re-reads the PR's current head immediately before committing and again after any
+non-fast-forward push rejection. A mismatch means a human or another bot advanced the PR
+concurrently, so the run is discarded as a stale no-op: it never force-pushes, never
+overwrites the newer commit, never consumes a repair attempt, and never mutates a permanent
+branch from an obsolete checkout. This applies even when `develop` or `main` is itself the
+PR head during a promotion, which is exactly when clobbering unreviewed newer content would
+be most damaging. See [Workflows](workflows.md) for the exact recheck points.
+
 The Conventional Commits job is the sole guarded exception that may force-update history.
 It can act only on a same-repository topic branch, only from an exact checked SHA, only on
 linear history, and only with `--force-with-lease`. Permanent branches are rejected by
