@@ -273,6 +273,11 @@ def test_github_helpers_and_state_persistence(monkeypatch, tmp_path):
     assert any(command[:3] == ["gh", "pr", "comment"] for command in calls)
     assert any("issues/comments/9" in " ".join(command) for command in calls)
 
+    monkeypatch.setenv("GH_REPO", "explicit/repository")
+    calls.clear()
+    pa.upsert_state(2, state, "explicit", [])
+    assert "explicit/repository" in calls[0]
+
     monkeypatch.setattr(subprocess, "run", lambda *a, **k: completed(1, err="boom"))
     with pytest.raises(RuntimeError, match="gh api"):
         pa._gh_json("api", "x")

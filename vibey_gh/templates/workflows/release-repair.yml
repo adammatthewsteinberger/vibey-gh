@@ -72,7 +72,15 @@ jobs:
           ref: ${{ github.event.workflow_run.head_sha }}
           path: target
           fetch-depth: 0
+          persist-credentials: false
           token: ${{ secrets.AUTOMERGE_TOKEN || github.token }}
+      - name: Create credential-free Claude git context
+        if: steps.context.outputs.stale == 'false'
+        run: |
+          set -euo pipefail
+          test ! -e .git
+          git init --quiet .claude-git-context
+          echo "gitdir: $GITHUB_WORKSPACE/.claude-git-context/.git" > .git
       - name: Diagnose and repair without executing repository code
         if: steps.context.outputs.stale == 'false'
         id: claude
@@ -116,6 +124,11 @@ jobs:
             For a fixable failure, edit files only. Do not commit, push, merge, create,
             rename, or delete any branch. A separate trusted step publishes one commit
             to a new repository-owned repair branch and opens a normal pull request.
+      - name: Remove credential-free Claude git context
+        if: always() && steps.context.outputs.stale == 'false'
+        run: |
+          rm -f .git
+          rm -rf .claude-git-context
       - name: Publish one guarded repair PR
         if: >-
           steps.context.outputs.stale == 'false' &&
@@ -149,6 +162,8 @@ jobs:
           git -C target add -A
           git -C target commit -m "Repair failed ${FAILED_NAME} release scan" \
             -m "Made-With: Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), Developed by [Adam Matthew Steinberger](https://hire.adam.matthewsteinberger.com/) ([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/))."
+          gh auth setup-git
+          git -C target remote set-url origin "https://github.com/${REPO}.git"
           # A non-empty source refspec can update only the new repair branch. Never push
           # directly to develop/main and never use a deletion option or empty source.
           git -C target push origin "HEAD:refs/heads/${REPAIR_BRANCH}"

@@ -137,7 +137,14 @@ def test_pr_gate_requires_exact_head_semantic_documentation_review_for_every_aut
     assert "--disallowedTools Agent" in text
     assert "Do not spawn subagents" in text
     assert text.count("GH_REPO: ${{ github.repository }}") >= 2
-    assert "leaving the workspace root without a" in text
+    assert "isolated temporary" in text
+    assert text.count("Create credential-free Claude git context") == 3
+    assert text.count("Remove credential-free Claude git context") == 3
+    assert text.count("persist-credentials: false") >= 3
+    assert "gitdir: $GITHUB_WORKSPACE/target/.git" not in text
+    assert "TRUSTED: ${{ needs.evaluate.outputs.trusted }}" not in text
+    assert '[ "$STATE" = ready ] || [ "$STATE" = review ]' in text
+    assert '[ "$REVIEW_PASSED" = true ]' in text
     for field in (
         "complete",
         "accurate",
@@ -253,6 +260,10 @@ def test_failed_permanent_branch_scans_use_a_guarded_repair_pr():
     assert "mcp__github_ci__download_job_log" in text
     assert "Never execute package managers" in text
     assert "Never lower coverage" in text
+    assert "Create credential-free Claude git context" in text
+    assert "Remove credential-free Claude git context" in text
+    assert "persist-credentials: false" in text
+    assert "gitdir: $GITHUB_WORKSPACE/target/.git" not in text
     assert 'repair_branch="vibey-gh/repair/release-' in text
     assert 'git -C target push origin "HEAD:refs/heads/${REPAIR_BRANCH}"' in text
     assert 'gh pr create --repo "$REPO" --base "$BASE_BRANCH"' in text
