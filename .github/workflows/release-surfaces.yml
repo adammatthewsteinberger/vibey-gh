@@ -168,7 +168,7 @@ jobs:
       cancel-in-progress: false
     environment:
       name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}${{ needs.context.outputs.channel }}/
+      url: ${{ format('https://{0}.github.io/{1}/{2}/', github.repository_owner, github.event.repository.name, needs.context.outputs.channel) }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -212,25 +212,298 @@ jobs:
           set -euo pipefail
           mkdir -p "pages/${CHANNEL}" "pages/${OTHER_CHANNEL}"
           cp -R channel-site/. "pages/${CHANNEL}/"
-          other_run=$(gh run list --workflow release-surfaces.yml \
-            --branch "$OTHER_BRANCH" --status success --limit 1 \
-            --json databaseId --jq '.[0].databaseId // empty')
-          if [ -n "$other_run" ]; then
-            gh run download "$other_run" --name "docs-${OTHER_CHANNEL}" \
-              --dir "pages/${OTHER_CHANNEL}"
-          else
+          restored=false
+          while read -r other_run; do
+            if gh run download "$other_run" --name "docs-${OTHER_CHANNEL}" \
+              --dir "pages/${OTHER_CHANNEL}" 2>/dev/null; then
+              restored=true
+              break
+            fi
+          done < <(gh run list --workflow release-surfaces.yml \
+            --status success --limit 20 --json databaseId --jq '.[].databaseId')
+          if [ "$restored" != true ]; then
             echo "::notice::No successful ${OTHER_CHANNEL} documentation artifact exists yet"
           fi
           cat > pages/index.html <<'HTML'
           <!doctype html>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width,initial-scale=1">
-          <title>Release documentation</title>
-          <h1>Release documentation</h1>
-          <ul>
-            <li><a href="main/">Production documentation (main)</a></li>
-            <li><a href="develop/">Test documentation (develop)</a></li>
-          </ul>
+          <html lang="en">
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width,initial-scale=1">
+            <meta name="theme-color" content="#080b14">
+            <meta name="description" content="Choose the production or preview vibey-gh documentation channel.">
+            <title>vibey-gh · Release documentation</title>
+            <style>
+              :root {
+                color-scheme: dark;
+                --bg: #080b14;
+                --ink: #f7f8ff;
+                --muted: #a7acc2;
+                --line: rgba(255, 255, 255, .11);
+                --violet: #9d7bff;
+                --cyan: #57dcff;
+                --mint: #75f0c2;
+              }
+              * { box-sizing: border-box; }
+              html { min-height: 100%; background: var(--bg); }
+              body {
+                min-height: 100vh;
+                margin: 0;
+                overflow-x: hidden;
+                color: var(--ink);
+                font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont,
+                  "Segoe UI", sans-serif;
+                background:
+                  radial-gradient(circle at 15% 10%, rgba(112, 74, 255, .22), transparent 32rem),
+                  radial-gradient(circle at 88% 18%, rgba(49, 207, 255, .15), transparent 29rem),
+                  linear-gradient(145deg, #080b14 0%, #0d1222 55%, #090d18 100%);
+              }
+              body::before {
+                position: fixed;
+                inset: 0;
+                pointer-events: none;
+                content: "";
+                opacity: .24;
+                background-image:
+                  linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px),
+                  linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
+                background-size: 52px 52px;
+                mask-image: linear-gradient(to bottom, black, transparent 78%);
+              }
+              .orb {
+                position: fixed;
+                width: 28rem;
+                aspect-ratio: 1;
+                top: 48%;
+                left: 50%;
+                border-radius: 50%;
+                transform: translate(-50%, -50%);
+                filter: blur(90px);
+                opacity: .11;
+                pointer-events: none;
+                background: linear-gradient(135deg, var(--violet), var(--cyan));
+                animation: breathe 8s ease-in-out infinite alternate;
+              }
+              main {
+                position: relative;
+                width: min(1120px, calc(100% - 40px));
+                margin: 0 auto;
+                padding: 48px 0 54px;
+              }
+              nav { display: flex; align-items: center; justify-content: space-between; }
+              .brand {
+                display: inline-flex;
+                align-items: center;
+                gap: 12px;
+                color: var(--ink);
+                font-size: 1.02rem;
+                font-weight: 760;
+                letter-spacing: -.02em;
+                text-decoration: none;
+              }
+              .mark {
+                display: grid;
+                width: 36px;
+                aspect-ratio: 1;
+                place-items: center;
+                border: 1px solid rgba(255,255,255,.17);
+                border-radius: 11px;
+                box-shadow: inset 0 1px rgba(255,255,255,.18), 0 12px 30px rgba(0,0,0,.24);
+                background: linear-gradient(145deg, rgba(157,123,255,.35), rgba(87,220,255,.16));
+              }
+              .mark svg { width: 21px; }
+              .github {
+                color: var(--muted);
+                font-size: .88rem;
+                text-decoration: none;
+                transition: color .2s ease;
+              }
+              .github:hover { color: var(--ink); }
+              .hero { max-width: 790px; padding: 112px 0 58px; }
+              .eyebrow {
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                margin: 0 0 22px;
+                color: #c5b6ff;
+                font-size: .73rem;
+                font-weight: 800;
+                letter-spacing: .16em;
+                text-transform: uppercase;
+              }
+              .eyebrow::before {
+                width: 7px;
+                aspect-ratio: 1;
+                border-radius: 50%;
+                content: "";
+                box-shadow: 0 0 18px var(--violet);
+                background: var(--violet);
+              }
+              h1 {
+                max-width: 760px;
+                margin: 0;
+                font-size: clamp(3.1rem, 8vw, 6.65rem);
+                line-height: .93;
+                letter-spacing: -.075em;
+              }
+              h1 span {
+                color: transparent;
+                background: linear-gradient(100deg, #fff 8%, #cbbcff 50%, #82e6ff 93%);
+                background-clip: text;
+                -webkit-background-clip: text;
+              }
+              .lede {
+                max-width: 620px;
+                margin: 30px 0 0;
+                color: var(--muted);
+                font-size: clamp(1.05rem, 2vw, 1.28rem);
+                line-height: 1.7;
+              }
+              .channels {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 20px;
+              }
+              .card {
+                position: relative;
+                display: flex;
+                min-height: 260px;
+                padding: 30px;
+                overflow: hidden;
+                flex-direction: column;
+                border: 1px solid var(--line);
+                border-radius: 24px;
+                color: var(--ink);
+                text-decoration: none;
+                box-shadow: 0 22px 60px rgba(0, 0, 0, .28), inset 0 1px rgba(255,255,255,.08);
+                background: linear-gradient(145deg, rgba(255,255,255,.075), rgba(255,255,255,.025));
+                backdrop-filter: blur(16px);
+                transition: transform .24s ease, border-color .24s ease, background .24s ease;
+              }
+              .card::after {
+                position: absolute;
+                width: 180px;
+                aspect-ratio: 1;
+                right: -60px;
+                bottom: -90px;
+                border-radius: 50%;
+                content: "";
+                filter: blur(4px);
+                opacity: .12;
+                background: var(--accent);
+                transition: opacity .24s ease, transform .24s ease;
+              }
+              .card:hover, .card:focus-visible {
+                border-color: color-mix(in srgb, var(--accent) 48%, transparent);
+                outline: none;
+                transform: translateY(-6px);
+                background: linear-gradient(145deg, rgba(255,255,255,.105), rgba(255,255,255,.035));
+              }
+              .card:hover::after { opacity: .22; transform: scale(1.14); }
+              .production { --accent: var(--mint); }
+              .preview { --accent: var(--violet); }
+              .card-top { display: flex; align-items: center; justify-content: space-between; }
+              .pill {
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                padding: 7px 11px;
+                border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+                border-radius: 99px;
+                color: var(--accent);
+                font-size: .68rem;
+                font-weight: 850;
+                letter-spacing: .12em;
+                text-transform: uppercase;
+                background: color-mix(in srgb, var(--accent) 8%, transparent);
+              }
+              .dot {
+                width: 6px;
+                aspect-ratio: 1;
+                border-radius: 50%;
+                box-shadow: 0 0 12px var(--accent);
+                background: var(--accent);
+              }
+              .arrow {
+                display: grid;
+                width: 38px;
+                aspect-ratio: 1;
+                place-items: center;
+                border: 1px solid var(--line);
+                border-radius: 50%;
+                color: var(--muted);
+                transition: transform .24s ease, color .24s ease, border-color .24s ease;
+              }
+              .card:hover .arrow { color: var(--accent); border-color: var(--accent); transform: rotate(-45deg); }
+              .card h2 { margin: auto 0 10px; font-size: clamp(1.65rem, 3vw, 2.25rem); letter-spacing: -.045em; }
+              .card p { max-width: 420px; margin: 0; color: var(--muted); line-height: 1.55; }
+              .branch { margin-top: 20px; color: #737991; font: 600 .76rem ui-monospace, SFMono-Regular, Menlo, monospace; }
+              footer {
+                display: flex;
+                padding-top: 38px;
+                align-items: center;
+                justify-content: space-between;
+                color: #737991;
+                font-size: .76rem;
+              }
+              footer strong { color: #a9aec1; font-weight: 650; }
+              @keyframes breathe { to { opacity: .18; transform: translate(-50%, -50%) scale(1.16); } }
+              @media (max-width: 720px) {
+                main { width: min(100% - 28px, 1120px); padding-top: 26px; }
+                .hero { padding: 86px 0 42px; }
+                .channels { grid-template-columns: 1fr; }
+                .card { min-height: 230px; padding: 25px; }
+                footer { align-items: flex-start; gap: 10px; flex-direction: column; }
+              }
+              @media (prefers-reduced-motion: reduce) {
+                *, *::before, *::after { scroll-behavior: auto !important; animation: none !important; transition: none !important; }
+              }
+            </style>
+          </head>
+          <body>
+            <div class="orb" aria-hidden="true"></div>
+            <main>
+              <nav aria-label="Primary">
+                <a class="brand" href="./" aria-label="vibey-gh documentation home">
+                  <span class="mark" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M5 6.5 12 3l7 3.5v7L12 21l-7-7.5v-7Z" stroke="currentColor" stroke-width="1.6"/><path d="m8.2 10 3.8 2.1 3.8-2.1M12 12.1v4.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+                  </span>
+                  vibey-gh
+                </a>
+                <a class="github" href="https://github.com/adammatthewsteinberger/vibey-gh">View on GitHub ↗</a>
+              </nav>
+              <section class="hero">
+                <p class="eyebrow">Documentation portal</p>
+                <h1>Build boldly.<br><span>Release safely.</span></h1>
+                <p class="lede">Choose the stable production reference or explore what is landing next. Both channels are generated from the exact code shipped by their release trains.</p>
+              </section>
+              <section class="channels" aria-label="Documentation channels">
+                <a class="card production" href="main/">
+                  <span class="card-top">
+                    <span class="pill"><span class="dot"></span>Production</span>
+                    <span class="arrow" aria-hidden="true">↗</span>
+                  </span>
+                  <h2>Stable documentation</h2>
+                  <p>The trusted reference for the latest version published to PyPI and GitHub Releases.</p>
+                  <span class="branch">branch / main</span>
+                </a>
+                <a class="card preview" href="develop/">
+                  <span class="card-top">
+                    <span class="pill"><span class="dot"></span>Preview</span>
+                    <span class="arrow" aria-hidden="true">↗</span>
+                  </span>
+                  <h2>Next documentation</h2>
+                  <p>Preview upcoming behavior alongside the development package published to TestPyPI.</p>
+                  <span class="branch">branch / develop</span>
+                </a>
+              </section>
+              <footer>
+                <span>Documentation that moves with the release.</span>
+                <span>Made with <strong>Vibey</strong></span>
+              </footer>
+            </main>
+          </body>
+          </html>
           HTML
       - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
       - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
