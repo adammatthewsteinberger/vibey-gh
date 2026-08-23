@@ -1,4 +1,4 @@
-# Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger.
+# Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), Developed by [Adam Matthew Steinberger](https://hire.adam.matthewsteinberger.com/) ([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/)).
 """Repository-profile configuration stays portable and refuses invalid metadata."""
 
 from pathlib import Path
@@ -49,3 +49,5 @@ def test_repository_profile_workflow_renders_disabled_and_json_safe(tmp_path: Pa
     assert "false &&" in rendered
     assert 'CONFIG_DESCRIPTION: "Quotes \\"stay\\" safe"' in rendered
     assert '\'\u007b"names":\u005b"python","github-actions"\u005d\u007d\'' in rendered
+    assert '"delete_branch_on_merge":false' in rendered
+    assert '"vulnerability_alerts":true' in rendered

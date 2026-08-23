@@ -1,4 +1,5 @@
-# Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger.
+# Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), Developed by [Adam Matthew Steinberger](https://hire.adam.matthewsteinberger.com/) ([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/)).
+# Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), Developed by [Adam Matthew Steinberger](https://hire.adam.matthewsteinberger.com/) ([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/)).
 """Deterministic documentation contract checks used locally and before AI maintenance."""
 
 from __future__ import annotations
@@ -7,6 +8,26 @@ import json
 from dataclasses import dataclass
 
 from vibey_gh.config import GhConfig
+
+README_PROVENANCE = (
+    "Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), "
+    "Developed by [Adam Matthew Steinberger]"
+    "(https://hire.adam.matthewsteinberger.com/) "
+    "([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/))."
+)
+README_SECTIONS = (
+    "## Why vibey-gh",
+    "## Requirements",
+    "## Quick start",
+    "## Architecture",
+    "## Security model",
+    "## Commands",
+    "## Configuration",
+    "## Workflows",
+    "## Troubleshooting",
+    "## Contributing",
+    "## Licence",
+)
 
 
 @dataclass(frozen=True)
@@ -59,4 +80,12 @@ def check(cfg: GhConfig) -> DocumentationReport:
         path = cfg.root / relative
         if path.is_file() and "Made with" not in path.read_text(encoding="utf-8"):
             problems.append(f"{relative} has no Vibey provenance")
+    readme = cfg.root / "README.md"
+    if readme.is_file():
+        text = readme.read_text(encoding="utf-8")
+        for heading in README_SECTIONS:
+            if heading not in text:
+                problems.append(f"README.md is missing human documentation section: {heading}")
+        if not text.rstrip().endswith(README_PROVENANCE):
+            problems.append("README.md must end with the exact Vibey provenance sentence")
     return DocumentationReport(tuple(problems))

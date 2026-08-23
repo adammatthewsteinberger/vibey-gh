@@ -1,4 +1,5 @@
-# Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger.
+# Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), Developed by [Adam Matthew Steinberger](https://hire.adam.matthewsteinberger.com/) ([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/)).
+# Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), Developed by [Adam Matthew Steinberger](https://hire.adam.matthewsteinberger.com/) ([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/)).
 """Install the git hooks that enforce the automation into a consuming repository.
 
 Installing is deliberately additive. A repository that already has its own `pre-push` or
@@ -89,6 +90,27 @@ def render_workflow(source: Path, cfg: GhConfig) -> str:
     wanted = wanted.replace(
         "__VIBEY_GH_PROFILE_TOPICS__",
         json.dumps({"names": list(cfg.repository_profile.topics)}, separators=(",", ":")),
+    )
+    profile_settings = {
+        name: getattr(cfg.repository_profile, name)
+        for name in (
+            "has_issues",
+            "has_projects",
+            "has_wiki",
+            "has_discussions",
+            "allow_squash_merge",
+            "allow_merge_commit",
+            "allow_rebase_merge",
+            "allow_auto_merge",
+            "delete_branch_on_merge",
+            "web_commit_signoff_required",
+            "vulnerability_alerts",
+            "automated_security_fixes",
+        )
+    }
+    wanted = wanted.replace(
+        "__VIBEY_GH_PROFILE_SETTINGS__",
+        json.dumps(profile_settings, separators=(",", ":")),
     )
     wanted = wanted.replace(
         "__VIBEY_GH_DOCUMENTATION_AI__",

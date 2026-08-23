@@ -1,4 +1,4 @@
-# Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger.
+# Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), Developed by [Adam Matthew Steinberger](https://hire.adam.matthewsteinberger.com/) ([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/)).
 """Comprehensive documentation configuration and deterministic contracts."""
 
 import json
@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from vibey_gh.config import DocumentationConfig, GhConfig, load_config
-from vibey_gh.documentation import check
+from vibey_gh.documentation import README_PROVENANCE, README_SECTIONS, check
 
 
 def test_documentation_can_be_disabled(tmp_path: Path):
@@ -101,3 +101,6 @@ def test_this_repository_documentation_contract_is_complete():
         path = root / plugin["source"]
         assert (path / ".claude-plugin/plugin.json").is_file()
         assert list((path / "skills").glob("*/SKILL.md"))
+    readme = (root / "README.md").read_text()
+    assert readme.rstrip().endswith(README_PROVENANCE)
+    assert all(section in readme for section in README_SECTIONS)
