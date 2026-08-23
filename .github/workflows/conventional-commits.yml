@@ -71,7 +71,7 @@ jobs:
             echo "Every commit already conforms."
             exit 0
           fi
-          test "$(git -C target rev-list --merges --count "${BASE_SHA}..${HEAD_SHA}")" = 0 || {
+          test "$(git rev-list --merges --count "${BASE_SHA}..${HEAD_SHA}")" = 0 || {
             echo "Refusing automatic rewrite of merge commits"
             exit 1
           }
