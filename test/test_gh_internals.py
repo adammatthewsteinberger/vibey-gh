@@ -595,6 +595,10 @@ def test_the_trust_gate_marks_the_verdict_as_held():
 
 def test_event_driven_merge_guards_and_single_pr_lookup(monkeypatch):
     cfg = GhConfig(root=Path.cwd(), owner="owner", trusted_authors=("owner",))
+    trusted_without_gate = merge_train.judge(
+        {"number": 1, "title": "t", "author": {"login": "owner"}}, cfg
+    )
+    assert "PR automation gate" in trusted_without_gate.reason
     unreviewed = merge_train.judge(
         {"number": 1, "title": "t", "author": {"login": "outsider"}}, cfg
     )

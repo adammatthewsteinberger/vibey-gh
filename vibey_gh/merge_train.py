@@ -143,8 +143,12 @@ def judge(pr: dict, cfg: GhConfig) -> Verdict:
             for c in rollup
         )
         untrusted = normalise_actor(author) not in trusted or EXTERNAL_REPAIR_LABEL in labels
-        if untrusted and cfg.pr_automation.enabled and not automation_passed:
-            reason = "automated outside-author review has not passed"
+        if cfg.pr_automation.enabled and not automation_passed:
+            reason = (
+                "automated outside-author review has not passed"
+                if untrusted
+                else "PR automation gate has not passed"
+            )
         elif untrusted and not cfg.pr_automation.enabled and review != "APPROVED":
             owner = cfg.owner or "the code owner"
             reason = f"from @{author} and not approved — needs {owner}'s review"
