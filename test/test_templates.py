@@ -153,6 +153,12 @@ def test_pr_gate_requires_exact_head_semantic_documentation_review_for_every_aut
     assert text.count("__VIBEY_GH_ALLOW_PRIVATE_FULL_OUTPUT__") == 4
     assert text.count("__VIBEY_GH_ARCHIVE_EXECUTION_FILE__") == 3
     assert "Full Claude output is disabled or unsafe" in text
+    assert "Collect exact-head failed-check evidence" in text
+    assert "repos/${REPO}/commits/${HEAD_SHA}/check-runs" in text
+    assert "diagnostics/failed-checks.txt" in text
+    assert "--log-failed" in text
+    assert "diagnostic bundle truncated at 200000 bytes" in text
+    assert "Read that file before" in text
     for field in (
         "complete",
         "accurate",
