@@ -133,7 +133,7 @@ def test_installation_notices_report_missing_secrets(monkeypatch):
         ({"headRefOid": "new"}, "blocked", "stale event"),
         ({"state": "CLOSED"}, "blocked", "not open"),
         ({"isDraft": True}, "blocked", "draft"),
-        ({"mergeable": "CONFLICTING"}, "blocked", "conflicts"),
+        ({"mergeable": "CONFLICTING"}, "conflict", "conflicts"),
         ({"reviewDecision": "CHANGES_REQUESTED"}, "blocked", "requested changes"),
         ({"labels": [pa.BLOCKED_LABEL]}, "blocked", "operator"),
         ({"labels": [{"name": pa.EXHAUSTED_LABEL}]}, "blocked", "exhausted"),
@@ -194,6 +194,18 @@ def test_retry_and_untrusted_review_policy(tmp_path):
         pa.evaluate(green, cfg(tmp_path, review_untrusted_authors=False), expected_sha="abc").state
         == "ready"
     )
+
+
+def test_conflict_resolution_uses_and_enforces_repair_budget(tmp_path):
+    conflicting = pr(mergeable="CONFLICTING", statusCheckRollup=[check()])
+    first = pa.evaluate(conflicting, cfg(tmp_path), expected_sha="abc")
+    assert first.state == "conflict"
+    assert first.repair_attempt == 1
+    assert first.failed_checks == ("Merge conflict with develop",)
+    exhausted = pa.AutomationState("abc", "abc", attempts=3)
+    result = pa.evaluate(conflicting, cfg(tmp_path), expected_sha="abc", stored=exhausted)
+    assert result.state == "blocked"
+    assert "conflict resolution budget" in result.reason
 
 
 def test_external_repair_is_untrusted_even_for_owner(tmp_path):

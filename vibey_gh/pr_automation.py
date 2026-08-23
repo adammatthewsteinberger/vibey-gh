@@ -153,8 +153,22 @@ def evaluate(
         return result("blocked", "pull request is not open")
     if pr.get("isDraft"):
         return result("blocked", "pull request is a draft")
+    state = stored
+    if state is None or state.current_sha != head:
+        state = AutomationState(lineage_sha=head, current_sha=head)
     if pr.get("mergeable") == "CONFLICTING":
-        return result("blocked", f"conflicts with {base}")
+        if state.attempts >= cfg.pr_automation.max_repair_attempts:
+            return result(
+                "blocked",
+                "conflict resolution budget is exhausted",
+                repair_attempt=state.attempts,
+            )
+        return result(
+            "conflict",
+            f"conflicts with {base}",
+            failed_checks=(f"Merge conflict with {base}",),
+            repair_attempt=state.attempts + 1,
+        )
     if pr.get("reviewDecision") == "CHANGES_REQUESTED":
         return result("blocked", "a human requested changes")
 
@@ -163,10 +177,6 @@ def evaluate(
         return result("blocked", "automation is blocked pending operator action")
     if EXHAUSTED_LABEL in labels:
         return result("blocked", "repair budget is exhausted")
-
-    state = stored
-    if state is None or state.current_sha != head:
-        state = AutomationState(lineage_sha=head, current_sha=head)
 
     ignored = set(cfg.pr_automation.ignored_checks) | {
         "PR automation / gate",

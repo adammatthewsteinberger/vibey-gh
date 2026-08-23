@@ -94,6 +94,13 @@ for pending scans, separates cancelled infrastructure from actionable failures, 
 at most three repair commits per contributor lineage. A new contributor commit starts a
 new lineage; bot repair pushes do not reset the counter.
 
+Conflicting same-repository PRs enter a bounded conflict-resolution job instead of failing
+permanently. The job materializes Git's exact unresolved path set without executing
+repository code, gives the constrained agent read/search/edit access only, rejects edits
+outside that set, rechecks the head SHA, and publishes one ordinary non-force resolution
+commit. Fork conflicts continue through the repository-owned replacement-PR path. Conflict
+attempts share the three-attempt repair budget, so an ambiguous merge cannot loop forever.
+
 Review and repair use the immutable-pinned Claude Code Action with selected `vibey-skills`.
 The privileged jobs may inspect source and CI logs but may not execute contributor package
 managers, tests, builds, scripts, or binaries. Ordinary PR CI validates every repair push.
