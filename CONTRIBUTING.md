@@ -3,20 +3,20 @@
 ## Development
 
 Use Python 3.11 or newer. Create a topic branch from `develop`; never work directly on
-`main`. Install the development environment with `uv sync --extra dev` and enable the
-managed hooks with `uv run vibey-gh install`.
+`main`. Install the development environment with `python -m pip install -e ".[dev]"` and
+enable the managed hooks with `vibey-gh install`.
 
 ## Required checks
 
 Run:
 
 ```bash
-uv run pytest
-uv run ruff check .
-uv run black --check .
-uv run isort --check-only .
-uv run mypy vibey_gh
-uv run vibey-gh check --ci
+pytest
+black --check vibey_gh test
+isort --check-only vibey_gh test
+ruff check vibey_gh test
+mypy vibey_gh
+vibey-gh check --ci
 ```
 
 Tests belong under `test/`. Maintain 100% line and branch coverage and add focused tests for new
