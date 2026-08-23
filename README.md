@@ -7,10 +7,82 @@ documentation maintenance, and post-release branch realignment.
 **No dependencies.** Everything is stdlib. This runs in every CI job of every repository
 that adopts it, so a dependency it grows is a dependency all of them grow.
 
+## Why vibey-gh
+
+GitHub can run tests, but a dependable open-source delivery system needs much more than a
+green test job. It must intake branches, keep documentation honest, review outside work,
+repair actionable failures without weakening gates, merge through protected branches,
+derive versions, publish to the correct registry, create releases and packages, deploy
+discoverable documentation, preserve provenance, and recover safely when a trusted
+post-merge job fails. `vibey-gh` installs that complete event-driven path as one portable,
+auditable contract.
+
+Use it when you want `develop` to be the integration channel, `main` to be production,
+and every transition between them to be reproducible and policy checked.
+
+## Requirements
+
+- Python 3.11 or newer, Git, and the GitHub CLI (`gh`).
+- A GitHub repository with Actions enabled and Pages configured for Actions deployments.
+- `ANTHROPIC_API_KEY` for AI review, repair, conflict resolution, and documentation upkeep.
+- `AUTOMERGE_TOKEN` when the default Actions token cannot merge or manage repository settings.
+- PyPI and TestPyPI trusted-publishing environments when Python publication is enabled.
+
+The installed Python runtime has no third-party dependencies. Workflow-only tools are
+pinned to immutable action revisions and run in GitHub-hosted jobs.
+
+## Quick start
+
 ```bash
 pip install vibey-gh
 vibey-gh install
 ```
+
+Commit the generated hooks, workflows, assets, and configuration; configure the required
+secrets and publishing environments; then verify the complete installation:
+
+```bash
+vibey-gh check --ci
+git status --short
+```
+
+Push a topic branch. Branch intake creates a draft PR, exact-head scans decide when it is
+stable, and the event chain handles review, repair, merge, promotion, publication, docs,
+tagging, GitHub Release creation, and repository-profile reconciliation.
+
+## Architecture
+
+Configuration value objects describe desired state; deterministic evaluators judge
+versions, PRs, documentation, and interface parity; CLI adapters call those policies; and
+rendered workflows provide the privileged GitHub edge. Managed templates are the source
+of truth, and dogfood tests require this repository's installed copies to match them.
+Every decision is tied to an exact commit SHA, and stale workflow events are ignored. See
+[Architecture](docs/architecture.md), [Workflows](docs/workflows.md), and
+[Threat model](docs/threat-model.md).
+
+## Security model
+
+Privileged jobs treat PR content, logs, model output, and repository instructions as
+untrusted. They inspect or edit constrained files but never execute contributor-controlled
+package managers, tests, builds, or scripts while write credentials are present. Ordinary
+PR CI validates resulting commits. Managed automation never sends a deletion refspec for
+`main` or `develop`, and automatic branch deletion stays disabled because `develop` is
+itself the head of production promotion PRs. See [SECURITY.md](SECURITY.md).
+
+## Commands
+
+| Command | Human purpose |
+|---|---|
+| `vibey-gh install` | Install or update hooks, workflows, and release assets without discarding local hooks. |
+| `vibey-gh check --ci` | Verify provenance, installation, documentation, marketplace, and interface parity. |
+| `vibey-gh version --explain` | Explain the derived semantic-version decision. |
+| `vibey-gh promote` | Open or reuse the asynchronous `develop → main` release PR. |
+| `vibey-gh realign` | Align identical `develop` and `main` trees after a rebase merge. |
+| `vibey-gh pr-automation evaluate` | Return the structured exact-head PR decision. |
+| `vibey-gh merge-train --pr N` | Judge and merge one gated PR with the target's merge method. |
+| `vibey-gh sdk`, `api`, `mcp`, `webhook` | Exercise capabilities through every public surface. |
+
+Run `vibey-gh --help` and read [docs/cli.md](docs/cli.md) for the full reference.
 
 `install` writes the git hooks and workflow files into your repository and points
 `core.hooksPath` at them. A hook you already have is moved aside to `<name>.local` and
@@ -181,6 +253,18 @@ generate_notes = true
 enabled = true
 description = "A configurable repository description"
 topics = ["automation", "documentation", "github-actions"]
+has_issues = true
+has_projects = true
+has_wiki = false
+has_discussions = true
+allow_squash_merge = true
+allow_merge_commit = false
+allow_rebase_merge = true
+allow_auto_merge = true
+delete_branch_on_merge = false
+web_commit_signoff_required = true
+vulnerability_alerts = true
+automated_security_fixes = true
 
 [documentation]
 enabled = true
@@ -256,7 +340,9 @@ production releases. The normal TestPyPI and PyPI uploads remain authoritative a
 unchanged.
 
 After release surfaces succeed, `repository-profile.yml` reconciles the repository's
-description, topics, and homepage with this configuration. An empty description derives
+description, topics, homepage, collaboration features, merge methods, automatic merge,
+commit signoff, branch retention, vulnerability alerts, and automated security fixes.
+An empty description derives
 a repository-specific description from the consuming repository name. It verifies that
 Pages, a GitHub Release, a deployment, and the OCI package really exist—the public API
 does not expose fictional “show Releases/Deployments/Packages” switches. Profile updates
@@ -295,6 +381,44 @@ trusted_authors = ["your-login", "dependabot[bot]"]
 
 
 
+## Workflows
+
+| Workflow | Responsibility |
+|---|---|
+| Branch intake | Turns a new topic branch into one reusable draft PR. |
+| CI / Provenance / Docs | Validate code, history, human docs, agent docs, plugins, and interfaces. |
+| PR automation | Aggregates exact-head scans; reviews, repairs, resolves conflicts, and gates. |
+| Merge train | Squash-merges into `develop` and rebase-merges promotions into `main`. |
+| Release | Publishes `develop` dev builds to TestPyPI and `main` releases to PyPI. |
+| GitHub Release | Tags the exact production commit and generates release notes. |
+| Release surfaces | Publishes GHCR artifacts and Production/Preview ProperDocs sites. |
+| Repository profile | Enforces repository metadata, policy settings, security, and public surfaces. |
+| Release repair | Returns trusted post-merge fixes through an ordinary guarded PR. |
+
+Scheduled and manual triggers are recovery backstops; normal delivery is event driven.
+
+## Troubleshooting
+
+- Empty Anthropic key: define `ANTHROPIC_API_KEY` as a repository secret, not only an
+  environment secret, and confirm the privileged workflow can read it.
+- Review-blocked promotion: verify the exact-head `PR automation / gate`; admin fallback
+  is permitted only after all independent policy checks pass.
+- Pages 404: select **GitHub Actions** as the Pages source and rerun Release surfaces.
+- Repository profile failure: give `AUTOMERGE_TOKEN` the administration and security
+  permissions required to reconcile the configured settings.
+- Wrong package index: `develop` must select TestPyPI and `main` must select PyPI.
+
+See [docs/troubleshooting.md](docs/troubleshooting.md) and [SUPPORT.md](SUPPORT.md); include
+the workflow URL, exact SHA, and redacted failing-step output when asking for help.
+
+## Contributing
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), and
+[AGENTS.md](AGENTS.md). Changes must preserve the dependency-free runtime, Python 3.11,
+100% line and branch coverage, immutable action pins, provenance, and permanent-branch
+non-deletion guarantee. Report vulnerabilities through [SECURITY.md](SECURITY.md), not a
+public issue.
+
 ### Taking the hooks without the workflows
 
 `install` writes the managed workflows alongside the hooks. A repository that already has richer
@@ -330,3 +454,5 @@ byte.
 ## Licence
 
 MIT. See [LICENSE](LICENSE).
+
+Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), Developed by [Adam Matthew Steinberger](https://hire.adam.matthewsteinberger.com/) ([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/)).

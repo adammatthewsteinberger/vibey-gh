@@ -1,4 +1,4 @@
-# Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger.
+# Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), Developed by [Adam Matthew Steinberger](https://hire.adam.matthewsteinberger.com/) ([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/)).
 """Tests for the vibey-gh automation.
 
 The readiness gate and the version decision are the parts most worth testing: both were
@@ -59,7 +59,7 @@ def cfg_for(root: Path, **kw) -> GhConfig:
 
 def test_defaults_apply_without_a_config_file(tmp_path):
     cfg = load_config(tmp_path)
-    assert cfg.header.startswith("# Made with love by Vibey")
+    assert cfg.header.startswith("# Made with ❤️ by [Vibey]")
     assert cfg.trailer_key == "Made-With"
 
 

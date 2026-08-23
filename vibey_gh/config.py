@@ -1,11 +1,12 @@
-# Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger.
+# Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), Developed by [Adam Matthew Steinberger](https://hire.adam.matthewsteinberger.com/) ([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/)).
+# Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), Developed by [Adam Matthew Steinberger](https://hire.adam.matthewsteinberger.com/) ([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/)).
 """Configuration for the GitHub automation, read from `.vibey-gh.toml`.
 
 Every project-specific decision lives here so the logic beside it can stay general:
 
     [fingerprint]
     text     = "Made with love by Vibey, ..."      # the source-header comment
-    trailer  = "Made-With: Vibey, ..."             # the commit trailer
+    trailer  = "Made-With: Made with ❤️ by ..."    # the commit trailer
     sources  = ["tools/*.py", ".github/workflows/*.yml"]
 
     [version]
@@ -32,11 +33,13 @@ from pathlib import Path
 
 CONFIG_NAME = ".vibey-gh.toml"
 
-DEFAULT_TEXT = "Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger."
-DEFAULT_TRAILER_KEY = "Made-With"
-DEFAULT_TRAILER = (
-    f"{DEFAULT_TRAILER_KEY}: Vibey, the auto-vibecoding machine by Adam Matthew Steinberger"
+DEFAULT_TEXT = (
+    "Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), "
+    "Developed by [Adam Matthew Steinberger](https://hire.adam.matthewsteinberger.com/) "
+    "([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/))."
 )
+DEFAULT_TRAILER_KEY = "Made-With"
+DEFAULT_TRAILER = f"{DEFAULT_TRAILER_KEY}: {DEFAULT_TEXT}"
 DEFAULT_SOURCES = ("tools/*.py", "src/**/*.py", ".github/workflows/*.yml")
 DEFAULT_SCAN_WORKFLOWS = (
     "CI",
@@ -123,6 +126,18 @@ class RepositoryProfileConfig:
         "github-actions",
         "release-automation",
     )
+    has_issues: bool = True
+    has_projects: bool = True
+    has_wiki: bool = False
+    has_discussions: bool = True
+    allow_squash_merge: bool = True
+    allow_merge_commit: bool = False
+    allow_rebase_merge: bool = True
+    allow_auto_merge: bool = True
+    delete_branch_on_merge: bool = False
+    web_commit_signoff_required: bool = True
+    vulnerability_alerts: bool = True
+    automated_security_fixes: bool = True
 
     def __post_init__(self) -> None:
         if len(self.description) > 350:
@@ -262,6 +277,18 @@ def load_config(root: Path | None = None) -> GhConfig:
             enabled=profile.get("enabled", True),
             description=profile.get("description", ""),
             topics=tuple(profile.get("topics", RepositoryProfileConfig().topics)),
+            has_issues=profile.get("has_issues", True),
+            has_projects=profile.get("has_projects", True),
+            has_wiki=profile.get("has_wiki", False),
+            has_discussions=profile.get("has_discussions", True),
+            allow_squash_merge=profile.get("allow_squash_merge", True),
+            allow_merge_commit=profile.get("allow_merge_commit", False),
+            allow_rebase_merge=profile.get("allow_rebase_merge", True),
+            allow_auto_merge=profile.get("allow_auto_merge", True),
+            delete_branch_on_merge=profile.get("delete_branch_on_merge", False),
+            web_commit_signoff_required=profile.get("web_commit_signoff_required", True),
+            vulnerability_alerts=profile.get("vulnerability_alerts", True),
+            automated_security_fixes=profile.get("automated_security_fixes", True),
         ),
         documentation=DocumentationConfig(
             enabled=documentation.get("enabled", True),
