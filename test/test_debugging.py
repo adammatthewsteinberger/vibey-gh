@@ -43,7 +43,7 @@ def test_branch_validation_checks_every_python_code_object(tmp_path):
     assert "SyntaxError" in problems[0]
 
 
-def test_branch_validation_flags_a_branch_the_tracer_cannot_classify(tmp_path):
+def test_branch_validation_flags_a_branch_the_tracer_cannot_classify(tmp_path, monkeypatch):
     valid = tmp_path / "valid.py"
     valid.write_text("def choose(value):\n    return 1 if value else 0\n")
     root = compile(valid.read_text(), str(valid), "exec")
@@ -59,6 +59,15 @@ def test_branch_validation_flags_a_branch_the_tracer_cannot_classify(tmp_path):
     # computed target) is one this tracer's outcome classification cannot represent.
     synthetic = branch._replace(argval="dynamic-target")
     assert debugging._unsupported_branch(synthetic)
+
+    monkeypatch.setattr(debugging, "_code_objects", lambda code: [code])
+    monkeypatch.setattr(debugging.dis, "get_instructions", lambda code: [synthetic])
+    problems = debugging.branch_logging_problems([valid])
+    expected = (
+        f"{valid}:{synthetic.starts_line or root.co_firstlineno}: "
+        f"unsupported branch opcode {synthetic.opname}"
+    )
+    assert problems == [expected]
 
 
 def test_branch_trace_records_outcomes_and_a_verifiable_hash_chain(tmp_path):
