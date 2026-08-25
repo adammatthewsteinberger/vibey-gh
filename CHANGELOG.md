@@ -56,6 +56,10 @@ This file follows Keep a Changelog and semantic versioning conventions.
   human commit started a fresh lineage in the evaluation but never in the stored record, so
   the documented per-lineage budget silently behaved as a cumulative per-pull-request one.
   Both paths now share `lineage_for()` and cannot disagree.
+- Add an optional, generic `[documentation] google_analytics_id` setting: configure any
+  repository's own GA4 measurement ID to inject Google Analytics into every page of both
+  generated documentation channels and the channel-picker page. Empty (the default)
+  disables it entirely, emitting no script tag and making no request to Google.
 
 - Report the exact-head gate's outcome truthfully when the review, not the scans, decides
   it: a review that returned actionable findings and a review that returned no verdict at

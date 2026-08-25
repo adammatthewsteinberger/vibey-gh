@@ -82,6 +82,7 @@ def test_documentation_validates_and_loads_configuration(tmp_path: Path):
         "preview_indexing=true\ngenerate_robots=false\ngenerate_sitemap_index=false\n"
         "generate_llms_txt=false\ngenerate_llms_full_txt=false\ngenerate_json_ld=false\n"
         'author_name="Maintainer"\nauthor_url="https://example.test"\n'
+        'google_analytics_id="G-ABC1234567"\n'
     )
     value = load_config(tmp_path).documentation
     assert value.model == "opus"
@@ -92,6 +93,22 @@ def test_documentation_validates_and_loads_configuration(tmp_path: Path):
     assert not value.generate_llms_txt and not value.generate_llms_full_txt
     assert not value.generate_json_ld
     assert value.author_name == "Maintainer" and value.author_url == "https://example.test"
+    assert value.google_analytics_id == "G-ABC1234567"
+
+
+def test_documentation_google_analytics_defaults_to_disabled(tmp_path: Path):
+    assert load_config(tmp_path).documentation.google_analytics_id == ""
+
+
+@pytest.mark.parametrize("value", ["G-ABC1234567", "G-0"])
+def test_documentation_accepts_valid_google_analytics_ids(value: str):
+    assert DocumentationConfig(google_analytics_id=value).google_analytics_id == value
+
+
+@pytest.mark.parametrize("value", ["UA-12345-1", "g-abc1234567", "G-", "G-ABC 123", " G-ABC123"])
+def test_documentation_rejects_malformed_google_analytics_ids(value: str):
+    with pytest.raises(ValueError):
+        DocumentationConfig(google_analytics_id=value)
 
 
 def test_documentation_validates_complete_marketplace_shape(tmp_path: Path):

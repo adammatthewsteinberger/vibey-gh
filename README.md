@@ -587,6 +587,7 @@ generate_llms_full_txt = true
 generate_json_ld = true
 author_name = "Adam Matthew Steinberger"
 author_url = "https://hire.adam.matthewsteinberger.com"
+google_analytics_id = ""                    # empty disables it; set a GA4 ID like "G-XXXXXXXXXX" to enable
 ```
 
 `CodeQL` is a real managed Python security-analysis workflow using an immutably pinned
@@ -604,6 +605,12 @@ proposal branch lives under; it is validated against the configured permanent br
 and `branch-intake.yml` is rendered to yield that namespace so the two never race to open
 the same pull request. Set `open_pull_request = false` to publish only the branch, or
 `enabled = false` to keep the workflow installed and inert.
+
+Google Analytics is off by default and fully generic: `google_analytics_id` accepts any
+repository's own GA4 measurement ID (`G-XXXXXXXXXX`), and leaving it empty means no
+analytics script tag is ever emitted and no request reaches Google. When set, the same ID
+is injected into every page of both generated documentation channels and the
+channel-picker landing page.
 
 Sanitized progress is the safe default. Claude's progress-comment mode is enabled only for
 the direct PR/issue events the action supports; `workflow_run`, `workflow_dispatch`, and
