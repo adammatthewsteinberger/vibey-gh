@@ -620,10 +620,11 @@ jobs:
             echo '::error::GitHub reported a conflict but no unresolved paths were materialized'
             exit 1
           fi
+          delimiter="EOF_$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')"
           {
-            echo 'files<<EOF'
+            echo "files<<${delimiter}"
             printf '%s\n' "$files"
-            echo EOF
+            echo "${delimiter}"
           } >> "$GITHUB_OUTPUT"
       - name: Create credential-free Claude git context
         run: |
