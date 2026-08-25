@@ -37,6 +37,7 @@ events. A skipped stale run is expected. A current-head failure is never bypasse
 
 | File | Workflow name | Responsibility |
 |---|---|---|
+| `branch-sync.yml` | Branch sync | Brings every open branch forward when the integration branch moves, and daily refills a bounded number of spent repair budgets. |
 | `branch-intake.yml` | Branch intake | Opens one reusable draft PR for a new same-repository topic branch and ignores permanent or automation-owned branches. |
 | `issue-automation.yml` | Issue automation | Decides whether a published issue is eligible for an autonomous solution and, if it is, publishes one guarded solution branch and linked pull request. |
 | `ci.yml` | CI | Runs the supported Python matrix, 100% coverage, lint, formatting, typing, managed-workflow dogfood, and package builds. |
@@ -68,7 +69,10 @@ failures, timeouts, startup failures, and action-required results enter repair; 
 or stale infrastructure runs are operationally blocked rather than presented as source
 defects.
 
-Repair and conflict budgets are bounded per contributor lineage. Bot repair pushes do not
+Repair, conflict, and review-finding budgets share one bound per contributor lineage, and
+it applies to trusted and outside authors alike — every author's exact head is reviewed, so
+every author's review-to-repair cycle needs the same limit. Once the budget is spent the
+next evaluation blocks rather than dispatching a further review. Bot repair pushes do not
 reset the budget; a new human or contributor commit creates a new lineage. Results persist
 in one machine-readable PR comment, and a verdict for an older SHA never satisfies the
 gate for a newer one.

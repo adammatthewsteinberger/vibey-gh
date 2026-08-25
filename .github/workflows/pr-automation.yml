@@ -505,6 +505,29 @@ jobs:
         run: |
           rm -f .git
           rm -rf .claude-git-context
+      - name: Normalize formatting deterministically
+        working-directory: target
+        run: |
+          set -euo pipefail
+          # The repair agent has no shell, so it cannot run a formatter. Left to hand-format,
+          # it guesses the line length and gets it wrong, the lint gate fails, and the next
+          # attempt reformats the other way — a loop that spends the whole repair budget
+          # undoing itself without ever converging. Running the repository's OWN declared
+          # formatters here, in the trusted step, settles it deterministically: each reads
+          # its settings from the repository's configuration rather than from a guess.
+          #
+          # These tools read and rewrite files. They do not execute repository code, and
+          # nothing here installs or runs the pull request's own package.
+          python -m pip install --quiet black ruff isort >/dev/null 2>&1 || {
+            echo "::notice::formatters unavailable; leaving the agent's formatting as-is"
+            exit 0
+          }
+          [ -f pyproject.toml ] || { echo "::notice::no pyproject.toml to read settings from"; exit 0; }
+          if grep -q '^\[tool\.ruff' pyproject.toml; then ruff check --fix . || true; fi
+          if grep -q '^\[tool\.isort' pyproject.toml; then isort . || true; fi
+          if grep -q '^\[tool\.black' pyproject.toml; then black . || true; fi
+          git diff --stat || true
+
       - name: Publish one guarded repair commit
         id: publish
         if: fromJSON(steps.claude.outputs.structured_output).fixable == true

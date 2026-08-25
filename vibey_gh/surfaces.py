@@ -26,6 +26,7 @@ CAPABILITIES = (
     "github-release",
     "promote",
     "realign",
+    "reconcile-branches",
 )
 SURFACES = ("mcp", "api", "cli", "sdk", "webhook")
 

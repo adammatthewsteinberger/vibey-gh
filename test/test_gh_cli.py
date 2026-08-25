@@ -13,8 +13,14 @@ from pathlib import Path
 
 import pytest
 
-from vibey_gh import github_release, issue_automation, merge_train, pr_automation
-from vibey_gh import realign as realign_mod
+from vibey_gh import (
+    github_release,
+    issue_automation,
+    merge_train,
+    pr_automation,
+    realign as realign_mod,
+    reconcile,
+)
 from vibey_gh.cli import main
 from vibey_gh.config import load_config
 from vibey_gh.merge_train import Verdict
@@ -496,6 +502,41 @@ def test_issue_automation_cli_reports_failures(repo, monkeypatch, capsys):
 
     assert main(["issue-automation", "record-solution", "--issue", "55", "--input", "[]"]) == 1
     assert "must be an object" in capsys.readouterr().err
+
+
+def test_self_heal_cli_sweeps_or_targets_one_pull_request(repo, monkeypatch, capsys):
+    monkeypatch.setattr(pr_automation, "exhausted_pull_requests", lambda cfg: [4, 9])
+    monkeypatch.setattr(
+        pr_automation, "self_heal", lambda number, cfg: {"pr": number, "healed": True}
+    )
+    assert main(["pr-automation", "self-heal"]) == 0
+    assert [item["pr"] for item in json.loads(capsys.readouterr().out)] == [4, 9]
+
+    assert main(["pr-automation", "self-heal", "--pr", "7"]) == 0
+    assert [item["pr"] for item in json.loads(capsys.readouterr().out)] == [7]
+
+
+def test_reconcile_branches_cli_reports_each_decision(repo, monkeypatch, capsys):
+    monkeypatch.setattr(
+        reconcile,
+        "reconcile",
+        lambda cfg, dry_run: [
+            {"pr": 1, "branch": "vibey-gh/a", "action": "close", "reason": "duplicate"}
+        ],
+    )
+    assert main(["reconcile-branches", "--dry-run"]) == 0
+    out = capsys.readouterr().out
+    assert "#1 (vibey-gh/a): close — duplicate" in out
+    assert "reconciled 1 open pull request(s)" in out
+
+
+def test_reconcile_branches_cli_reports_failures(repo, monkeypatch, capsys):
+    def boom(*a, **k):
+        raise ValueError("refusing to delete protected or unsafe branch 'develop'")
+
+    monkeypatch.setattr(reconcile, "reconcile", boom)
+    assert main(["reconcile-branches"]) == 1
+    assert "refusing to delete" in capsys.readouterr().err
 
 
 def test_api_and_mcp_surface_failures_return_nonzero(repo, monkeypatch, capsys):

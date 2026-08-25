@@ -21,6 +21,7 @@ from vibey_gh import (
     pr_automation,
     promote,
     realign,
+    reconcile,
     surfaces,
     versioning,
 )
@@ -215,6 +216,10 @@ def _pr_automation(args) -> int:
             print(json.dumps(asdict(state), sort_keys=True))
         elif args.action == "mirror-fork":
             print(json.dumps(pr_automation.mirror_fork(args.pr, cfg), sort_keys=True))
+        elif args.action == "self-heal":
+            numbers = [args.pr] if args.pr else pr_automation.exhausted_pull_requests(cfg)
+            results = [pr_automation.self_heal(number, cfg) for number in numbers]
+            print(json.dumps(results, sort_keys=True))
         elif args.action == "ensure-labels":
             pr_automation.ensure_labels()
             print("vibey-gh: PR automation labels are ready")
@@ -315,6 +320,21 @@ def _realign(args) -> int:
         print(f"vibey-gh: {exc}", file=sys.stderr)
         return 1
     print(f"vibey-gh: {message}")
+    return 0
+
+
+def _reconcile(args) -> int:
+    cfg = load_config()
+    try:
+        outcomes = reconcile.reconcile(cfg, dry_run=args.dry_run)
+    except (RuntimeError, ValueError, json.JSONDecodeError) as exc:
+        print(f"vibey-gh: {exc}", file=sys.stderr)
+        return 1
+    for outcome in outcomes:
+        print(
+            f"  #{outcome['pr']} ({outcome['branch']}): {outcome['action']} — {outcome['reason']}"
+        )
+    print(f"vibey-gh: reconciled {len(outcomes)} open pull request(s)")
     return 0
 
 
@@ -457,6 +477,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     mirror.add_argument("--pr", type=int, required=True)
     mirror.set_defaults(func=_pr_automation)
+    heal = automation_sub.add_parser(
+        "self-heal", help="refill an exhausted repair budget, itself bounded"
+    )
+    heal.add_argument("--pr", type=int, help="one pull request; omit to sweep every exhausted one")
+    heal.set_defaults(func=_pr_automation)
     labels = automation_sub.add_parser("ensure-labels", help="create or update automation labels")
     labels.set_defaults(func=_pr_automation)
 
@@ -522,6 +547,13 @@ def main(argv: list[str] | None = None) -> int:
 
     r = sub.add_parser("realign", help="realign the integration branch with the release branch")
     r.set_defaults(func=_realign)
+
+    rec = sub.add_parser(
+        "reconcile-branches",
+        help="rebase, close, or leave open branches stranded by a realign rewrite",
+    )
+    rec.add_argument("--dry-run", action="store_true", help="decide without mutating anything")
+    rec.set_defaults(func=_reconcile)
 
     for surface in ("api", "mcp", "sdk", "webhook"):
         adapter = sub.add_parser(surface, help=f"invoke a capability through the {surface} adapter")

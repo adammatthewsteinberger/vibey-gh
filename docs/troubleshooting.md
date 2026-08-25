@@ -22,6 +22,12 @@
   are an exhausted Anthropic credit balance, a missing or expired `ANTHROPIC_API_KEY`, or
   model unavailability. The gate deliberately fails closed rather than inferring a verdict,
   so correct the operator condition and rerun the review — do not merge past it.
+- Repeated repair attempts that only reformat the same file mean the repository's
+  formatters disagree with each other. The repair agent has no shell and cannot run one,
+  so it hand-formats; if `ruff` and `isort` reject each other's output the loop can never
+  converge and the budget is spent for nothing. Run each formatter in turn on a file with
+  the disputed shape and check whether the other still accepts it, then match their
+  configuration — `test_the_configured_formatters_agree_with_each_other` guards this.
 - Package verification should query the GHCR manifest, not account package listing APIs.
 - Pages 404s require a successful deployment containing an `index.html` at each channel.
 - A `vibey-gh check` failure printed as `debug logging: <path>: cannot validate branch
