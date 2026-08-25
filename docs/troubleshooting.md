@@ -28,6 +28,12 @@
   converge and the budget is spent for nothing. Run each formatter in turn on a file with
   the disputed shape and check whether the other still accepts it, then match their
   configuration — `test_the_configured_formatters_agree_with_each_other` guards this.
+- An issue commented "An automated solution attempt ran and returned no result" means the
+  attempt produced nothing at all. The usual cause is a request too large for one attempt —
+  several distinct changes asked for together, or a wide audit before any of them — which
+  the run log shows as `error_max_turns`. Split it into separate issues with their own
+  acceptance criteria, or raise `[issue_automation].max_turns`. The same symptom appears
+  for an exhausted API credit balance; the run log distinguishes them.
 - Package verification should query the GHCR manifest, not account package listing APIs.
 - Pages 404s require a successful deployment containing an `index.html` at each channel.
 - A `vibey-gh check` failure printed as `debug logging: <path>: cannot validate branch

@@ -395,8 +395,24 @@ jobs:
           PUBLISHED: ${{ steps.publish.outputs.published }}
           PULL_REQUEST: ${{ steps.publish.outputs.pull_request }}
           STRUCTURED: ${{ steps.claude.outputs.structured_output }}
+          AGENT_RESULT: ${{ steps.claude.outcome }}
         run: |
           set -euo pipefail
+          if [ -z "${STRUCTURED:-}" ]; then
+            # An attempt that produces nothing must still say so on the issue. Silence
+            # here costs the same tokens and minutes as a refusal but leaves the issue
+            # looking untouched, so nobody knows an attempt was made or why it stopped.
+            marker='<!-- vibey-gh-issue-attempt-failed -->'
+            if ! gh issue view "$ISSUE" --repo "$REPO" --json comments --jq '.comments[].body' | grep -Fq "$marker"; then
+              gh issue comment "$ISSUE" --repo "$REPO" --body "$marker
+          An automated solution attempt ran and returned no result (agent step: ${AGENT_RESULT}). Nothing was changed.
+
+          The usual cause is a request too large to complete in one attempt — several distinct changes asked for together, or a wide audit before any of them. Splitting it into separate issues, each with its own acceptance criteria, makes each one solvable. Infrastructure failures such as an exhausted API credit balance produce the same symptom; the run log distinguishes them.
+
+          Run: ${GITHUB_SERVER_URL}/${REPO}/actions/runs/${GITHUB_RUN_ID}"
+            fi
+            gh issue edit "$ISSUE" --repo "$REPO" --add-label vibey-gh:solve-blocked || true
+          fi
           if [ -n "${STRUCTURED:-}" ]; then
             payload=$(jq -c \
               --arg branch "$BRANCH" \
@@ -414,8 +430,6 @@ jobs:
             elif [ -n "${PULL_REQUEST:-}" ]; then
               gh issue edit "$ISSUE" --repo "$REPO" --add-label vibey-gh:solution-proposed
             fi
-          else
-            echo "::notice::no structured result was produced; recording no attempt"
           fi
           gh issue edit "$ISSUE" --repo "$REPO" --remove-label vibey-gh:solving || true
       - name: Archive the solution record

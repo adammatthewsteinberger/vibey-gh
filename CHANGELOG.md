@@ -5,6 +5,13 @@ This file follows Keep a Changelog and semantic versioning conventions.
 
 ## Unreleased
 
+- Say so on the issue when a solution attempt produces nothing. An attempt that exhausted
+  its turn budget left no branch, no label, and no comment, so twenty minutes and real
+  tokens looked from the issue exactly like nothing having happened. The issue now receives
+  one comment naming the agent's outcome and the usual cause, and is labelled so it is
+  visible in a listing.
+- Make the attempt's turn budget configurable through `[issue_automation].max_turns`.
+
 - Report whether a branch reconciliation actually took effect, not merely what it decided.
   A rebase that conflicted and aborted printed exactly like one that succeeded and left the
   job green, so two stranded pull requests looked reconciled across four runs while neither
