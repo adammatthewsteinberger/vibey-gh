@@ -5,6 +5,11 @@ This file follows Keep a Changelog and semantic versioning conventions.
 
 ## Unreleased
 
+- Keep a successful realign successful when its branch reconciliation cannot reach GitHub.
+  Reconciliation is a follow-up that needs credentials some contexts do not have, and a
+  branch left unreconciled is a nuisance rather than a reason to report the realign as
+  failed and leave the caller believing the branches never converged.
+
 - Normalize formatting deterministically in the repair job. The repair agent holds no
   shell, so it cannot run a formatter: it hand-formats, guesses the line length, fails the
   lint gate, and the next attempt reformats the other way — a loop that spends the whole

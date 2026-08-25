@@ -58,8 +58,15 @@ def realign(cfg: GhConfig | None = None) -> tuple[bool, str]:
         # reconcile them here rather than leaving each one to discover a conflict it did
         # not cause. Doing it inside `realign` means every adopter gets it wherever they
         # already call this, with no workflow change.
-        for outcome in reconcile.reconcile(cfg):
-            message += f"\n  {outcome['pr']} ({outcome['branch']}): {outcome['action']}"
+        try:
+            for outcome in reconcile.reconcile(cfg):
+                message += f"\n  {outcome['pr']} ({outcome['branch']}): {outcome['action']}"
+        except (OSError, RuntimeError) as exc:
+            # The realign itself has already succeeded and must stand. Reconciliation is a
+            # follow-up that needs GitHub credentials this context may not have, and a
+            # branch left unreconciled is a nuisance, not a reason to report the realign
+            # as failed and leave the caller believing the branches never converged.
+            message += f"\n  branches were not reconciled: {exc}"
         return True, message
     raise RuntimeError(
         f"could not realign {cfg.integration_branch}, so it is now divergent and the next "

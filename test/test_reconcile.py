@@ -467,6 +467,29 @@ def test_a_dry_run_decides_without_touching_anything(monkeypatch, tmp_path):
     assert outcomes[0]["action"] == rc.CLOSE and "applied" not in outcomes[0]
 
 
+def test_a_realign_stands_even_when_reconciliation_cannot_reach_github(monkeypatch, tmp_path):
+    """The realign has already happened; a follow-up that needs credentials this context
+    lacks must not report it as failed and leave the caller thinking it never converged."""
+    from vibey_gh import realign as realign_mod
+
+    def run(args, **kwargs):
+        if args[:2] == ["git", "rev-parse"]:
+            return completed(out=("dev\n" if args[-1].endswith("develop") else "rel\n"))
+        return completed()
+
+    monkeypatch.setattr(subprocess, "run", run)
+
+    def unreachable(cfg):
+        raise RuntimeError("gh repo view: no credentials in this context")
+
+    monkeypatch.setattr(realign_mod.reconcile, "reconcile", unreachable)
+    changed, message = realign_mod.realign(cfg(tmp_path))
+    assert changed, "the realign itself succeeded and must be reported as such"
+    assert "realigned to main" in message
+    assert "branches were not reconciled" in message
+    assert "no credentials" in message
+
+
 def test_realign_reconciles_the_branches_its_rewrite_stranded(monkeypatch, tmp_path):
     from vibey_gh import realign as realign_mod
 
