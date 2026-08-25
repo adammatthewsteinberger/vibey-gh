@@ -153,6 +153,9 @@ def render_workflow(source: Path, cfg: GhConfig) -> str:
     wanted = wanted.replace("__VIBEY_GH_DOC_PRODUCTION_LABEL__", cfg.documentation.production_label)
     wanted = wanted.replace("__VIBEY_GH_DOC_PREVIEW_LABEL__", cfg.documentation.preview_label)
     wanted = wanted.replace(
+        "__VIBEY_GH_DOC_GOOGLE_ANALYTICS_ID__", cfg.documentation.google_analytics_id
+    )
+    wanted = wanted.replace(
         "__VIBEY_GH_DOCUMENTATION_FILES__",
         json.dumps(list(cfg.documentation.required_files)),
     )

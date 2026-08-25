@@ -237,7 +237,9 @@ and sdist as an OCI artifact to GitHub Packages, tagged with the channel and `la
 `main`; `docs` (`actions: read`, `contents: read`, `pages: write`, `id-token: write`)
 builds a branch-specific ProperDocs site with the managed release theme and deploys it to
 the shared `github-pages` environment under a channel-specific path, restoring the other
-channel's existing site alongside it.
+channel's existing site alongside it. When `documentation.google_analytics_id` is set, the
+same GA4 measurement ID is injected into every generated page and the channel-picker page;
+left empty (the default), no analytics script is emitted anywhere.
 
 ## Repository profile
 
