@@ -31,6 +31,7 @@ no file at all. `tomllib` is stdlib from 3.11, which this package already requir
 
 from __future__ import annotations
 
+import re
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
@@ -68,6 +69,7 @@ DEFAULT_IGNORED_ISSUE_LABELS = (
     "wontfix",
     SOLVE_BLOCKED_LABEL,
 )
+GOOGLE_ANALYTICS_ID_PATTERN = re.compile(r"^G-[A-Z0-9]+$")
 DEFAULT_DOCUMENTATION_FILES = (
     ".claude-plugin/marketplace.json",
     ".claude/settings.json",
@@ -281,6 +283,7 @@ class DocumentationConfig:
     generate_json_ld: bool = True
     author_name: str = "Adam Matthew Steinberger"
     author_url: str = "https://hire.adam.matthewsteinberger.com"
+    google_analytics_id: str = ""
 
     def __post_init__(self) -> None:
         _unique_nonempty("documentation.required_files", self.required_files)
@@ -297,6 +300,13 @@ class DocumentationConfig:
         ):
             if not value.strip():
                 raise ValueError(f"documentation.{name} must not be empty")
+        if self.google_analytics_id and not GOOGLE_ANALYTICS_ID_PATTERN.match(
+            self.google_analytics_id
+        ):
+            raise ValueError(
+                "documentation.google_analytics_id must be empty (disabled) or a GA4 "
+                f"measurement ID matching 'G-<alphanumeric>': {self.google_analytics_id!r}"
+            )
 
 
 @dataclass(frozen=True)
@@ -474,6 +484,7 @@ def load_config(root: Path | None = None) -> GhConfig:
             generate_json_ld=documentation.get("generate_json_ld", True),
             author_name=documentation.get("author_name", "Adam Matthew Steinberger"),
             author_url=documentation.get("author_url", "https://hire.adam.matthewsteinberger.com"),
+            google_analytics_id=documentation.get("google_analytics_id", ""),
         ),
     )
 

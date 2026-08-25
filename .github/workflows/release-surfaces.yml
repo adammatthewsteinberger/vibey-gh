@@ -183,6 +183,7 @@ jobs:
           RELEASE_SHA: ${{ needs.context.outputs.sha }}
         run: |
           set -euo pipefail
+          export GA_ID=""
           python -m pip install --quiet \
             'properdocs==1.6.7' 'properdocs-theme-mkdocs==1.6.7'
           if [ ! -f properdocs.yml ]; then
@@ -267,6 +268,16 @@ jobs:
           root = f"https://{owner}.github.io/{name}/"
           canonical = f"{root}{channel}/"
           indexable = os.environ["PRODUCTION_INDEX" if channel == "main" else "PREVIEW_INDEX"] == "true"
+          ga_id = os.environ.get("GA_ID", "")
+          ga_snippet = (
+              f'<script async src="https://www.googletagmanager.com/gtag/js?id={ga_id}"></script>\n'
+              "<script>\n"
+              "window.dataLayer = window.dataLayer || [];\n"
+              "function gtag(){dataLayer.push(arguments);}\n"
+              "gtag('js', new Date());\n"
+              f"gtag('config', '{ga_id}');\n"
+              "</script>\n"
+          ) if ga_id else ""
           for path in pathlib.Path("channel-site").rglob("*.html"):
               relative = path.relative_to("channel-site").as_posix()
               url = canonical + ("" if relative == "index.html" else relative.removesuffix("index.html"))
@@ -277,6 +288,7 @@ jobs:
                   f'<meta property="og:url" content="{url}">\n'
                   f'<meta property="og:site_name" content="{name}">\n'
                   f'<meta name="twitter:card" content="summary_large_image">\n'
+                  f'{ga_snippet}'
               )
               if os.environ["JSON_LD"] == "true":
                   record = {"@context":"https://schema.org","@type":"SoftwareSourceCode",
@@ -298,6 +310,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          GA_ID=""
           mkdir -p "pages/${CHANNEL}" "pages/${OTHER_CHANNEL}"
           cp -R channel-site/. "pages/${CHANNEL}/"
           restored=false
@@ -551,6 +564,7 @@ jobs:
                 *, *::before, *::after { scroll-behavior: auto !important; animation: none !important; transition: none !important; }
               }
             </style>
+            __GA_SNIPPET__
           </head>
           <body>
             <div class="orb" aria-hidden="true"></div>
@@ -602,12 +616,23 @@ jobs:
           RELEASE_BRANCH=${{ needs.context.outputs.branch }} \
           RELEASE_CHANNEL=${{ needs.context.outputs.channel }} \
           RELEASE_SHA=${{ needs.context.outputs.sha }} \
+          GA_ID="$GA_ID" \
           python - <<'PY'
           import os
           import pathlib
 
           path = pathlib.Path("pages/index.html")
           text = path.read_text()
+          ga_id = os.environ.get("GA_ID", "")
+          ga_snippet = (
+              f'<script async src="https://www.googletagmanager.com/gtag/js?id={ga_id}"></script>\n'
+              "<script>\n"
+              "window.dataLayer = window.dataLayer || [];\n"
+              "function gtag(){dataLayer.push(arguments);}\n"
+              "gtag('js', new Date());\n"
+              f"gtag('config', '{ga_id}');\n"
+              "</script>"
+          ) if ga_id else ""
           values = {
               "__REPOSITORY_NAME__": os.environ["REPOSITORY_NAME"],
               "__REPOSITORY__": os.environ["GITHUB_REPOSITORY"],
@@ -616,6 +641,7 @@ jobs:
               "__RELEASE_CHANNEL__": os.environ["RELEASE_CHANNEL"],
               "__RELEASE_SHA__": os.environ["RELEASE_SHA"],
               "__SHORT_SHA__": os.environ["RELEASE_SHA"][:12],
+              "__GA_SNIPPET__": ga_snippet,
           }
           for old, new in values.items():
               text = text.replace(old, new)
