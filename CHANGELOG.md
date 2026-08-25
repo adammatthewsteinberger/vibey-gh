@@ -30,6 +30,13 @@ This file follows Keep a Changelog and semantic versioning conventions.
   now treats a version already tagged at a different commit as that intentional no-op
   rather than an error, unless the new `[github_release] require_new_version` opts a
   repository into the stricter behavior.
+- Answer a configured mention in a comment. Everything else here reacts to scans, issues,
+  and branches; none of it could hear "also handle the empty case" written under a pull
+  request. Mentioning `@vibey` now has the automation read the thread and answer, and — on
+  a pull request, from a trusted commenter — make the change and push one guarded commit.
+  Outside commenters get no response unless a repository opts in, comment text reaches the
+  model only as a bounded untrusted briefing, interactions per thread are budgeted, and the
+  automation refuses to answer its own comments so a reply cannot recurse indefinitely.
 
 - Keep a successful realign successful when its branch reconciliation cannot reach GitHub.
   Reconciliation is a follow-up that needs credentials some contexts do not have, and a

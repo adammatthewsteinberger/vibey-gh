@@ -56,6 +56,24 @@ Raw output additionally requires a manual `workflow_dispatch` with
 `full_claude_output = true`. Event-triggered runs can never enable it, and the workflow
 fails closed when repository visibility is not private.
 
+## `[conversation]`
+
+Answers a mention in a comment on an issue or pull request. Comments are the least guarded
+input a repository has, so the defaults are closed.
+
+| Field | Type / default | Meaning |
+|---|---|---|
+| `enabled` | boolean / `true` | Respond to mentions at all. |
+| `trigger` | string / `@vibey` | The mention that addresses the automation. Matched on a word boundary, so `@vibey-gh-bot` is not a mention. |
+| `model` | string / `claude-sonnet-5` | Model that reads the thread and answers. |
+| `max_interactions` | integer / `10` (1–100) | Responses per thread, so a conversation cannot become an unbounded work queue. |
+| `respond_to_untrusted` | boolean / `false` | Answer commenters outside the owner/trusted set. A response costs tokens, so answering everyone is a deliberate spending decision. |
+| `allow_changes` | boolean / `true` | Permit file changes. Only ever on a pull request, only from a trusted commenter, and never on a fork or permanent branch. |
+| `ignore_actors` | string list / the automation's own bot identities | **The loop guard.** Its own reply mentions the trigger too; answering it would run and bill forever. Cannot be empty while enabled. |
+
+An issue is answered in words only — there is nowhere to put a commit. A pull request from
+a trusted commenter may also receive one guarded commit on its own branch.
+
 ## `[branch_sync]`
 
 Keeps open branches current so conflicts never accumulate, and refills a spent repair

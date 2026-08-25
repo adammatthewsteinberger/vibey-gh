@@ -11,6 +11,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 from vibey_gh import (
+    conversation,
     debugging,
     documentation,
     fingerprints,
@@ -186,18 +187,7 @@ def _merge_train(args) -> int:
 
 
 def _read_json(value: str) -> dict:
-    if value == "-":
-        raw = sys.stdin.read()
-    else:
-        path = Path(value)
-        try:
-            is_file = path.is_file()
-        except OSError:
-            # Inline JSON may exceed the platform's filename length limit.
-            # A failed path probe must not prevent parsing the value itself.
-            is_file = False
-        raw = path.read_text(encoding="utf-8") if is_file else value
-    parsed = json.loads(raw)
+    parsed = json.loads(_read_text(value))
     if not isinstance(parsed, dict):
         raise TypeError("input JSON must be an object")
     return parsed
@@ -322,6 +312,60 @@ def _realign(args) -> int:
         return 1
     print(f"vibey-gh: {message}")
     return 0
+
+
+def _conversation(args) -> int:
+    cfg = load_config()
+    try:
+        subject = conversation.fetch_subject(args.subject)
+        comments = list(subject.get("comments") or [])
+        comment: dict = {}
+        if args.comment_id:
+            comment = next(
+                (item for item in comments if int(item.get("id") or 0) == args.comment_id),
+                {},
+            )
+        else:
+            comment = comments[-1] if comments else {}
+        if args.action == "evaluate":
+            decision = conversation.evaluate(
+                comment, subject, cfg, stored=conversation.parse_state(comments)
+            )
+            print(decision.to_json())
+        elif args.action == "context":
+            document = conversation.context(subject, comment, cfg, max_bytes=args.max_bytes)
+            if args.output:
+                args.output.parent.mkdir(parents=True, exist_ok=True)
+                args.output.write_text(document, encoding="utf-8")
+                print(f"vibey-gh: wrote {len(document.encode())} bytes to {args.output}")
+            else:
+                print(document, end="")
+        elif args.action == "reply":
+            body = _read_text(args.body)
+            if not conversation.reply(args.subject, body, cfg):
+                raise RuntimeError("could not post the reply")
+            print(f"vibey-gh: replied on #{args.subject}")
+        else:  # record-response
+            state = conversation.record(args.subject, _read_json(args.input))
+            print(json.dumps(asdict(state), sort_keys=True))
+    except (OSError, RuntimeError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        print(f"vibey-gh: {exc}", file=sys.stderr)
+        return 1
+    return 0
+
+
+def _read_text(value: str) -> str:
+    """A literal value, the contents of a file at that path, or stdin for `-`."""
+    if value == "-":
+        return sys.stdin.read()
+    path = Path(value)
+    try:
+        is_file = path.is_file()
+    except OSError:
+        # An inline value may exceed the platform's filename length limit. A failed path
+        # probe must not prevent using the value itself.
+        is_file = False
+    return path.read_text(encoding="utf-8") if is_file else value
 
 
 def _reconcile(args) -> int:
@@ -578,6 +622,26 @@ def main(argv: list[str] | None = None) -> int:
 
     r = sub.add_parser("realign", help="realign the integration branch with the release branch")
     r.set_defaults(func=_realign)
+
+    talk = sub.add_parser("conversation", help="respond to a mention in a comment")
+    talk_sub = talk.add_subparsers(dest="action", required=True)
+    for name, helptext in (
+        ("evaluate", "decide whether one comment gets a response"),
+        ("context", "render the thread as a bounded, untrusted briefing"),
+        ("reply", "post an answer as a comment"),
+        ("record-response", "persist one interaction against the thread"),
+    ):
+        item = talk_sub.add_parser(name, help=helptext)
+        item.add_argument("--subject", type=int, required=True, help="issue or PR number")
+        item.add_argument("--comment-id", type=int, help="exact comment; omit for the newest")
+        if name == "context":
+            item.add_argument("--output", type=Path)
+            item.add_argument("--max-bytes", type=int, default=conversation.DEFAULT_CONTEXT_BYTES)
+        if name == "reply":
+            item.add_argument("--body", required=True, help="text, file, or - for stdin")
+        if name == "record-response":
+            item.add_argument("--input", required=True, help="JSON object, file, or - for stdin")
+        item.set_defaults(func=_conversation)
 
     rec = sub.add_parser(
         "reconcile-branches",

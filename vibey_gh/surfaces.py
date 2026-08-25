@@ -23,6 +23,7 @@ CAPABILITIES = (
     "merge-train",
     "pr-automation",
     "issue-automation",
+    "conversation",
     "github-release",
     "promote",
     "realign",

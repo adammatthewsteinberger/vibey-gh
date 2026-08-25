@@ -37,6 +37,7 @@ events. A skipped stale run is expected. A current-head failure is never bypasse
 
 | File | Workflow name | Responsibility |
 |---|---|---|
+| `conversation.yml` | Conversation | Answers a configured mention in a comment, and on a pull request from a trusted commenter may publish one guarded commit. |
 | `branch-sync.yml` | Branch sync | Brings every open branch forward when the integration branch moves, and daily refills a bounded number of spent repair budgets. |
 | `branch-intake.yml` | Branch intake | Opens one reusable draft PR for a new same-repository topic branch and ignores permanent or automation-owned branches. |
 | `issue-automation.yml` | Issue automation | Decides whether a published issue is eligible for an autonomous solution and, if it is, publishes one guarded solution branch and linked pull request. |
