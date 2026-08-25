@@ -132,9 +132,7 @@ def test_documentation_workflow_authors_guarded_refresh_prs():
     text = (WORKFLOWS / "documentation.yml").read_text(encoding="utf-8")
     assert "name: Docs" in text
     assert "vibey-gh check --ci" in text
-    assert (
-        "anthropics/claude-code-action@8569a83495a3f6f0c50a90e46351d3816fed1a75" in text
-    )
+    assert "anthropics/claude-code-action@8569a83495a3f6f0c50a90e46351d3816fed1a75" in text
     assert "This is an authoring" in text
     assert "--allowedTools Read,Glob,Grep,Edit,Write" in text
     assert 'branch="vibey-gh/docs/refresh-${RUN_ID}"' in text
@@ -164,13 +162,8 @@ def test_security_and_api_drift_workflows_are_real_managed_gates():
     codeql = (WORKFLOWS / "codeql.yml").read_text(encoding="utf-8")
     drift = (WORKFLOWS / "api-drift.yml").read_text(encoding="utf-8")
     assert "name: CodeQL" in codeql
-    assert (
-        "github/codeql-action/init@6d786de4d6f3531a740e445b53a42b622bbbace8" in codeql
-    )
-    assert (
-        "github/codeql-action/analyze@6d786de4d6f3531a740e445b53a42b622bbbace8"
-        in codeql
-    )
+    assert "github/codeql-action/init@6d786de4d6f3531a740e445b53a42b622bbbace8" in codeql
+    assert "github/codeql-action/analyze@6d786de4d6f3531a740e445b53a42b622bbbace8" in codeql
     assert "name: API drift (Cloud Agents OpenAPI)" in drift
     assert "MCP, API, CLI, SDK, and webhook parity" in drift
     assert "from vibey_gh.surfaces import CAPABILITIES, SURFACES, parity" in drift
@@ -382,10 +375,7 @@ def test_failed_permanent_branch_scans_use_a_guarded_repair_pr():
     assert "Never lower coverage" in text
     assert "Create credential-free Claude git context" in text
     assert "Remove credential-free Claude git context" in text
-    assert (
-        'git remote add origin "https://github.com/${{ github.repository }}.git"'
-        in text
-    )
+    assert 'git remote add origin "https://github.com/${{ github.repository }}.git"' in text
     assert 'allowed_non_write_users: "__vibey_gh_no_nonwrite_users__"' in text
     assert "persist-credentials: false" in text
     assert "gitdir: $GITHUB_WORKSPACE/target/.git" not in text
@@ -511,10 +501,7 @@ def test_conventional_commits_self_heal_only_guarded_topic_history():
     assert '--force-with-lease="refs/heads/${HEAD_REF}:${HEAD_SHA}"' in text
     assert '"$INTEGRATION_BRANCH"|"$RELEASE_BRANCH"|develop|main' in text
     assert "permanent branch history is never rewritten" in text
-    assert (
-        "github.event.pull_request.head.ref != '__VIBEY_GH_INTEGRATION_BRANCH__'"
-        in text
-    )
+    assert "github.event.pull_request.head.ref != '__VIBEY_GH_INTEGRATION_BRANCH__'" in text
     assert "github.event.pull_request.head.ref != '__VIBEY_GH_RELEASE_BRANCH__'" in text
     assert "Refusing automatic rewrite of merge commits" in text
     assert "./target" not in text
@@ -591,14 +578,8 @@ def test_privileged_agent_cannot_mutate_git_or_execute_pr_code():
     assert text.count("secrets.AUTOMERGE_TOKEN || github.token") >= 3
     assert "Skipping stale repair: expected $EXPECTED_SHA, found $current" in text
     assert "Discarding stale repair after concurrent update to $current" in text
-    assert (
-        "Skipping stale conflict resolution: expected $EXPECTED_SHA, found $current"
-        in text
-    )
-    assert (
-        "Discarding stale conflict resolution after concurrent update to $current"
-        in text
-    )
+    assert "Skipping stale conflict resolution: expected $EXPECTED_SHA, found $current" in text
+    assert "Discarding stale conflict resolution after concurrent update to $current" in text
     assert "if: steps.publish.outputs.stale != 'true'" in text
     assert "git -C target push --force" not in text
 
@@ -638,10 +619,7 @@ def test_cancelled_or_pending_evaluations_cannot_publish_a_gate():
     assert "needs.evaluate.result == 'success'" in text
     assert "needs.evaluate.outputs.state != 'pending'" in text
     assert "needs.evaluate.outputs.state != ''" in text
-    assert (
-        "needs.evaluate.outputs.evaluated_head_sha == needs.evaluate.outputs.head_sha"
-        in text
-    )
+    assert "needs.evaluate.outputs.evaluated_head_sha == needs.evaluate.outputs.head_sha" in text
     assert "reason=${REASON}" in text
     assert 'select(.state == "open")' in text
     assert "github.event.workflow_run.pull_requests[0].number" in text
@@ -651,10 +629,7 @@ def test_draft_evaluation_is_nonterminal_until_ready_draft_promotes_it():
     source = (Path(__file__).resolve().parent.parent / "vibey_gh/pr_automation.py").read_text(
         encoding="utf-8"
     )
-    assert (
-        'return result("pending", "pull request is a draft awaiting a stable head")'
-        in source
-    )
+    assert 'return result("pending", "pull request is a draft awaiting a stable head")' in source
 
 
 def test_new_branch_intake_is_draft_idempotent_and_excludes_permanent_branches():
@@ -692,9 +667,7 @@ def test_every_rendered_run_block_is_valid_shell(path):
                 capture_output=True,
                 check=False,
             )
-            assert (
-                result.returncode == 0
-            ), f"{path.name}:{job}:{step.get('name')}: {result.stderr}"
+            assert result.returncode == 0, f"{path.name}:{job}:{step.get('name')}: {result.stderr}"
 
 
 def test_the_configured_formatters_agree_with_each_other(tmp_path):
