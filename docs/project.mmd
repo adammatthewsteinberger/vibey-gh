@@ -171,6 +171,8 @@ flowchart TB
   PublishRelease --> Release
   Main --> Realign
   Realign --> Develop
+  Realign --> Guard
+  Realign -->|rewrite may strand open topic branches| Reconcile
   Develop --> Packages
   Main --> Packages
   Develop --> Pages
