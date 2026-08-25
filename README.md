@@ -831,7 +831,10 @@ Start with the PR’s `PR automation / gate`, then follow the linked workflow ru
 summary contains the evaluated SHA, aggregate scans, trust classification, repair attempt,
 semantic review result, and merge decision. Review artifacts are retained for 90 days.
 State comments use machine-readable markers and are updated idempotently rather than
-creating an unbounded comment stream.
+creating an unbounded comment stream. The marker is located by pattern, not by comment
+author, so its stored attempt/heal counters are a cost control rather than an access
+control on public repositories — see [Security architecture](docs/security.md) and
+[Threat model](docs/threat-model.md).
 
 ## Project documentation map
 
