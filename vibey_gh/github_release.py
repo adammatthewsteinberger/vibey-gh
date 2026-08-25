@@ -31,7 +31,12 @@ def _repository() -> str:
 
 
 def publish(cfg: GhConfig, *, target: str, version: str | None = None) -> ReleaseResult:
-    """Create, but never move or delete, the version tag and its GitHub Release."""
+    """Create, but never move or delete, the version tag and its GitHub Release.
+
+    A release-branch push that carries no version bump already tags the exact same
+    version at an earlier commit. That is a no-op, not a failure, unless
+    `require_new_version` opts the adopting repository into treating it as one.
+    """
     if not cfg.github_release.enabled:
         raise RuntimeError("GitHub Releases are disabled by [github_release]")
     version = version or read_version(cfg)
@@ -43,7 +48,9 @@ def publish(cfg: GhConfig, *, target: str, version: str | None = None) -> Releas
     if existing.returncode == 0:
         tagged = str(json.loads(existing.stdout)["object"]["sha"])
         if tagged != target:
-            raise RuntimeError(f"refusing to move existing tag {tag}: {tagged} != {target}")
+            if cfg.github_release.require_new_version:
+                raise RuntimeError(f"refusing to move existing tag {tag}: {tagged} != {target}")
+            return ReleaseResult(tag, tagged, False, False)
     else:
         create = _run(
             "gh",

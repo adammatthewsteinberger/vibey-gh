@@ -123,6 +123,7 @@ starts a fresh lineage. Managed labels are `vibey-gh:solve`, `vibey-gh:solving`,
 | `enabled` | boolean / `true` | Enable immutable tags and GitHub Releases. |
 | `tag_prefix` | string / `v` | Nonempty, whitespace-free tag prefix. |
 | `generate_notes` | boolean / `true` | Ask GitHub to generate release notes. |
+| `require_new_version` | boolean / `false` | Fail instead of silently doing nothing when a release-branch push does not carry a new version (the tag it would need already exists at a different commit). Leave off for a repository where a docs-only or tooling-only promotion is a normal, frequent, versionless push. |
 
 ## `[repository_profile]`
 

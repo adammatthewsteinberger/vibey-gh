@@ -55,9 +55,10 @@ def fake(monkeypatch, answers):
 def test_config_parses_and_validates(tmp_path):
     (tmp_path / ".vibey-gh.toml").write_text(
         '[github_release]\nenabled=false\ntag_prefix="release-"\ngenerate_notes=false\n'
+        "require_new_version=true\n"
     )
     value = load_config(tmp_path).github_release
-    assert value == GithubReleaseConfig(False, "release-", False)
+    assert value == GithubReleaseConfig(False, "release-", False, True)
     for prefix in ("", "bad tag"):
         with pytest.raises(ValueError, match="tag_prefix"):
             GithubReleaseConfig(tag_prefix=prefix)
@@ -115,13 +116,6 @@ def test_release_without_generated_notes(monkeypatch, tmp_path):
         (
             [
                 (("gh", "repo", "view"), done(out='{"nameWithOwner":"o/r"}')),
-                (("gh", "api"), done(out='{"object":{"sha":"other"}}')),
-            ],
-            "refusing to move",
-        ),
-        (
-            [
-                (("gh", "repo", "view"), done(out='{"nameWithOwner":"o/r"}')),
                 (("gh", "api", "repos/o/r/git/ref"), done(1)),
                 (("gh", "api", "repos/o/r/git/refs"), done(1, err="denied")),
             ],
@@ -142,6 +136,31 @@ def test_release_failures_are_safe(monkeypatch, tmp_path, answers, match):
     fake(monkeypatch, answers)
     with pytest.raises(RuntimeError, match=match):
         github_release.publish(cfg(tmp_path), target="abc")
+
+
+def test_existing_tag_at_other_sha_is_a_no_op_by_default(monkeypatch, tmp_path):
+    calls = fake(
+        monkeypatch,
+        [
+            (("gh", "repo", "view"), done(out='{"nameWithOwner":"o/r"}')),
+            (("gh", "api"), done(out='{"object":{"sha":"other"}}')),
+        ],
+    )
+    result = github_release.publish(cfg(tmp_path), target="abc")
+    assert result == github_release.ReleaseResult("v1.2.3", "other", False, False)
+    assert len(calls) == 2  # never reaches the release-view/create step
+
+
+def test_existing_tag_at_other_sha_raises_when_new_version_required(monkeypatch, tmp_path):
+    fake(
+        monkeypatch,
+        [
+            (("gh", "repo", "view"), done(out='{"nameWithOwner":"o/r"}')),
+            (("gh", "api"), done(out='{"object":{"sha":"other"}}')),
+        ],
+    )
+    with pytest.raises(RuntimeError, match="refusing to move"):
+        github_release.publish(cfg(tmp_path, require_new_version=True), target="abc")
 
 
 def test_disabled_release_does_not_touch_github(monkeypatch, tmp_path):
