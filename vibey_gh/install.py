@@ -90,6 +90,25 @@ def render_workflow(source: Path, cfg: GhConfig) -> str:
         "__VIBEY_GH_ALLOW_PRIVATE_FULL_OUTPUT__",
         "true" if cfg.pr_automation.observability.allow_private_full_output else "false",
     )
+    issues = cfg.issue_automation
+    wanted = wanted.replace("__VIBEY_GH_ISSUE_ENABLED__", "true" if issues.enabled else "false")
+    wanted = wanted.replace("__VIBEY_GH_ISSUE_MODEL__", issues.model)
+    wanted = wanted.replace("__VIBEY_GH_ISSUE_BRANCH_PREFIX__", issues.branch_prefix)
+    wanted = wanted.replace("__VIBEY_GH_ISSUE_LABEL__", issues.required_label)
+    wanted = wanted.replace(
+        "__VIBEY_GH_ISSUE_OPEN_PR__", "true" if issues.open_pull_request else "false"
+    )
+    wanted = wanted.replace(
+        "__VIBEY_GH_ISSUE_DRAFT_PR__", "true" if issues.draft_pull_request else "false"
+    )
+    wanted = wanted.replace(
+        "  # __VIBEY_GH_ISSUE_SCHEDULE__",
+        (
+            '  schedule:\n    - cron: "19 */12 * * *"'
+            if issues.retain_schedule_backstop
+            else "  # schedule backstop disabled by .vibey-gh.toml"
+        ),
+    )
     wanted = wanted.replace(
         "__VIBEY_GH_PROFILE_ENABLED__",
         "true" if cfg.repository_profile.enabled else "false",

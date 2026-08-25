@@ -10,6 +10,8 @@ on:
       - __VIBEY_GH_INTEGRATION_BRANCH__
       - __VIBEY_GH_RELEASE_BRANCH__
       - "vibey-gh/repair/**"
+      # Issue automation opens its own linked pull request; intake must not race it.
+      - "__VIBEY_GH_ISSUE_BRANCH_PREFIX__/**"
 
 permissions:
   contents: read

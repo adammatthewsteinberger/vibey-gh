@@ -18,6 +18,11 @@ transport failure. Run `vibey-gh COMMAND --help` for argparse's generated refere
 | `pr-automation record-repair` | required `--pr N --input JSON\|FILE\|-` | Persist a structured repair attempt. |
 | `pr-automation mirror-fork` | required `--pr N` | Create a linked repository-owned replacement when a fork needs edits. |
 | `pr-automation ensure-labels` | none | Create or reconcile all managed labels idempotently. |
+| `issue-automation evaluate` | required `--issue N` | Classify one issue and emit stable JSON, including the derived solution branch and a Conventional Commit `pr_title`. |
+| `issue-automation context` | required `--issue N`; optional `--output FILE`, `--max-bytes N` | Render one issue as a bounded, explicitly untrusted briefing. Writes to stdout when `--output` is omitted; parent directories are created. |
+| `issue-automation record-solution` | required `--issue N --input JSON\|FILE\|-` | Persist a structured solution attempt against the issue's content lineage. |
+| `issue-automation list-eligible` | none | Emit the JSON array of open issues a recovery sweep should dispatch. |
+| `issue-automation ensure-labels` | none | Create or reconcile the issue automation labels idempotently. |
 | `github-release` | required `--target SHA`; optional `--version VERSION` | Create or reuse an immutable tag and GitHub Release. |
 | `promote` | `--method rebase\|squash\|merge`, `--dry-run`, `--wait` or `--no-wait`, `--summary FILE` | Open/reuse the integration-to-release PR. Event-driven `--no-wait` is the default. |
 | `realign` | none | Bring the integration branch forward after release without rewriting it. |

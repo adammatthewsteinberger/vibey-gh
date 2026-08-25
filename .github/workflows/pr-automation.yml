@@ -157,9 +157,12 @@ jobs:
           GH_TOKEN: ${{ secrets.AUTOMERGE_TOKEN || github.token }}
           PR: ${{ steps.resolve.outputs.pr }}
           HEAD_SHA: ${{ steps.resolve.outputs.head_sha }}
+          DRY_RUN: ${{ inputs.dry_run }}
         run: |
           set -euo pipefail
-          vibey-gh pr-automation ready-draft --pr "$PR" --head-sha "$HEAD_SHA" | jq .
+          if [ "$DRY_RUN" != true ]; then
+            vibey-gh pr-automation ready-draft --pr "$PR" --head-sha "$HEAD_SHA" | jq .
+          fi
           result=$(vibey-gh pr-automation evaluate --pr "$PR" --head-sha "$HEAD_SHA")
           printf '%s\n' "$result" | jq .
           {
@@ -618,10 +621,11 @@ jobs:
             echo '::error::GitHub reported a conflict but no unresolved paths were materialized'
             exit 1
           fi
+          delimiter="EOF_$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')"
           {
-            echo 'files<<EOF'
+            echo "files<<${delimiter}"
             printf '%s\n' "$files"
-            echo EOF
+            echo "${delimiter}"
           } >> "$GITHUB_OUTPUT"
       - name: Create credential-free Claude git context
         run: |
@@ -768,6 +772,7 @@ jobs:
     # check. Pending scans likewise must produce no terminal gate yet.
     if: >-
       always() && !cancelled() && github.event_name != 'schedule' &&
+      inputs.dry_run != true &&
       needs.evaluate.result == 'success' &&
       needs.evaluate.outputs.pr != '' &&
       needs.evaluate.outputs.head_sha != '' &&
@@ -790,22 +795,43 @@ jobs:
           STATE: ${{ needs.evaluate.outputs.state }}
           REASON: ${{ needs.evaluate.outputs.reason }}
           REVIEW_PASSED: ${{ needs.review.outputs.passed }}
+          REVIEW_RESULT: ${{ needs.review.result }}
         run: |
           set -euo pipefail
           conclusion=failure
-          if { [ "$STATE" = ready ] || [ "$STATE" = review ]; } && \
-             [ "$REVIEW_PASSED" = true ]; then
-            conclusion=success
+          title="PR automation: ${STATE}"
+          summary="${REASON}."
+          # `$REASON` comes from the evaluation, which only ever describes the SCANS. Once
+          # scans are green it reads "all scans and applicable reviews passed" — true of
+          # the scans, and actively misleading beside a failing conclusion the review
+          # caused. A reader then hunts for a source defect that does not exist. So when
+          # the outcome is decided by the review rather than the scans, the gate reports
+          # the review's outcome instead, and distinguishes findings from no verdict at all.
+          if [ "$STATE" = ready ] || [ "$STATE" = review ]; then
+            case "$REVIEW_PASSED" in
+              true)
+                conclusion=success
+                ;;
+              false)
+                title="PR automation: review findings"
+                summary="Scans passed for this exact head, but the exact-head review returned actionable findings. Bounded repair addresses them and rescans; the findings are in the review job log and the PR automation state comment."
+                ;;
+              *)
+                title="PR automation: review incomplete"
+                summary="Scans passed for this exact head, but the exact-head review returned no verdict (review job: ${REVIEW_RESULT}). This is an infrastructure or operator failure rather than a defect in the pull request. Check the review job log for API credit balance, credentials, or model availability, then rerun."
+                ;;
+            esac
           fi
           gh api "repos/${REPO}/check-runs" --method POST \
             -f name='PR automation / gate' -f head_sha="$HEAD_SHA" \
             -f status=completed -f conclusion="$conclusion" \
-            -f "output[title]=PR automation: ${STATE}" \
-            -f "output[summary]=${REASON}. Run ${GITHUB_SERVER_URL}/${REPO}/actions/runs/${GITHUB_RUN_ID} evaluated ${HEAD_SHA}."
+            -f "output[title]=${title}" \
+            -f "output[summary]=${summary} Run ${GITHUB_SERVER_URL}/${REPO}/actions/runs/${GITHUB_RUN_ID} evaluated ${HEAD_SHA}."
           if [ "$conclusion" = success ]; then
             gh workflow run merge-train.yml --repo "$REPO" \
               --ref "${{ github.event.repository.default_branch }}" -f "pr=${PR}"
             exit 0
           fi
-          echo "PR is not ready: state=${STATE}, reason=${REASON}, review_passed=${REVIEW_PASSED}"
+          echo "PR is not ready: state=${STATE}, reason=${REASON}, review_passed=${REVIEW_PASSED:-<none>}, review_job=${REVIEW_RESULT}"
+          echo "${summary}"
           exit 1

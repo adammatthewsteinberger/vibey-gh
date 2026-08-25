@@ -20,8 +20,15 @@ nav:
   - CLI: cli.md
   - Workflows: workflows.md
   - Security: security.md
+  - Threat model: threat-model.md
   - Operations: operations.md
   - Contributing: development.md
+  - Testing: testing.md
   - Releases: releases.md
   - Support: troubleshooting.md
+  - Governance: governance.md
+  - Accessibility: accessibility.md
+  - Dependencies: dependencies.md
+  - Roadmap: roadmap.md
+  - Architecture decisions: adr/README.md
 strict: true

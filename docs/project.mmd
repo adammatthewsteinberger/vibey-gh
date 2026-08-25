@@ -7,6 +7,7 @@ flowchart TB
     Contributor[Contributor]
     Push[Branch push]
     PullRequest[Pull request]
+    Issue[Published issue]
   end
 
   subgraph Interfaces["Complete public interface parity"]
@@ -24,6 +25,8 @@ flowchart TB
     Debugging["Debugging (opt-in, tamper-evident branch tracing)"]
     Documentation[Documentation contract]
     PRAutomation[PR Automation]
+    IssueAutomation[Issue Automation]
+    GithubState["Durable marker-comment state (vibey_gh.github_state)"]
     MergeTrain[Merge train]
     Promotion[Promotion]
     Versioning[Versioning]
@@ -46,12 +49,17 @@ flowchart TB
     Diagnostics[Bounded exact-head failed-check evidence]
     Guard[Exact SHA, branch, lease, and policy guards]
     Bootstrap[Admin-authorized automation bootstrap]
+    ReviewIncomplete["Review incomplete: no verdict, operator action required"]
+    UntrustedIssue[Untrusted contributor issue text]
+    Briefing[Bounded untrusted issue briefing]
+    IssueTrust["Issue eligibility policy (author trust, labels, budget)"]
     Fork[Untrusted fork PR head]
     MirrorFork["Repository-owned replacement PR (mirror-fork)"]
   end
 
   subgraph Delivery["Event-driven delivery"]
     BranchIntake[Branch intake]
+    IssueSolution[Guarded issue solution branch and linked PR]
     CI[CI, tests, lint, build]
     CodeQL[CodeQL security analysis]
     APIDrift[API drift and five-surface parity]
@@ -73,6 +81,8 @@ flowchart TB
 
   Maintainer --> CLI
   Contributor --> Push
+  Contributor --> Issue
+  Maintainer --> Issue
   Push --> BranchIntake
   BranchIntake --> PullRequest
   CLI --> CapabilitySurfaces
@@ -83,7 +93,23 @@ flowchart TB
   CapabilitySurfaces --> Config
   Config --> Install
   Install --> PRAutomation
+  Install --> IssueAutomation
   Install --> MergeTrain
+  Issue --> IssueAutomation
+  Issue --> UntrustedIssue
+  IssueAutomation --> IssueTrust
+  IssueTrust -->|ineligible: skipped or blocked| Issue
+  IssueTrust -->|eligible| Briefing
+  UntrustedIssue --> Briefing
+  Briefing --> Sandbox
+  Sandbox --> IssueSolution
+  IssueSolution --> Guard
+  Guard --> PullRequest
+  IssueAutomation --> GithubState
+  PRAutomation --> GithubState
+  IssueAutomation --> Trusted
+  BranchIntake -->|yields the issue branch namespace| IssueSolution
+  MergeTrain -->|merged solution closes the issue| Issue
   PullRequest --> CI
   PullRequest --> CodeQL
   PullRequest --> APIDrift
@@ -104,6 +130,8 @@ flowchart TB
   Sandbox --> Review
   Review --> Repair
   Repair --> Guard
+  Review -->|no verdict| ReviewIncomplete
+  ReviewIncomplete -->|operator corrects condition, then reruns| Review
   Trusted --> EphemeralGit
   EphemeralGit --> CredentialHelper
   Sandbox --> SafeProgress
@@ -155,7 +183,9 @@ flowchart TB
   Release --> ReleaseRepair
   ReleaseSurfaces --> ReleaseRepair
   ReleaseRepair --> Guard
-  Fingerprints --> CI
+  Fingerprints --> Provenance
+  Fingerprints --> Docs
+  CapabilitySurfaces --> APIDrift
   Documentation --> Docs
   Guard --> Fingerprints
   CLI --> Debugging
