@@ -381,6 +381,96 @@ def test_failed_permanent_branch_scans_use_a_guarded_repair_pr():
     assert "HEAD:refs/heads/${BASE_BRANCH}" not in text
 
 
+@pytest.mark.parametrize(
+    "paths,match",
+    [
+        (("/abs/CHANGELOG.md",), "repository-relative"),
+        (("../outside.md",), "repository-relative"),
+        (("a", "a"), "must be unique"),
+        ((" ",), "must be non-empty"),
+    ],
+)
+def test_unsafe_union_merge_paths_are_rejected(tmp_path, paths, match):
+    from vibey_gh.config import GhConfig
+
+    with pytest.raises(ValueError, match=match):
+        GhConfig(root=tmp_path, union_merge_paths=paths)
+
+
+def test_a_repository_can_decline_the_union_merge_rule_entirely(tmp_path):
+    from vibey_gh.config import GhConfig
+    from vibey_gh.install import apply_union_merge, missing_union_merge_lines
+
+    cfg = GhConfig(root=tmp_path, union_merge_paths=())
+    assert apply_union_merge(cfg) is None
+    assert missing_union_merge_lines(cfg) == []
+    assert not (tmp_path / ".gitattributes").exists()
+
+
+def test_append_only_files_merge_instead_of_conflicting(tmp_path):
+    """Every branch appends to the changelog, so every merge stranded every other branch
+    on a conflict carrying no information. `merge=union` keeps both sides."""
+    import subprocess
+
+    from vibey_gh.config import GhConfig
+    from vibey_gh.install import apply_union_merge
+
+    def git(*args, cwd=tmp_path):
+        return subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, check=False)
+
+    git("init", "-q", "-b", "main", ".")
+    git("config", "user.email", "t@e.com")
+    git("config", "user.name", "t")
+    cfg = GhConfig(root=tmp_path)
+    assert apply_union_merge(cfg) == "installed"
+    log = tmp_path / "CHANGELOG.md"
+    log.write_text("# Changelog\n\n## Unreleased\n\n- base\n", encoding="utf-8")
+    git("add", "-A")
+    git("commit", "-qm", "base")
+
+    git("switch", "-qc", "topic")
+    log.write_text("# Changelog\n\n## Unreleased\n\n- base\n- from the topic\n", encoding="utf-8")
+    git("commit", "-qam", "topic")
+    git("switch", "-q", "main")
+    log.write_text("# Changelog\n\n## Unreleased\n\n- base\n- from develop\n", encoding="utf-8")
+    git("commit", "-qam", "develop")
+
+    git("switch", "-q", "topic")
+    assert git("rebase", "main").returncode == 0, "the union driver should absorb this"
+    settled = log.read_text(encoding="utf-8")
+    assert "- from develop" in settled and "- from the topic" in settled
+    assert "<<<<<<<" not in settled
+
+
+def test_the_union_declaration_never_rewrites_an_adopters_own_attributes(tmp_path):
+    from vibey_gh.config import GhConfig
+    from vibey_gh.install import GITATTRIBUTES, apply_union_merge, missing_union_merge_lines
+
+    theirs = tmp_path / GITATTRIBUTES
+    theirs.write_text("*.png binary\n", encoding="utf-8")
+    cfg = GhConfig(root=tmp_path)
+    assert apply_union_merge(cfg) == "updated"
+    text = theirs.read_text(encoding="utf-8")
+    assert "*.png binary" in text, "an adopter's own rules must survive adoption"
+    assert "CHANGELOG.md merge=union" in text
+    # Idempotent: a second install changes nothing and reports nothing missing.
+    assert apply_union_merge(cfg) is None
+    assert missing_union_merge_lines(cfg) == []
+    assert theirs.read_text(encoding="utf-8") == text
+
+
+def test_an_attributes_file_without_a_trailing_newline_is_appended_safely(tmp_path):
+    from vibey_gh.config import GhConfig
+    from vibey_gh.install import GITATTRIBUTES, apply_union_merge
+
+    (tmp_path / GITATTRIBUTES).write_text("*.png binary", encoding="utf-8")
+    cfg = GhConfig(root=tmp_path)
+    apply_union_merge(cfg)
+    lines = (tmp_path / GITATTRIBUTES).read_text(encoding="utf-8").splitlines()
+    assert lines[0] == "*.png binary"
+    assert "CHANGELOG.md merge=union" in lines
+
+
 def test_repository_dogfoods_the_exact_rendered_workflows_and_hooks():
     root = Path(__file__).resolve().parent.parent
     ok, problems = installed(load_config(root), local=False)

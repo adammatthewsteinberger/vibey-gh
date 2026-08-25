@@ -5,6 +5,13 @@ This file follows Keep a Changelog and semantic versioning conventions.
 
 ## Unreleased
 
+- Declare `CHANGELOG.md merge=union` in `.gitattributes` so branches appending to the same
+  section merge instead of conflicting. Every open branch adds an Unreleased entry, so each
+  merge stranded every other one on a conflict carrying no information — four manual
+  resolutions in a single afternoon, and the reason automated branch reconciliation kept
+  deciding to rebase and then failing to. Configurable through `[install].union_merge_paths`,
+  and appended to an adopter's existing `.gitattributes` rather than rewriting it.
+
 - Say so on the issue when a solution attempt produces nothing. An attempt that exhausted
   its turn budget left no branch, no label, and no comment, so twenty minutes and real
   tokens looked from the issue exactly like nothing having happened. The issue now receives
