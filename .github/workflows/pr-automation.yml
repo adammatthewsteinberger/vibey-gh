@@ -325,7 +325,11 @@ jobs:
               ((.findings // []) | length == 0)
             )
           ' <<<"$STRUCTURED")
-          python -m pip install --quiet ./automation
+          if grep -qE '^name = "vibey-gh"' automation/pyproject.toml; then
+            python -m pip install --quiet ./automation
+          else
+            python -m pip install --quiet vibey-gh
+          fi
           vibey-gh pr-automation record-review --pr "$PR" --input "$payload"
           echo "passed=$(jq -r .pass <<<"$payload")" >> "$GITHUB_OUTPUT"
       - name: Archive review record
@@ -402,7 +406,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ needs.evaluate.outputs.pr }}
         run: |
-          python -m pip install --quiet ./automation
+          set -euo pipefail
+          if grep -qE '^name = "vibey-gh"' automation/pyproject.toml; then
+            python -m pip install --quiet ./automation
+          else
+            python -m pip install --quiet vibey-gh
+          fi
           vibey-gh pr-automation ensure-labels
           gh pr edit "$PR" --add-label vibey-gh:repairing
       - name: Collect exact-head failed-check evidence
@@ -586,7 +595,11 @@ jobs:
           REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          python -m pip install --quiet ./automation
+          if grep -qE '^name = "vibey-gh"' automation/pyproject.toml; then
+            python -m pip install --quiet ./automation
+          else
+            python -m pip install --quiet vibey-gh
+          fi
           head_sha=$(gh pr view "$PR" --repo "$REPO" --json headRefOid --jq .headRefOid)
           payload=$(jq -c --arg head_sha "$head_sha" '. + {head_sha:$head_sha}' <<<"$STRUCTURED")
           vibey-gh pr-automation record-repair --pr "$PR" --input "$payload"
@@ -744,7 +757,11 @@ jobs:
             printf '%s\n' "$push_output" >&2
             exit 1
           fi
-          python -m pip install --quiet ./automation
+          if grep -qE '^name = "vibey-gh"' automation/pyproject.toml; then
+            python -m pip install --quiet ./automation
+          else
+            python -m pip install --quiet vibey-gh
+          fi
           new_sha=$(git -C target rev-parse HEAD)
           payload=$(jq -c --arg head_sha "$new_sha" \
             '. + {head_sha:$head_sha,fixable:true}' <<<"$STRUCTURED")
