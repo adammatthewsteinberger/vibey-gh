@@ -57,6 +57,8 @@ def completed(code=0, out="", err=""):
     [
         ({"max_attempts": 0}, "between 1 and 10"),
         ({"max_attempts": 11}, "between 1 and 10"),
+        ({"max_turns": 0}, "max_turns must be between 1 and 1000"),
+        ({"max_turns": 1001}, "max_turns must be between 1 and 1000"),
         ({"model": "  "}, "model must not be empty"),
         ({"branch_prefix": " "}, "non-empty and unspaced"),
         ({"branch_prefix": "a b"}, "non-empty and unspaced"),
@@ -88,6 +90,7 @@ def test_configuration_round_trips_from_the_repository_file(tmp_path):
         "enabled = false\n"
         'model = "claude-opus-5"\n'
         "max_attempts = 5\n"
+        "max_turns = 400\n"
         'branch_prefix = "bots/fix"\n'
         'base_branch = "trunk"\n'
         "solve_untrusted_authors = true\n"
@@ -104,6 +107,7 @@ def test_configuration_round_trips_from_the_repository_file(tmp_path):
         enabled=False,
         model="claude-opus-5",
         max_attempts=5,
+        max_turns=400,
         branch_prefix="bots/fix",
         base_branch="trunk",
         solve_untrusted_authors=True,
@@ -444,6 +448,7 @@ def test_rendering_resolves_every_issue_marker(tmp_path):
     text = render_workflow(WORKFLOWS / "issue-automation.yml", config)
     assert "__VIBEY_GH" not in text
     assert "--model claude-opus-5" in text
+    assert "--max-turns 200" in text
     assert "BRANCH_PREFIX: bots/fix" in text
     assert "OPEN_PR: false" in text and "DRAFT_PR: false" in text
     assert "schedule backstop disabled by .vibey-gh.toml" in text

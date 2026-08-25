@@ -545,6 +545,7 @@ notify_contributor_branches = true   # comment on a human branch instead of rewr
 enabled = true
 model = "claude-sonnet-5"
 max_attempts = 2
+max_turns = 200                      # per-attempt turn budget; raise for large issues
 branch_prefix = "vibey-gh/issue"
 base_branch = ""                     # blank uses branches.integration
 solve_untrusted_authors = false
@@ -777,6 +778,7 @@ The automation distinguishes failures by what can safely resolve them:
 | Missing secret, expired token, billing/credit exhaustion, registry denial, unsupported runner, or unavailable external service | Mark `vibey-gh:automation-blocked`; make no speculative source edit | Correct the named repository or provider setting, then redispatch |
 | Three unsuccessful repair attempts in one contributor lineage | Mark `vibey-gh:repair-exhausted`; publish remaining failures and run links | Push a new human-authored commit or deliberately reset the lineage |
 | Issue too ambiguous, out of scope, or blocked on an operator decision | Return `needs_human`, change nothing, mark `vibey-gh:solve-blocked` | Answer the question in the issue, or refine and edit it to start a new lineage |
+| Solution attempt returns no result at all (turn-budget exhaustion or an infrastructure failure) | Comment once naming the cause; mark `vibey-gh:solve-blocked` | Split the issue into smaller requests, or raise `[issue_automation].max_turns` |
 | Configured unsuccessful solution attempts for one issue lineage | Mark `vibey-gh:solve-exhausted`; comment once with the reason | Edit the issue to restate the request, or take it manually |
 | Exact-head review returns no verdict (exhausted API credits, missing key, model unavailable) | Publish a failing `PR automation: review incomplete` gate naming the operator cause; never infer a verdict | Correct the operator condition, then rerun the review |
 | Stale workflow completion | Ignore it; it cannot create a successful current-head gate | None |
@@ -831,7 +833,10 @@ Start with the PR’s `PR automation / gate`, then follow the linked workflow ru
 summary contains the evaluated SHA, aggregate scans, trust classification, repair attempt,
 semantic review result, and merge decision. Review artifacts are retained for 90 days.
 State comments use machine-readable markers and are updated idempotently rather than
-creating an unbounded comment stream.
+creating an unbounded comment stream. The marker is located by pattern, not by comment
+author, so its stored attempt/heal counters are a cost control rather than an access
+control on public repositories — see [Security architecture](docs/security.md) and
+[Threat model](docs/threat-model.md).
 
 ## Project documentation map
 

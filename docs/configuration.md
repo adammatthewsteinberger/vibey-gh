@@ -99,6 +99,7 @@ closed, because anyone with a GitHub account can open an issue.
 | `enabled` | boolean / `true` | Enable evaluation and autonomous solution proposals. `false` keeps the workflow installed and inert. |
 | `model` | string / `claude-sonnet-5` | Model used to design and implement the proposed solution. |
 | `max_attempts` | integer / `2` (1–10) | Solution budget per issue content lineage. |
+| `max_turns` | integer / `200` (1–1000) | Turn budget for one attempt. An attempt that exhausts it produces nothing, so raise it for a repository whose issues are routinely large — or split the issue, which is usually the better answer. |
 | `branch_prefix` | string / `vibey-gh/issue` | Namespace every proposal branch lives under. Validated against the configured permanent branches and rendered into `branch-intake.yml`'s ignore list. |
 | `base_branch` | string / empty | Branch a solution is built on. Blank uses `branches.integration`. |
 | `solve_untrusted_authors` | boolean / `false` | Permit issues from outside the owner/trusted-author set without a maintainer label. |

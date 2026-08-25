@@ -570,6 +570,24 @@ def test_the_configured_formatters_agree_with_each_other(tmp_path):
     assert probe.read_text(encoding="utf-8") == settled, "the formatters oscillate"
 
 
+def test_a_solution_attempt_that_produced_nothing_still_says_so_on_the_issue():
+    """Silence costs the same tokens and minutes as a refusal but leaves the issue looking
+    untouched, so nobody knows an attempt was made or why it stopped."""
+    text = (WORKFLOWS / "issue-automation.yml").read_text(encoding="utf-8")
+    assert "AGENT_RESULT: ${{ steps.claude.outcome }}" in text
+    assert 'if [ -z "${STRUCTURED:-}" ]; then' in text
+    assert "vibey-gh-issue-attempt-failed" in text
+    assert "returned no result (agent step: ${AGENT_RESULT})" in text
+    # The advice names the cause the observed failure actually had.
+    assert "too large to complete in one attempt" in text
+    assert "exhausted API credit balance" in text
+    # Commented exactly once, and the issue is labelled so it is visible in a listing.
+    assert 'grep -Fq "$marker"' in text
+    assert "--add-label vibey-gh:solve-blocked" in text
+    # The turn budget is configuration, not a constant nobody can reach.
+    assert "--max-turns __VIBEY_GH_ISSUE_MAX_TURNS__" in text
+
+
 def test_the_repair_job_normalizes_formatting_it_cannot_ask_the_agent_to_run():
     """The agent has no shell, so formatting is the one failure it cannot fix itself."""
     text = (WORKFLOWS / "pr-automation.yml").read_text(encoding="utf-8")

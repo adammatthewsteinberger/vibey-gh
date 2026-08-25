@@ -147,6 +147,7 @@ class IssueAutomationConfig:
     enabled: bool = True
     model: str = "claude-sonnet-5"
     max_attempts: int = 2
+    max_turns: int = 200
     branch_prefix: str = "vibey-gh/issue"
     base_branch: str = ""
     solve_untrusted_authors: bool = False
@@ -162,6 +163,8 @@ class IssueAutomationConfig:
         _unique_nonempty("issue_automation.ignored_labels", self.ignored_labels)
         if not 1 <= self.max_attempts <= 10:
             raise ValueError("issue_automation.max_attempts must be between 1 and 10")
+        if not 1 <= self.max_turns <= 1000:
+            raise ValueError("issue_automation.max_turns must be between 1 and 1000")
         if not self.model.strip():
             raise ValueError("issue_automation.model must not be empty")
         prefix = self.branch_prefix
@@ -422,6 +425,7 @@ def load_config(root: Path | None = None) -> GhConfig:
             enabled=issues.get("enabled", True),
             model=issues.get("model", "claude-sonnet-5"),
             max_attempts=issues.get("max_attempts", 2),
+            max_turns=issues.get("max_turns", 200),
             branch_prefix=issues.get("branch_prefix", "vibey-gh/issue"),
             base_branch=issues.get("base_branch", ""),
             solve_untrusted_authors=issues.get("solve_untrusted_authors", False),
