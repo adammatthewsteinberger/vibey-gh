@@ -547,6 +547,8 @@ generate_sitemap_index = true
 generate_llms_txt = true
 generate_llms_full_txt = true
 generate_json_ld = true
+author_name = "Adam Matthew Steinberger"
+author_url = "https://hire.adam.matthewsteinberger.com"
 ```
 
 `CodeQL` is a real managed Python security-analysis workflow using an immutably pinned
