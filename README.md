@@ -529,6 +529,11 @@ sanitized_progress = true
 archive_execution_file = true
 allow_private_full_output = false
 
+[branch_sync]
+enabled = true                       # run the sync and self-heal jobs at all
+update_contributor_branches = true   # merge the integration branch forward via GitHub's update-branch endpoint; never a rewrite
+max_self_heals = 2                   # repair-budget refills allowed before a lineage stays exhausted for a human (0-10; 0 disables)
+
 [realign]
 reconcile_branches = true            # reconcile open branches after a realign rewrite
 automation_prefixes = ["vibey-gh/"]  # branches this automation may rebase on its own
