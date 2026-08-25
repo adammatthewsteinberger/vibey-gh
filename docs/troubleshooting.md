@@ -11,9 +11,13 @@
   outside `[merge_train].owner` and `trusted_authors` is skipped until a maintainer applies
   the configured `required_label`, and a configured ignored label, an absent trigger label,
   an exhausted budget, or a `vibey-gh:solve-blocked` label each produce their own reason.
-- An issue labelled `vibey-gh:solve-blocked` means the attempt returned `needs_human`: the
-  request needs a human decision, named in the issue's state comment. Answer it in the
-  issue, then edit the body to restate the request — editing starts a new attempt lineage.
+- An issue labelled `vibey-gh:solve-blocked` has two distinct causes, and the issue's own
+  comments say which applies: a `needs_human` verdict, where the request needs a human
+  decision named in the state comment — answer it in the issue, then edit the body to
+  restate the request, which starts a new attempt lineage; or an attempt that returned no
+  structured output at all (turn-budget exhaustion or an infrastructure failure), reported
+  as "An automated solution attempt ran and returned no result" — see the entry below for
+  that remedy instead.
 - A redispatched `Issue automation` run that does nothing is working correctly. Attempts
   are keyed to a fingerprint of the issue's title and body, so unchanged text cannot spend
   a second attempt or open a second pull request.
