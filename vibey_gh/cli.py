@@ -330,11 +330,24 @@ def _reconcile(args) -> int:
     except (RuntimeError, ValueError, json.JSONDecodeError) as exc:
         print(f"vibey-gh: {exc}", file=sys.stderr)
         return 1
+    stalled = 0
     for outcome in outcomes:
         print(
             f"  #{outcome['pr']} ({outcome['branch']}): {outcome['action']} — {outcome['reason']}"
         )
-    print(f"vibey-gh: reconciled {len(outcomes)} open pull request(s)")
+        # Deciding an action and performing it are different things: a rebase can conflict
+        # and abort, a push can be refused by a lease, GitHub can decline an update. Print
+        # the decision and the outcome separately, because a decision reported alone reads
+        # exactly like a success and hides a branch that never moved.
+        if "applied" in outcome and not outcome["applied"]:
+            stalled += 1
+            print(f"      not applied: {outcome.get('detail', 'no detail reported')}")
+        elif outcome.get("deleted") is False:
+            print("      branch deletion was refused by GitHub")
+    summary = f"vibey-gh: reconciled {len(outcomes)} open pull request(s)"
+    if stalled:
+        summary += f"; {stalled} action(s) did not take effect"
+    print(summary)
     return 0
 
 

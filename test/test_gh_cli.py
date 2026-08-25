@@ -530,6 +530,48 @@ def test_reconcile_branches_cli_reports_each_decision(repo, monkeypatch, capsys)
     assert "reconciled 1 open pull request(s)" in out
 
 
+def test_reconcile_branches_cli_distinguishes_deciding_from_doing(repo, monkeypatch, capsys):
+    """A decision printed alone reads exactly like a success, and hides a branch that
+    never moved — which is how a rebase that conflicted looked green for four runs."""
+    monkeypatch.setattr(
+        reconcile,
+        "reconcile",
+        lambda cfg, dry_run: [
+            {
+                "pr": 1,
+                "branch": "vibey-gh/a",
+                "action": "rebase",
+                "reason": "1 unique commit(s)",
+                "applied": False,
+                "detail": "rebase conflicted; left for ordinary conflict resolution",
+            },
+            {
+                "pr": 2,
+                "branch": "vibey-gh/b",
+                "action": "rebase",
+                "reason": "2 unique commit(s)",
+                "applied": True,
+                "detail": "rebased aaaaaaa onto the new tip as bbbbbbb",
+            },
+            {
+                "pr": 3,
+                "branch": "vibey-gh/c",
+                "action": "close",
+                "reason": "duplicate",
+                "applied": True,
+                "deleted": False,
+            },
+        ],
+    )
+    assert main(["reconcile-branches"]) == 0
+    out = capsys.readouterr().out
+    assert "not applied: rebase conflicted" in out
+    assert "branch deletion was refused by GitHub" in out
+    assert "1 action(s) did not take effect" in out
+    # The one that worked is not reported as stalled.
+    assert out.count("not applied") == 1
+
+
 def test_reconcile_branches_cli_reports_failures(repo, monkeypatch, capsys):
     def boom(*a, **k):
         raise ValueError("refusing to delete protected or unsafe branch 'develop'")
