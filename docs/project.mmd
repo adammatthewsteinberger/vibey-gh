@@ -49,6 +49,7 @@ flowchart TB
     Diagnostics[Bounded exact-head failed-check evidence]
     Guard[Exact SHA, branch, lease, and policy guards]
     Bootstrap[Admin-authorized automation bootstrap]
+    ReviewIncomplete["Review incomplete: no verdict, operator action required"]
     UntrustedIssue[Untrusted contributor issue text]
     Briefing[Bounded untrusted issue briefing]
     IssueTrust["Issue eligibility policy (author trust, labels, budget)"]
@@ -129,6 +130,8 @@ flowchart TB
   Sandbox --> Review
   Review --> Repair
   Repair --> Guard
+  Review -->|no verdict| ReviewIncomplete
+  ReviewIncomplete -->|operator corrects condition, then reruns| Review
   Trusted --> EphemeralGit
   EphemeralGit --> CredentialHelper
   Sandbox --> SafeProgress
