@@ -791,9 +791,13 @@ creating an unbounded comment stream.
 | Operating and recovering the system | [docs/operations.md](docs/operations.md) |
 | Releases and publishing channels | [docs/releases.md](docs/releases.md) |
 | Threats and privileged-job boundaries | [docs/threat-model.md](docs/threat-model.md) and [SECURITY.md](SECURITY.md) |
+| Security architecture | [docs/security.md](docs/security.md) |
 | Local development and verification | [docs/development.md](docs/development.md) and [docs/testing.md](docs/testing.md) |
 | Common failures | [docs/troubleshooting.md](docs/troubleshooting.md) |
 | Governance, support, and conduct | [docs/governance.md](docs/governance.md), [SUPPORT.md](SUPPORT.md), and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) |
+| Accessibility standards | [docs/accessibility.md](docs/accessibility.md) |
+| Dependency policy | [docs/dependencies.md](docs/dependencies.md) |
+| Roadmap and priorities | [docs/roadmap.md](docs/roadmap.md) |
 | GitHub Actions workflow reference and admin recovery paths | [.github/README.md](.github/README.md) |
 | Agent instructions and skills | [AGENTS.md](AGENTS.md), [CLAUDE.md](CLAUDE.md), [GEMINI.md](GEMINI.md), `.cursor/`, `.agent/`, `.agents/`, and `.claude/` |
 | Architectural decisions | [docs/adr/README.md](docs/adr/README.md) |
