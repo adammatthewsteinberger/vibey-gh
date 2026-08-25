@@ -503,6 +503,41 @@ def test_conventional_commits_self_heal_only_guarded_topic_history():
     assert "--delete-branch" not in text
 
 
+def test_conventional_commits_installs_the_published_package_not_the_adopting_repo():
+    """A repo with `dependencies = []` that only pulls in vibey-gh as a CI tool must not
+    have this step assume its own `pip install .` yields the vibey-gh CLI.
+    """
+    text = (WORKFLOWS / "conventional-commits.yml").read_text(encoding="utf-8")
+    assert "pip install --quiet ./automation" not in text
+    assert "grep -qE '^name = \"vibey-(gh|bootstrap)\"' pyproject.toml" in text
+    assert "python -m pip install --quiet -e ." in text
+    assert "python -m pip install --quiet vibey-gh" in text
+    assert "name: Check out trusted automation" in text
+    assert "name: Check out trusted normalizer" not in text
+
+    # The step that actually decides whether commits conform must fail loudly, not
+    # treat "vibey-gh: command not found" as a false `if` condition that then barrels
+    # ahead into a doomed git filter-branch.
+    normalize = text.split("name: Normalize every nonconforming commit message", 1)[1]
+    guard = normalize.split("if vibey-gh conventional-check", 1)[0]
+    assert "command -v vibey-gh" in guard
+    assert "exit 1" in guard
+
+
+def test_pr_automation_never_assumes_the_adopting_repos_own_package_is_vibey_gh():
+    """Every `automation/` checkout of the adopting repo's default branch must detect
+    self-hosting before installing from it, the same class of bug as the conventional-
+    commits template: a repo with `dependencies = []` does not yield the vibey-gh CLI
+    from `pip install ./automation`.
+    """
+    text = (WORKFLOWS / "pr-automation.yml").read_text(encoding="utf-8")
+    assert "pip install --quiet ./automation" not in text
+    checks = re.findall(r"""grep -qE '\^name = "vibey-gh"' automation/pyproject\.toml""", text)
+    assert len(checks) == 4
+    installs = re.findall(r"python -m pip install --quiet vibey-gh\b", text)
+    assert len(installs) == 5  # the four guarded installs above plus the evaluate job's own
+
+
 def test_promotion_checks_provenance_without_rewriting_or_reauditing_history():
     text = (WORKFLOWS / "provenance.yml").read_text(encoding="utf-8")
     assert 'if [ "$HEAD_REF" = "$INTEGRATION_BRANCH" ]' in text
@@ -614,7 +649,11 @@ def test_every_rendered_run_block_is_valid_shell(path):
             if not script:
                 continue
             result = subprocess.run(
-                ["bash", "-n"], input=script, text=True, capture_output=True, check=False
+                ["bash", "-n"],
+                input=script,
+                text=True,
+                capture_output=True,
+                check=False,
             )
             assert result.returncode == 0, f"{path.name}:{job}:{step.get('name')}: {result.stderr}"
 

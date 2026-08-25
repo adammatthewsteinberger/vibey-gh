@@ -81,6 +81,12 @@ This file follows Keep a Changelog and semantic versioning conventions.
   generated documentation channels and the channel-picker page. Empty (the default)
   disables it entirely, emitting no script tag and making no request to Google.
 
+- Fix `conventional-commits.yml` installing the adopting repository's own default-branch
+  checkout and assuming that yields the `vibey-gh` CLI: it now detects genuine self-hosting
+  the same way `provenance.yml` does and otherwise installs the published package, and the
+  commit-conformance check fails loudly instead of treating "command not found" as a false
+  `if` condition that then barrels ahead into a doomed history rewrite. Fix the same
+  adopting-repo-assumption bug in four `pr-automation.yml` installation steps.
 - Report the exact-head gate's outcome truthfully when the review, not the scans, decides
   it: a review that returned actionable findings and a review that returned no verdict at
   all are now distinct, named states instead of a failing check whose summary claims every
