@@ -325,7 +325,7 @@ jobs:
             )
           ' <<<"$STRUCTURED")
           if grep -qE '^name = "vibey-gh"' automation/pyproject.toml; then
-            python -m pip install --quiet ./automation
+            python -m pip install --quiet -e ./automation
           else
             python -m pip install --quiet vibey-gh
           fi
@@ -407,7 +407,7 @@ jobs:
         run: |
           set -euo pipefail
           if grep -qE '^name = "vibey-gh"' automation/pyproject.toml; then
-            python -m pip install --quiet ./automation
+            python -m pip install --quiet -e ./automation
           else
             python -m pip install --quiet vibey-gh
           fi
@@ -595,7 +595,7 @@ jobs:
         run: |
           set -euo pipefail
           if grep -qE '^name = "vibey-gh"' automation/pyproject.toml; then
-            python -m pip install --quiet ./automation
+            python -m pip install --quiet -e ./automation
           else
             python -m pip install --quiet vibey-gh
           fi
@@ -757,7 +757,7 @@ jobs:
             exit 1
           fi
           if grep -qE '^name = "vibey-gh"' automation/pyproject.toml; then
-            python -m pip install --quiet ./automation
+            python -m pip install --quiet -e ./automation
           else
             python -m pip install --quiet vibey-gh
           fi
