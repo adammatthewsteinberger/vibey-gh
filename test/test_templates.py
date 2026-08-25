@@ -185,9 +185,7 @@ def test_security_and_api_drift_workflows_are_real_managed_gates():
     assert '[ "$STATE" = ready ] || [ "$STATE" = review ]' in text
     # Only an explicit `true` verdict may pass the gate; every other value, including
     # the empty string a failed review job leaves behind, fails closed.
-    assert re.search(
-        r'case "\$REVIEW_PASSED" in\n\s+true\)\n\s+conclusion=success\n', text
-    )
+    assert re.search(r'case "\$REVIEW_PASSED" in\n\s+true\)\n\s+conclusion=success\n', text)
     assert "full_claude_output:" in text
     assert "Validate diagnostic output policy" in text
     assert "github.event.repository.visibility == 'private'" in text
@@ -225,9 +223,7 @@ def test_security_and_api_drift_workflows_are_real_managed_gates():
     assert "Exact-head semantic review result:" in text
     # Only an explicit `true` verdict may pass the gate; every other value, including
     # the empty string a failed review job leaves behind, fails closed.
-    assert re.search(
-        r'case "\$REVIEW_PASSED" in\n\s+true\)\n\s+conclusion=success\n', text
-    )
+    assert re.search(r'case "\$REVIEW_PASSED" in\n\s+true\)\n\s+conclusion=success\n', text)
 
 
 def test_branch_intake_reopens_a_reused_branch_name_without_duplicating_open_prs():
@@ -285,9 +281,7 @@ def test_automation_bootstrap_scope_check_rejects_files_outside_automation_core(
         # step when grep finds an out-of-scope line (exit 0), and passes when grep finds
         # none (exit 1, no matches).
         script = f"grep -Ev '{pattern}' <<'EOF'\n{changed_files}EOF\n"
-        result = subprocess.run(
-            ["sh", "-c", script], capture_output=True, text=True, check=False
-        )
+        result = subprocess.run(["sh", "-c", script], capture_output=True, text=True, check=False)
         return result.returncode != 0
 
     assert confinement_check_passes(in_scope_only)
@@ -515,7 +509,7 @@ def test_conventional_commits_installs_the_published_package_not_the_adopting_re
     """
     text = (WORKFLOWS / "conventional-commits.yml").read_text(encoding="utf-8")
     assert "pip install --quiet ./automation" not in text
-    assert 'grep -qE \'^name = "vibey-(gh|bootstrap)"\' pyproject.toml' in text
+    assert "grep -qE '^name = \"vibey-(gh|bootstrap)\"' pyproject.toml" in text
     assert "python -m pip install --quiet -e ." in text
     assert "python -m pip install --quiet vibey-gh" in text
     assert "name: Check out trusted automation" in text
@@ -538,9 +532,7 @@ def test_pr_automation_never_assumes_the_adopting_repos_own_package_is_vibey_gh(
     """
     text = (WORKFLOWS / "pr-automation.yml").read_text(encoding="utf-8")
     assert "pip install --quiet ./automation" not in text
-    checks = re.findall(
-        r"""grep -qE '\^name = "vibey-gh"' automation/pyproject\.toml""", text
-    )
+    checks = re.findall(r"""grep -qE '\^name = "vibey-gh"' automation/pyproject\.toml""", text)
     assert len(checks) == 4
     installs = re.findall(r"python -m pip install --quiet vibey-gh\b", text)
     assert len(installs) == 5  # the four guarded installs above plus the evaluate job's own
@@ -557,12 +549,8 @@ def test_promotion_checks_provenance_without_rewriting_or_reauditing_history():
 
 def test_every_managed_third_party_action_is_immutably_pinned():
     for path in [*WORKFLOW_TEMPLATES, *REPO_WORKFLOWS]:
-        for action, revision in re.findall(
-            r"uses:\s+([^@\s]+)@([^\s#]+)", path.read_text()
-        ):
-            assert re.fullmatch(
-                r"[0-9a-f]{40}", revision
-            ), f"{path.name}: {action}@{revision}"
+        for action, revision in re.findall(r"uses:\s+([^@\s]+)@([^\s#]+)", path.read_text()):
+            assert re.fullmatch(r"[0-9a-f]{40}", revision), f"{path.name}: {action}@{revision}"
 
 
 def test_privileged_agent_cannot_mutate_git_or_execute_pr_code():
