@@ -166,6 +166,33 @@ and manual dispatch (optionally scoped to one PR, optionally `dry_run`). With `a
 read`, `contents: write`, and `pull-requests: write`, it resolves the gated PR and runs
 `vibey-gh merge-train`, which squash-merges every currently ready PR into `develop`.
 
+## Branch sync
+
+`Branch sync` runs on every push to `develop`, a nightly `37 5 * * *` schedule, and manual
+dispatch with an optional `dry_run` input. Top-level permissions are read-only
+`contents: read`; each job elevates only what it needs. It holds two independent jobs that
+never run in the same trigger.
+
+The `sync` job (push or manual dispatch, never schedule; `contents: write`,
+`pull-requests: write`) checks out trusted default-branch automation and runs `vibey-gh
+reconcile-branches`, the CLI entry point over `vibey_gh/reconcile.py`. For every open pull
+request it classifies the branch by `git cherry` patch identity against `develop`: a branch
+with nothing unique has its PR closed and (when configured) its branch deleted; a branch
+automation owns and that is behind is rebased onto the new tip, dropping the
+now-duplicated commits; a contributor's own branch is left untouched and, when behind,
+either merged forward through GitHub's update-branch endpoint (with the contributor's
+consent implied by "allow maintainer edits") or left with an explanatory comment. Forks are
+only ever moved forward, never rewritten, rebased, closed, or deleted. `dry_run` decides
+and reports without mutating anything. `[branch_sync]` and `[realign]` in configuration
+control this behavior; see [Configuration](configuration.md).
+
+The `heal` job (schedule only; `actions: write`, `contents: read`, `pull-requests: write`)
+runs `vibey-gh pr-automation self-heal` to refill the repair budget of every pull request
+labeled `vibey-gh:repair-exhausted`, up to `branch_sync.max_self_heals` refills per lineage,
+so a transient outage does not permanently strand a PR that a human has not yet noticed.
+Each healed pull request then has `pr-automation.yml` re-dispatched against its exact head
+SHA, returning it to ordinary review and repair with no exemption.
+
 ## Promote
 
 `Promote` (workflow file `promote-to-main.yml`) runs on completion of `Merge train`, a
