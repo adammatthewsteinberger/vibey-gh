@@ -68,7 +68,10 @@ failures, timeouts, startup failures, and action-required results enter repair; 
 or stale infrastructure runs are operationally blocked rather than presented as source
 defects.
 
-Repair and conflict budgets are bounded per contributor lineage. Bot repair pushes do not
+Repair, conflict, and review-finding budgets share one bound per contributor lineage, and
+it applies to trusted and outside authors alike — every author's exact head is reviewed, so
+every author's review-to-repair cycle needs the same limit. Once the budget is spent the
+next evaluation blocks rather than dispatching a further review. Bot repair pushes do not
 reset the budget; a new human or contributor commit creates a new lineage. Results persist
 in one machine-readable PR comment, and a verdict for an older SHA never satisfies the
 gate for a newer one.

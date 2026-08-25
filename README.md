@@ -175,7 +175,9 @@ all configured scans settle for the exact head SHA
 ```
 
 Every new commit invalidates earlier evidence and starts evaluation for the new SHA. The
-repair budget is three attempts per contributor lineage by default. Bot-authored repair
+repair budget is three attempts per contributor lineage by default, and it covers every
+automated repair on that lineage — failing scans, merge conflicts, and review findings
+alike, for trusted and outside authors equally. Bot-authored repair
 commits do not reset it; a new human/contributor commit does.
 
 ### Your first successful run
@@ -373,7 +375,10 @@ conflicting, closed, and fork draft heads are no-ops; they are never promoted pr
 `pr-automation.yml` reacts to configured scan-workflow completions, re-reads the entire
 current-head check rollup, and publishes an explicit check run on that exact SHA. It waits
 for pending scans, separates cancelled infrastructure from actionable failures, and allows
-at most three repair commits per contributor lineage. A new contributor commit starts a
+at most three repair commits per contributor lineage. Because every author's exact head
+is reviewed, the same budget bounds the review-to-repair cycle too: once it is spent the
+next evaluation blocks instead of dispatching another review. A new contributor commit
+starts a
 new lineage; bot repair pushes do not reset the counter.
 
 Conflicting same-repository PRs enter a bounded conflict-resolution job instead of failing

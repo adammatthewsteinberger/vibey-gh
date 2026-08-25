@@ -127,6 +127,24 @@ def _trusted(pr: dict[str, Any], cfg: GhConfig) -> bool:
     return actor in trusted
 
 
+def lineage_for(stored: AutomationState | None, head: str) -> AutomationState:
+    """The state that applies to `head`, starting a new lineage when it has moved on.
+
+    `current_sha` tracks the last head automation itself produced or evaluated, so a head
+    that differs from it arrived from a human. That starts a fresh attempt budget — which
+    is the documented contract, and was previously computed by `evaluate` and then thrown
+    away, because the persisting path built its own state and never applied the same rule.
+    Both callers share this so the decision and the record cannot disagree again.
+    """
+    if stored is None or stored.current_sha != head:
+        return AutomationState(
+            lineage_sha=head,
+            current_sha=head,
+            history=list(stored.history) if stored else [],
+        )
+    return stored
+
+
 def evaluate(
     pr: dict[str, Any],
     cfg: GhConfig,
@@ -152,9 +170,7 @@ def evaluate(
         # Draft intake is intentionally nonterminal. `ready_draft` promotes the exact
         # head once its scans are stable; until then no failing gate may be published.
         return result("pending", "pull request is a draft awaiting a stable head")
-    state = stored
-    if state is None or state.current_sha != head:
-        state = AutomationState(lineage_sha=head, current_sha=head)
+    state = lineage_for(stored, head)
 
     labels = _labels(pr)
     if BLOCKED_LABEL in labels:
@@ -219,14 +235,21 @@ def evaluate(
             repair_attempt=state.attempts + 1,
         )
 
-    if not trusted and cfg.pr_automation.review_untrusted_authors:
+    # Every author's exact head is reviewed — the documentation audit is repository-wide,
+    # and only the *scope* of the review widens for an outside author. The loop that
+    # review can start must therefore be bounded for every author too. Bounding it here,
+    # at the point another review would be dispatched, is what makes it finite: each
+    # repair publishes a new head and clears `review_sha`, so a check placed after the
+    # verdict would never be reached while heads keep advancing.
+    reviewable = trusted or cfg.pr_automation.review_untrusted_authors
+    if reviewable:
+        if state.attempts >= cfg.pr_automation.max_repair_attempts:
+            return result(
+                "blocked", "review repair budget is exhausted", repair_attempt=state.attempts
+            )
         if state.review_sha != head:
             return result("review", "current head requires automated review")
         if state.review_passed is not True:
-            if state.attempts >= cfg.pr_automation.max_repair_attempts:
-                return result(
-                    "blocked", "review repair budget is exhausted", repair_attempt=state.attempts
-                )
             return result(
                 "repair",
                 "automated review has actionable findings",
@@ -297,11 +320,16 @@ def updated_state(
 ) -> AutomationState:
     current = parse_state(pr.get("comments") or [])
     head = str(payload.get("head_sha") or pr.get("headRefOid") or "")
-    state = current or AutomationState(lineage_sha=head, current_sha=head)
     if kind == "review":
+        # A review is recorded for the exact head just evaluated, so this is the one
+        # record that can tell a human push apart from an automation repair — a repair
+        # advances `current_sha` to its own new head as it is recorded, leaving them
+        # equal. Applying the reset here is what finally persists a new lineage.
+        state = lineage_for(current, head)
         state.review_sha = head
         state.review_passed = bool(payload.get("pass"))
     elif kind == "repair":
+        state = current or AutomationState(lineage_sha=head, current_sha=head)
         if payload.get("fixable") is not False:
             state.attempts += 1
         state.current_sha = head

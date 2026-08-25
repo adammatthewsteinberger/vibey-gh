@@ -5,6 +5,16 @@ This file follows Keep a Changelog and semantic versioning conventions.
 
 ## Unreleased
 
+- Bound the review-to-repair cycle for every author. The budget check sat behind an
+  outside-author condition, so a trusted author's exact-head review could request repair
+  after repair without limit; it is now applied wherever another review would be
+  dispatched, which is the only point that is reachable while each repair publishes a new
+  head.
+- Persist the per-lineage attempt reset that was previously computed and discarded. A new
+  human commit started a fresh lineage in the evaluation but never in the stored record, so
+  the documented per-lineage budget silently behaved as a cumulative per-pull-request one.
+  Both paths now share `lineage_for()` and cannot disagree.
+
 - Report the exact-head gate's outcome truthfully when the review, not the scans, decides
   it: a review that returned actionable findings and a review that returned no verdict at
   all are now distinct, named states instead of a failing check whose summary claims every

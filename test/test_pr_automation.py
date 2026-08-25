@@ -194,7 +194,63 @@ def test_evaluation_ignores_own_checks_and_accepts_context_shape(tmp_path):
         cfg(tmp_path),
         expected_sha="abc",
     )
-    assert result.state == "ready"
+    # Reaching the review stage is what proves the rollup was read correctly: the two own
+    # checks were ignored and the legacy `context` entry counted as a real passing scan.
+    assert result.state == "review"
+
+
+def test_the_review_loop_is_bounded_for_a_trusted_author_too(tmp_path):
+    """The workflow reviews every author, so every author's review loop needs a budget.
+
+    A trusted author previously fell straight through to `ready`, leaving the
+    review-to-repair cycle in the workflow with nothing bounding it at all.
+    """
+    config = cfg(tmp_path, max_repair_attempts=2)
+    green = pr(statusCheckRollup=[check()])
+    assert pa._trusted(green, config), "fixture must be a trusted author for this test"
+
+    below = pa.AutomationState("abc", "abc", attempts=1)
+    assert pa.evaluate(green, config, expected_sha="abc", stored=below).state == "review"
+
+    verdict = pa.AutomationState("abc", "abc", attempts=1, review_sha="abc", review_passed=False)
+    findings = pa.evaluate(green, config, expected_sha="abc", stored=verdict)
+    assert findings.state == "repair" and findings.repair_attempt == 2
+
+    spent = pa.AutomationState("abc", "abc", attempts=2)
+    blocked = pa.evaluate(green, config, expected_sha="abc", stored=spent)
+    assert blocked.state == "blocked"
+    assert "review repair budget is exhausted" in blocked.reason
+
+    passed = pa.AutomationState("abc", "abc", attempts=1, review_sha="abc", review_passed=True)
+    assert pa.evaluate(green, config, expected_sha="abc", stored=passed).state == "ready"
+
+
+def test_an_outside_author_with_review_disabled_still_reaches_ready(tmp_path):
+    config = cfg(tmp_path, review_untrusted_authors=False)
+    green = pr(author={"login": "stranger"}, statusCheckRollup=[check()])
+    assert pa.evaluate(green, config, expected_sha="abc", stored=None).state == "ready"
+
+
+def test_a_human_push_persists_a_fresh_attempt_budget():
+    """`evaluate` always computed the lineage reset; only the record never applied it."""
+    spent = pa.AutomationState(lineage_sha="old", current_sha="old", attempts=3)
+    pushed = pr(headRefOid="new", comments=[pa.state_body(spent, "x")])
+    fresh = pa.updated_state(pushed, {"head_sha": "new", "pass": True}, kind="review")
+    assert fresh.attempts == 0
+    assert fresh.lineage_sha == "new" and fresh.current_sha == "new"
+    assert [item["kind"] for item in fresh.history] == ["review"]
+
+    # A bot repair advances the head as it records, so it must NOT look like a new
+    # lineage — otherwise the budget would reset on every repair and bound nothing.
+    carried = pa.AutomationState(lineage_sha="new", current_sha="new", attempts=1)
+    repaired = pr(headRefOid="newer", comments=[pa.state_body(carried, "x")])
+    after = pa.updated_state(repaired, {"head_sha": "newer", "fixable": True}, kind="repair")
+    assert after.attempts == 2 and after.lineage_sha == "new" and after.current_sha == "newer"
+
+    # And a review recorded for the head that repair just produced continues the lineage.
+    again = pr(headRefOid="newer", comments=[pa.state_body(after, "x")])
+    continued = pa.updated_state(again, {"head_sha": "newer", "pass": False}, kind="review")
+    assert continued.attempts == 2 and continued.lineage_sha == "new"
 
 
 def test_evaluation_waits_when_no_scan_result_exists(tmp_path):
