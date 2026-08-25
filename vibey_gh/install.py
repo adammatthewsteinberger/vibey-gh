@@ -26,6 +26,8 @@ WORKFLOWS_DIR = ".github/workflows"
 RELEASE_ASSETS_DIR = ".github/vibey-gh/release"
 HOOKS = ("commit-msg", "pre-push")
 HOOKS_DIR = ".githooks"
+GITATTRIBUTES = ".gitattributes"
+UNION_MARKER = "# vibey-gh: append-only files merge instead of conflicting"
 
 
 @dataclass
@@ -202,6 +204,45 @@ def installation_notices() -> tuple[str, ...]:
     return tuple(notices)
 
 
+def union_merge_lines(cfg: GhConfig) -> list[str]:
+    return [f"{path} merge=union" for path in cfg.union_merge_paths]
+
+
+def missing_union_merge_lines(cfg: GhConfig) -> list[str]:
+    """Which `merge=union` declarations `.gitattributes` does not already carry."""
+    path = cfg.root / GITATTRIBUTES
+    existing = path.read_text(encoding="utf-8").splitlines() if path.is_file() else []
+    present = {line.strip() for line in existing}
+    return [line for line in union_merge_lines(cfg) if line not in present]
+
+
+def apply_union_merge(cfg: GhConfig) -> str | None:
+    """Append the missing declarations, never rewriting what is already there.
+
+    Every branch appends to the changelog, so two branches almost always touch the same
+    lines and every merge strands the others — a conflict that carries no information and
+    has to be resolved by hand each time. Git's `union` driver keeps both sides instead.
+
+    It only works from the branch being merged *into*, so this file has to be committed on
+    the integration branch to have any effect on the topic branches that follow.
+
+    A repository's own `.gitattributes` is its own: this appends and never rewrites, so an
+    adopter's existing rules survive adoption untouched.
+    """
+    missing = missing_union_merge_lines(cfg)
+    if not missing:
+        return None
+    path = cfg.root / GITATTRIBUTES
+    existing = path.read_text(encoding="utf-8") if path.is_file() else ""
+    outcome = "updated" if existing else "installed"
+    block = "\n".join([UNION_MARKER, *missing])
+    if existing and not existing.endswith("\n"):
+        existing += "\n"
+    prefix = f"{existing}\n" if existing else ""
+    path.write_text(f"{prefix}{block}\n", encoding="utf-8")
+    return outcome
+
+
 def install(cfg: GhConfig | None = None, hooks_path: bool = True) -> list[Action]:
     cfg = cfg or load_config()
     target = cfg.root / HOOKS_DIR
@@ -263,6 +304,9 @@ def install(cfg: GhConfig | None = None, hooks_path: bool = True) -> list[Action
         dest.write_text(wanted, encoding="utf-8")
         actions.append(Action(f"{RELEASE_ASSETS_DIR}/{name}", outcome))
 
+    attributes = apply_union_merge(cfg)
+    actions.append(Action(GITATTRIBUTES, attributes or "unchanged"))
+
     if hooks_path:
         subprocess.run(
             ["git", "config", "core.hooksPath", HOOKS_DIR],
@@ -305,6 +349,9 @@ def installed(cfg: GhConfig | None = None, local: bool = True) -> tuple[bool, li
             problems.append(f"{RELEASE_ASSETS_DIR}/{name} is missing")
         elif dest.read_text(encoding="utf-8") != source.read_text(encoding="utf-8"):
             problems.append(f"{RELEASE_ASSETS_DIR}/{name} is out of date")
+
+    for line in missing_union_merge_lines(cfg):
+        problems.append(f"{GITATTRIBUTES} is missing `{line}`")
 
     if local:
         import subprocess

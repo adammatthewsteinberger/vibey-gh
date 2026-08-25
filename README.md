@@ -270,6 +270,13 @@ request bytes for HMAC verification; see [the CLI and adapter reference](docs/cl
 
 Run `vibey-gh --help` and read [docs/cli.md](docs/cli.md) for the full reference.
 
+`install` also declares `CHANGELOG.md merge=union` in `.gitattributes`. Every branch
+appends to the same changelog section, so without it every merge strands every other open
+branch on a conflict that carries no information and has to be resolved by hand. The union
+driver keeps both sides. It only takes effect from the branch being merged *into*, so it
+has to reach the integration branch before the topic branches that follow benefit. An
+existing `.gitattributes` is appended to, never rewritten.
+
 `install` writes the git hooks and workflow files into your repository and points
 `core.hooksPath` at them. A hook you already have is moved aside to `<name>.local` and
 chained, never discarded — adopting this should not silently drop checks somebody thought

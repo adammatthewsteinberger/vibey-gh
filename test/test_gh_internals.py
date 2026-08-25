@@ -540,7 +540,9 @@ def test_a_repository_can_take_the_hooks_without_the_workflows(repo):
     cfg = GhConfig(root=repo, managed_workflows=())
     actions = install.install(cfg)
 
-    assert {a.hook for a in actions} == {"commit-msg", "pre-push"}
+    # The hooks and the append-only merge rule are install-level concerns that do not
+    # depend on any workflow, so they arrive even when no workflow is wanted.
+    assert {a.hook for a in actions} == {"commit-msg", "pre-push", ".gitattributes"}
     assert not (repo / ".github/workflows/provenance.yml").exists()
     assert install.installed(cfg) == (True, [])
 
