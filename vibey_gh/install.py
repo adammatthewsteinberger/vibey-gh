@@ -96,6 +96,7 @@ def render_workflow(source: Path, cfg: GhConfig) -> str:
     issues = cfg.issue_automation
     wanted = wanted.replace("__VIBEY_GH_ISSUE_ENABLED__", "true" if issues.enabled else "false")
     wanted = wanted.replace("__VIBEY_GH_ISSUE_MODEL__", issues.model)
+    wanted = wanted.replace("__VIBEY_GH_ISSUE_MAX_TURNS__", str(issues.max_turns))
     wanted = wanted.replace("__VIBEY_GH_ISSUE_BRANCH_PREFIX__", issues.branch_prefix)
     wanted = wanted.replace("__VIBEY_GH_ISSUE_LABEL__", issues.required_label)
     wanted = wanted.replace(

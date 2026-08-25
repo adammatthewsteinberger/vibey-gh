@@ -65,6 +65,14 @@ branch from an obsolete checkout. This applies even when `develop` or `main` is 
 PR head during a promotion, which is exactly when clobbering unreviewed newer content would
 be most damaging. See [Workflows](workflows.md) for the exact recheck points.
 
+Repair and solve budgets persist in a single marker comment per PR or issue, located by
+pattern match rather than by comment author (see [Threat model](threat-model.md)). On a
+public repository any commenter can forge or edit that marker to reset `attempts` or
+`heals`, so the stored counters are a cost control, not an access control. They cannot
+authorize an unreviewed merge: the review job re-runs on every SHA that reaches `ready` or
+`review`, and the exact-head recheck above still gates every publish independently of the
+stored state.
+
 The Conventional Commits job is the sole guarded exception that may force-update history.
 It can act only on a same-repository topic branch, only from an exact checked SHA, only on
 linear history, and only with `--force-with-lease`. Permanent branches are rejected by

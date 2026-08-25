@@ -50,6 +50,22 @@ resource-exhaustion attempt through repeated events is bounded by `max_attempts`
 resulting pull request receives ordinary review, repair, and merge-train treatment; nothing
 about its origin exempts it.
 
+The repair/solve attempt budget itself is adversary-reachable. `vibey_gh.github_state`
+locates the one marker comment holding `attempts`, `heals`, and the last reviewed SHA by
+regexing the newest comment body for `<!-- marker:{...} -->`; it does not check who posted
+that comment. On a public repository, any accountholder who can comment on the PR or
+issue — including its own author — can post a hidden marker resetting the stored counters,
+and `upsert_comment` locates "the existing" comment the same unauthenticated way, so a later
+legitimate update silently edits the forged one instead of rejecting it. This cannot force
+an unreviewed merge: `PRAutomation`'s review job re-runs whenever `evaluate` reaches `ready`
+or `review` regardless of the stored `review_passed` value, and every merge still requires
+the exact-head gates above. What a forged marker can do is defeat `max_repair_attempts`,
+`max_self_heals`, and `max_attempts` as cost controls, turning the advertised bounded
+repair/solve budget into repeated paid Claude invocations. The reusable Python capability
+does not itself bind state to a trusted author or sign the payload; operators who need a
+hard cost ceiling on a public repository should restrict who can comment on
+automation-managed PRs and issues.
+
 Fork PR heads are a distinct adversary-controlled asset: the fork owner controls the head
 commit but never receives privileged credentials. When a fork PR needs a repair it cannot
 receive directly, the `mirror-fork` job (`contents: write`, `issues: write`,

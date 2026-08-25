@@ -11,9 +11,13 @@
   outside `[merge_train].owner` and `trusted_authors` is skipped until a maintainer applies
   the configured `required_label`, and a configured ignored label, an absent trigger label,
   an exhausted budget, or a `vibey-gh:solve-blocked` label each produce their own reason.
-- An issue labelled `vibey-gh:solve-blocked` means the attempt returned `needs_human`: the
-  request needs a human decision, named in the issue's state comment. Answer it in the
-  issue, then edit the body to restate the request — editing starts a new attempt lineage.
+- An issue labelled `vibey-gh:solve-blocked` has two distinct causes, and the issue's own
+  comments say which applies: a `needs_human` verdict, where the request needs a human
+  decision named in the state comment — answer it in the issue, then edit the body to
+  restate the request, which starts a new attempt lineage; or an attempt that returned no
+  structured output at all (turn-budget exhaustion or an infrastructure failure), reported
+  as "An automated solution attempt ran and returned no result" — see the entry below for
+  that remedy instead.
 - A redispatched `Issue automation` run that does nothing is working correctly. Attempts
   are keyed to a fingerprint of the issue's title and body, so unchanged text cannot spend
   a second attempt or open a second pull request.
@@ -28,6 +32,12 @@
   converge and the budget is spent for nothing. Run each formatter in turn on a file with
   the disputed shape and check whether the other still accepts it, then match their
   configuration — `test_the_configured_formatters_agree_with_each_other` guards this.
+- An issue commented "An automated solution attempt ran and returned no result" means the
+  attempt produced nothing at all. The usual cause is a request too large for one attempt —
+  several distinct changes asked for together, or a wide audit before any of them — which
+  the run log shows as `error_max_turns`. Split it into separate issues with their own
+  acceptance criteria, or raise `[issue_automation].max_turns`. The same symptom appears
+  for an exhausted API credit balance; the run log distinguishes them.
 - Package verification should query the GHCR manifest, not account package listing APIs.
 - Pages 404s require a successful deployment containing an `index.html` at each channel.
 - A `vibey-gh check` failure printed as `debug logging: <path>: cannot validate branch
