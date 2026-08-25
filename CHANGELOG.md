@@ -24,6 +24,12 @@ This file follows Keep a Changelog and semantic versioning conventions.
   job green, so two stranded pull requests looked reconciled across four runs while neither
   branch had moved. The decision and its outcome are now printed separately, and a run that
   could not apply an action says how many.
+- Stop `github-release.yml` from failing on a release-branch push that carries no version
+  bump. A docs-only or tooling-only promotion is expected, by an adopting repository's own
+  `version.content_paths`/`code_paths` configuration, to publish nothing new — `publish()`
+  now treats a version already tagged at a different commit as that intentional no-op
+  rather than an error, unless the new `[github_release] require_new_version` opts a
+  repository into the stricter behavior.
 
 - Keep a successful realign successful when its branch reconciliation cannot reach GitHub.
   Reconciliation is a follow-up that needs credentials some contexts do not have, and a

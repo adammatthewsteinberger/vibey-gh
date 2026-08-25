@@ -567,6 +567,7 @@ retain_schedule_backstop = true
 enabled = true
 tag_prefix = "v"
 generate_notes = true
+require_new_version = false          # a versionless release-branch push is a no-op, not an error
 
 [repository_profile]
 enabled = true

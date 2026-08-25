@@ -228,9 +228,21 @@ class RealignConfig:
 
 @dataclass(frozen=True)
 class GithubReleaseConfig:
+    """How a release-branch commit becomes an immutable tag and GitHub Release.
+
+    Not every push to the release branch carries a new version — a docs-only or
+    tooling-only promotion is expected and, per `version.content_paths`/`code_paths`,
+    deliberately publishes nothing new. `require_new_version` decides what that means: by
+    default such a push is a no-op, because a version already tagged elsewhere is the
+    normal, frequent case, not an error. Set it when the adopting repository's release
+    branch should carry a new version on every push, so a tag that would otherwise move
+    silently reports as the mistake it actually is.
+    """
+
     enabled: bool = True
     tag_prefix: str = "v"
     generate_notes: bool = True
+    require_new_version: bool = False
 
     def __post_init__(self) -> None:
         if not self.tag_prefix or any(char.isspace() for char in self.tag_prefix):
@@ -468,6 +480,7 @@ def load_config(root: Path | None = None) -> GhConfig:
             enabled=release.get("enabled", True),
             tag_prefix=release.get("tag_prefix", "v"),
             generate_notes=release.get("generate_notes", True),
+            require_new_version=release.get("require_new_version", False),
         ),
         repository_profile=RepositoryProfileConfig(
             enabled=profile.get("enabled", True),
