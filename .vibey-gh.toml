@@ -36,6 +36,18 @@ sanitized_progress = true
 archive_execution_file = true
 allow_private_full_output = false
 
+[issue_automation]
+enabled = true
+model = "claude-sonnet-5"
+max_attempts = 2
+branch_prefix = "vibey-gh/issue"
+solve_untrusted_authors = false
+required_label = "vibey-gh:solve"
+ignored_labels = ["question", "discussion", "duplicate", "wontfix", "vibey-gh:solve-blocked"]
+open_pull_request = true
+draft_pull_request = true
+retain_schedule_backstop = true
+
 [github_release]
 enabled = true
 tag_prefix = "v"

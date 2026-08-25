@@ -5,6 +5,22 @@ This file follows Keep a Changelog and semantic versioning conventions.
 
 ## Unreleased
 
+- Add autonomous issue automation: an eligible published issue is evaluated by trusted
+  policy code, implemented by a constrained agent that reads the issue only as bounded
+  untrusted data, and published as one guarded solution branch and linked pull request
+  that closes the issue on merge.
+- Treat issue text as an adversary-controlled input to a privileged job: outside authors
+  are opt-in behind a configurable maintainer label, the agent holds no shell, `gh`,
+  subagent, or Git tool, and nothing derived from an issue reaches a shell command, a
+  workflow expression, or a branch name.
+- Budget autonomous solution attempts against a fingerprint of the issue's title and body,
+  so a redispatch of unchanged text cannot spend the budget twice and editing an issue
+  starts a new lineage with a new branch.
+- Render `branch-intake.yml` to yield the configured issue-solution branch namespace, so
+  branch intake and issue automation never race to open the same pull request.
+- Extract durable marker-comment automation state into `vibey_gh.github_state`, shared by
+  pull-request and issue automation instead of duplicated across them.
+
 - Require advanced debug instrumentation for every Python control-flow branch and add
   opt-in, correlated, metadata-only JSONL tracing with tamper-evident SHA-256 chaining.
 - Enforce genuine 100% line and branch coverage with pytest-cov and align all contributor

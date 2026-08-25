@@ -9,13 +9,13 @@ That keeps stale-SHA rejection, trust, retry limits, and check classification te
 from __future__ import annotations
 
 import json
-import os
 import re
 import subprocess
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass, field
 from typing import Any, cast
 
+from vibey_gh import github_state
 from vibey_gh.config import GhConfig, normalise_actor
 
 STATE_MARKER = "vibey-gh-pr-automation"
@@ -27,7 +27,7 @@ AUTOMATION_LABELS = (EXTERNAL_REPAIR_LABEL, REPAIRING_LABEL, EXHAUSTED_LABEL, BL
 PASSING = {"SUCCESS", "NEUTRAL", "SKIPPED"}
 FAILING = {"FAILURE", "TIMED_OUT", "STARTUP_FAILURE", "ACTION_REQUIRED"}
 OPERATIONAL = {"CANCELLED", "STALE"}
-_STATE_RE = re.compile(r"<!-- " + STATE_MARKER + r":(\{.*?\}) -->", re.DOTALL)
+_STATE_RE = github_state.marker_pattern(STATE_MARKER)
 
 
 @dataclass(frozen=True)
@@ -81,30 +81,25 @@ def _check(raw: dict[str, Any]) -> Check:
 
 def parse_state(comments: Sequence[dict[str, Any] | str]) -> AutomationState | None:
     """Return the newest valid state marker, ignoring ordinary or malformed comments."""
-    for item in reversed(comments):
-        body = item if isinstance(item, str) else str(item.get("body", ""))
-        match = _STATE_RE.search(body)
-        if not match:
-            continue
-        try:
-            data = json.loads(match.group(1))
-            return AutomationState(
-                lineage_sha=str(data["lineage_sha"]),
-                current_sha=str(data["current_sha"]),
-                attempts=int(data.get("attempts", 0)),
-                review_sha=data.get("review_sha"),
-                review_passed=data.get("review_passed"),
-                replacement_pr=data.get("replacement_pr"),
-                history=list(data.get("history", [])),
-            )
-        except (KeyError, TypeError, ValueError, json.JSONDecodeError):
-            continue
-    return None
+    data = github_state.parse_payload(comments, _STATE_RE)
+    if data is None:
+        return None
+    try:
+        return AutomationState(
+            lineage_sha=str(data["lineage_sha"]),
+            current_sha=str(data["current_sha"]),
+            attempts=int(data.get("attempts", 0)),
+            review_sha=data.get("review_sha"),
+            review_passed=data.get("review_passed"),
+            replacement_pr=data.get("replacement_pr"),
+            history=list(data.get("history", [])),
+        )
+    except (KeyError, TypeError, ValueError):
+        return None
 
 
 def state_body(state: AutomationState, summary: str) -> str:
-    encoded = json.dumps(asdict(state), sort_keys=True, separators=(",", ":"))
-    return f"<!-- {STATE_MARKER}:{encoded} -->\n## Vibey GH PR automation\n\n{summary.strip()}\n"
+    return github_state.render_body(STATE_MARKER, asdict(state), "Vibey GH PR automation", summary)
 
 
 def _labels(pr: dict[str, Any]) -> set[str]:
@@ -241,11 +236,7 @@ def evaluate(
     return result("ready", "all scans and applicable reviews passed")
 
 
-def _gh_json(*args: str) -> Any:
-    run = subprocess.run(["gh", *args], capture_output=True, text=True, check=False)
-    if run.returncode:
-        raise RuntimeError(f"gh {' '.join(args)}: {run.stderr.strip()}")
-    return json.loads(run.stdout or "null")
+_gh_json = github_state.gh_json
 
 
 def fetch_pr(number: int) -> dict[str, Any]:
@@ -324,67 +315,14 @@ def updated_state(
 def upsert_state(
     number: int, state: AutomationState, summary: str, comments: list[dict[str, Any]]
 ) -> None:
-    body = state_body(state, summary)
-    repository_name = os.environ.get("GH_REPO")
-    if not repository_name:
-        repository = _gh_json("repo", "view", "--json", "nameWithOwner")
-        repository_name = str(repository["nameWithOwner"])
-    existing: dict[str, Any] | None = None
-    for comment in reversed(comments):
-        if _STATE_RE.search(str(comment.get("body", ""))):
-            existing = comment
-            break
-    if existing is None:
-        run = subprocess.run(
-            ["gh", "pr", "comment", str(number), "--repo", repository_name, "--body", body],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-    elif existing.get("databaseId") is not None:
-        comment_id = existing["databaseId"]
-        run = subprocess.run(
-            [
-                "gh",
-                "api",
-                f"repos/{repository_name}/issues/comments/{comment_id}",
-                "--method",
-                "PATCH",
-                "--field",
-                f"body={body}",
-            ],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-    else:
-        # GraphQL comments sometimes expose only an opaque `IC_...` node ID. Passing
-        # that value to the REST issues/comments endpoint produces a misleading 404.
-        comment_id = existing.get("id")
-        if not comment_id:
-            raise RuntimeError("could not persist PR automation state: comment has no ID")
-        mutation = (
-            "mutation($id:ID!,$body:String!){updateIssueComment(input:{id:$id,body:$body})"
-            "{issueComment{id}}}"
-        )
-        run = subprocess.run(
-            [
-                "gh",
-                "api",
-                "graphql",
-                "--field",
-                f"query={mutation}",
-                "--field",
-                f"id={comment_id}",
-                "--field",
-                f"body={body}",
-            ],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-    if run.returncode:
-        raise RuntimeError(f"could not persist PR automation state: {run.stderr.strip()}")
+    github_state.upsert_comment(
+        number,
+        state_body(state, summary),
+        comments,
+        _STATE_RE,
+        subject="pr",
+        error="could not persist PR automation state",
+    )
 
 
 def record(number: int, payload: dict[str, Any], kind: str) -> AutomationState:

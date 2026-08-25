@@ -22,6 +22,7 @@ CAPABILITIES = (
     "trailer-key",
     "merge-train",
     "pr-automation",
+    "issue-automation",
     "github-release",
     "promote",
     "realign",

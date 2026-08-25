@@ -6,7 +6,9 @@ compares the PR head with the SHA that was evaluated. A concurrent update conver
 run into a successful stale no-op; it never force-pushes, overwrites newer work, consumes a
 repair attempt, or mutates a permanent branch from an obsolete checkout.
 
-Branch intake opens draft PRs. CI and provenance validate code. Documentation validates
+Issue automation turns an eligible published issue into one guarded solution branch and
+linked pull request, which then enters this same path with no exemption. Branch intake
+opens draft PRs. CI and provenance validate code. Documentation validates
 the complete docs contract and periodically authors guarded refresh PRs. PR automation
 aggregates exact-head scans, reviews outside contributions, repairs failures, and resolves
 conflicts. The merge train squash-merges to develop and rebase-merges promotions to main.
@@ -23,6 +25,39 @@ key off a `workflow_run` named `Release` (and `release-repair.yml` also watches 
 `Release` workflow that runs on `develop`/`main`, derives the version with `vibey-gh
 version --apply`, builds, and publishes through the `testpypi`/`pypi` trusted-publishing
 environments is what the rest of this reference assumes exists.
+
+## Issue automation
+
+`Issue automation` runs on `issues` (`opened`, `reopened`, `labeled`), `workflow_dispatch`
+with an issue number, and — when `[issue_automation].retain_schedule_backstop` is set — a
+twice-daily recovery sweep that dispatches only the issues `vibey-gh issue-automation
+list-eligible` reports.
+
+The `evaluate` job holds `contents: read` and `issues: read`. It runs trusted default-branch
+workflow code, installs the published `vibey-gh` package (never the adopting repository's
+own package), and emits one structured decision: `solve`, `skip`, or `blocked`, each with a
+stated reason. Only `solve` starts the privileged `solve` job; `blocked` labels and comments
+once through the `exhausted` job.
+
+The `solve` job checks out trusted automation under `automation/` and the configured base
+branch under `target/` with `persist-credentials: false`. A trusted step renders the issue
+into `briefing/issue.md`; the pinned Claude Code Action then runs from a disposable
+credential-free Git context with `Read,Glob,Grep,Edit,Write` and no `Bash`, `gh`, or
+`Agent` tool, and is told the briefing is an untrusted report rather than an instruction.
+It edits files only.
+
+Publication is a separate trusted step that validates the branch against the configured
+namespace and the permanent branches, normalizes provenance headers with
+`vibey-gh check --ci --apply`, commits with the repository's own configured trailer from
+`vibey-gh trailer`, pushes one non-empty-source refspec, and opens one linked pull request
+containing `Closes #N`. It publishes nothing when the agent returned `solved=false` or
+produced no diff. `branch-intake.yml` is rendered to ignore the same namespace so the two
+never race. From there the proposal is an ordinary pull request with no exemption from
+scans, review, repair, or the merge train.
+
+Attempts are budgeted per issue content fingerprint and stored in one machine-readable
+issue comment, so a redispatch of unchanged text is a no-op and an edit starts a new
+lineage.
 
 ## CodeQL
 

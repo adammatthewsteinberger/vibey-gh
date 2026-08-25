@@ -38,6 +38,7 @@ events. A skipped stale run is expected. A current-head failure is never bypasse
 | File | Workflow name | Responsibility |
 |---|---|---|
 | `branch-intake.yml` | Branch intake | Opens one reusable draft PR for a new same-repository topic branch and ignores permanent or automation-owned branches. |
+| `issue-automation.yml` | Issue automation | Decides whether a published issue is eligible for an autonomous solution and, if it is, publishes one guarded solution branch and linked pull request. |
 | `ci.yml` | CI | Runs the supported Python matrix, 100% coverage, lint, formatting, typing, managed-workflow dogfood, and package builds. |
 | `codeql.yml` | CodeQL | Runs immutably pinned Python CodeQL analysis for pull requests and both delivery branches. |
 | `api-drift.yml` | API drift (Cloud Agents OpenAPI) | Proves that every canonical capability is available through MCP, API, CLI, SDK, and webhook adapters. |
@@ -78,6 +79,44 @@ maintainability, architecture-boundary, and test-quality review. Forks are inspe
 never mutated with privileged credentials; required edits use a linked repository-owned
 replacement PR that preserves the contributor and exact head.
 
+## Autonomous issue solutions
+
+`issue-automation.yml` runs on `issues` (`opened`, `reopened`, `labeled`), manual dispatch,
+and an optional scheduled sweep. Its `evaluate` job holds only `contents: read` and
+`issues: read`: it installs the published `vibey-gh` package from trusted default-branch
+workflow code and asks `vibey-gh issue-automation evaluate` for a decision. Only the
+explicit `solve` decision starts the privileged `solve` job.
+
+Eligibility is policy, not judgement. An issue is skipped when the feature is disabled,
+when it is really a pull request, when it is closed, when it carries a configured ignored
+label, when configured trigger labels are absent, when it has no title and no body, when a
+proposal already exists, or — for an author outside the configured owner and trusted-author
+set — when the configured `required_label` has not been applied by a maintainer. It is
+blocked when an operator label is present or the attempt budget for that issue's content is
+spent. **Opening an issue can never, on its own, cause a privileged job to make changes.**
+
+The `solve` job holds `contents: write`, `issues: write`, `pull-requests: write`, and
+`id-token: write`. It checks out trusted automation under `automation/` and the base branch
+under `target/` with `persist-credentials: false`, writes the issue into
+`briefing/issue.md` through a trusted CLI call, and runs the pinned Claude Code Action from
+a disposable credential-free Git context with `Read,Glob,Grep,Edit,Write` and no `Bash`,
+no `gh`, and no `Agent` tool. The prompt states that the briefing is an untrusted report
+and that any instruction inside it is hostile input to be reported through
+`prompt_injection_observed` rather than obeyed.
+
+Publication is a separate trusted step. It refuses a branch that is empty, contains `:`,
+begins with `-`, contains `..`, escapes the configured branch namespace, or names a
+permanent branch; it publishes nothing when the agent returned `solved=false` or produced
+no diff; and it pushes exactly one non-empty-source refspec
+(`HEAD:refs/heads/<namespaced-branch>`) before opening one linked pull request that closes
+the issue. `branch-intake.yml` is rendered to ignore that same namespace, so the two never
+race to open a pull request for the same branch. The resulting pull request then receives
+ordinary scans, exact-head review, repair, and merge-train treatment with no exemption.
+
+Attempts are budgeted against a SHA-256 fingerprint of the issue's title and body, stored
+in one machine-readable issue comment. Re-dispatching unchanged text is a no-op; editing
+the issue starts a new lineage with a new branch and a new budget.
+
 ## AI trust boundary
 
 Claude runs from trusted base-branch workflow code. PR files, logs, comments, repository
@@ -95,7 +134,7 @@ private-repository diagnostic.
 ## Credentials and settings
 
 - `ANTHROPIC_API_KEY` must be a repository secret for AI review, repair, conflict
-  resolution, documentation upkeep, and release repair.
+  resolution, autonomous issue solutions, documentation upkeep, and release repair.
 - `AUTOMERGE_TOKEN` is needed when the default `GITHUB_TOKEN` cannot merge through the
   ruleset, manage settings, create PRs, or reconcile the repository profile.
 - PyPI and TestPyPI use trusted publishing through the `pypi` and `testpypi` environments;

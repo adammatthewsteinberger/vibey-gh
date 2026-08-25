@@ -20,6 +20,11 @@ Every project-specific decision lives here so the logic beside it can stay gener
     [install]
     workflows = []          # omit for all of them; [] for hooks and the CLI only
 
+    [issue_automation]
+    enabled        = true               # propose a solution branch for a published issue
+    branch_prefix  = "vibey-gh/issue"   # namespace every proposal branch lives under
+    required_label = "vibey-gh:solve"   # what opts an outside author's issue in
+
 Absent keys fall back to the defaults below, so a repository that agrees with them needs
 no file at all. `tomllib` is stdlib from 3.11, which this package already requires.
 """
@@ -48,6 +53,21 @@ DEFAULT_SCAN_WORKFLOWS = (
     "API drift (Cloud Agents OpenAPI)",
 )
 DEFAULT_IGNORED_CHECKS = ("PR automation / gate", "gate", "Merge train / merge")
+# Managed issue-automation labels. They live here rather than beside the policy because
+# `IssueAutomationConfig` defaults name one of them, and configuration must not import
+# the module that imports configuration.
+SOLVE_LABEL = "vibey-gh:solve"
+SOLVING_LABEL = "vibey-gh:solving"
+PROPOSED_LABEL = "vibey-gh:solution-proposed"
+SOLVE_EXHAUSTED_LABEL = "vibey-gh:solve-exhausted"
+SOLVE_BLOCKED_LABEL = "vibey-gh:solve-blocked"
+DEFAULT_IGNORED_ISSUE_LABELS = (
+    "question",
+    "discussion",
+    "duplicate",
+    "wontfix",
+    SOLVE_BLOCKED_LABEL,
+)
 DEFAULT_DOCUMENTATION_FILES = (
     ".claude-plugin/marketplace.json",
     ".claude/settings.json",
@@ -108,6 +128,47 @@ def _unique_nonempty(name: str, values: tuple[str, ...]) -> None:
         raise ValueError(f"{name} entries must be non-empty")
     if len(set(values)) != len(values):
         raise ValueError(f"{name} entries must be unique")
+
+
+@dataclass(frozen=True)
+class IssueAutomationConfig:
+    """Policy for autonomously proposing a solution to a published issue.
+
+    Issue text is contributor-controlled, so the defaults are deliberately closed for
+    anyone outside the trusted set: an outside issue is solved only after a maintainer
+    applies `required_label`. Everything a consuming repository could reasonably want to
+    change — the model, the budget, the branch namespace, the base branch, which labels
+    opt in or out, and whether a pull request is opened at all — is configuration rather
+    than a code change, because this ships to repositories the author never sees.
+    """
+
+    enabled: bool = True
+    model: str = "claude-sonnet-5"
+    max_attempts: int = 2
+    branch_prefix: str = "vibey-gh/issue"
+    base_branch: str = ""
+    solve_untrusted_authors: bool = False
+    required_label: str = SOLVE_LABEL
+    trigger_labels: tuple[str, ...] = ()
+    ignored_labels: tuple[str, ...] = DEFAULT_IGNORED_ISSUE_LABELS
+    open_pull_request: bool = True
+    draft_pull_request: bool = True
+    retain_schedule_backstop: bool = True
+
+    def __post_init__(self) -> None:
+        _unique_nonempty("issue_automation.trigger_labels", self.trigger_labels)
+        _unique_nonempty("issue_automation.ignored_labels", self.ignored_labels)
+        if not 1 <= self.max_attempts <= 10:
+            raise ValueError("issue_automation.max_attempts must be between 1 and 10")
+        if not self.model.strip():
+            raise ValueError("issue_automation.model must not be empty")
+        prefix = self.branch_prefix
+        if not prefix.strip() or any(char.isspace() for char in prefix):
+            raise ValueError("issue_automation.branch_prefix must be non-empty and unspaced")
+        if prefix.startswith(("-", "/")) or prefix.endswith("/") or ":" in prefix or ".." in prefix:
+            raise ValueError(f"issue_automation.branch_prefix is unsafe: {prefix!r}")
+        if any(char.isspace() for char in self.required_label):
+            raise ValueError("issue_automation.required_label must contain no whitespace")
 
 
 @dataclass(frozen=True)
@@ -206,6 +267,7 @@ class GhConfig:
     owner: str = ""
     trusted_authors: tuple[str, ...] = ()
     pr_automation: PrAutomationConfig = PrAutomationConfig()
+    issue_automation: IssueAutomationConfig = IssueAutomationConfig()
     github_release: GithubReleaseConfig = GithubReleaseConfig()
     repository_profile: RepositoryProfileConfig = RepositoryProfileConfig()
     documentation: DocumentationConfig = DocumentationConfig()
@@ -215,6 +277,19 @@ class GhConfig:
     # keeps only the hooks and the CLI — otherwise `check` reports a permanent failure
     # for workflows it deliberately does not want.
     managed_workflows: tuple[str, ...] | None = None
+
+    def __post_init__(self) -> None:
+        """Cross-field rules neither dataclass can check on its own.
+
+        A branch namespace only reads as safe next to the branches it must never
+        collide with, and those live here rather than in `IssueAutomationConfig`.
+        """
+        prefix = self.issue_automation.branch_prefix
+        permanent = {self.integration_branch, self.release_branch, "develop", "main"}
+        if prefix in permanent or any(prefix.startswith(f"{name}/") for name in permanent):
+            raise ValueError(
+                f"issue_automation.branch_prefix must not shadow a permanent branch: {prefix!r}"
+            )
 
     @property
     def header(self) -> str:
@@ -249,6 +324,7 @@ def load_config(root: Path | None = None) -> GhConfig:
     inst = data.get("install", {})
     auto = data.get("pr_automation", {})
     observability = auto.get("observability", {})
+    issues = data.get("issue_automation", {})
     release = data.get("github_release", {})
     profile = data.get("repository_profile", {})
     documentation = data.get("documentation", {})
@@ -282,6 +358,20 @@ def load_config(root: Path | None = None) -> GhConfig:
         owner=tr.get("owner", ""),
         trusted_authors=tuple(tr.get("trusted_authors", ())),
         pr_automation=automation,
+        issue_automation=IssueAutomationConfig(
+            enabled=issues.get("enabled", True),
+            model=issues.get("model", "claude-sonnet-5"),
+            max_attempts=issues.get("max_attempts", 2),
+            branch_prefix=issues.get("branch_prefix", "vibey-gh/issue"),
+            base_branch=issues.get("base_branch", ""),
+            solve_untrusted_authors=issues.get("solve_untrusted_authors", False),
+            required_label=issues.get("required_label", SOLVE_LABEL),
+            trigger_labels=tuple(issues.get("trigger_labels", ())),
+            ignored_labels=tuple(issues.get("ignored_labels", DEFAULT_IGNORED_ISSUE_LABELS)),
+            open_pull_request=issues.get("open_pull_request", True),
+            draft_pull_request=issues.get("draft_pull_request", True),
+            retain_schedule_backstop=issues.get("retain_schedule_backstop", True),
+        ),
         github_release=GithubReleaseConfig(
             enabled=release.get("enabled", True),
             tag_prefix=release.get("tag_prefix", "v"),

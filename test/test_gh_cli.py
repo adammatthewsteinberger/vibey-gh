@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from vibey_gh import github_release, merge_train, pr_automation
+from vibey_gh import github_release, issue_automation, merge_train, pr_automation
 from vibey_gh import realign as realign_mod
 from vibey_gh.cli import main
 from vibey_gh.config import load_config
@@ -427,6 +427,75 @@ def test_pr_automation_cli_surfaces(repo, monkeypatch, tmp_path, capsys):
     monkeypatch.setattr(pr_automation, "ensure_labels", lambda: calls.append("labels"))
     assert main(["pr-automation", "ensure-labels"]) == 0
     assert calls[-1] == "labels"
+
+
+def _evaluation(**changes):
+    values = dict(
+        issue=55,
+        title="Conventional commits bug",
+        author="owner",
+        trusted=True,
+        state="solve",
+        fingerprint="a" * 64,
+        base="develop",
+        branch="vibey-gh/issue/55-aaaaaaaa-conventional-commits-bug",
+        attempt=1,
+    )
+    values.update(changes)
+    return issue_automation.Evaluation(**values)
+
+
+def test_issue_automation_cli_surfaces(repo, monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr(issue_automation, "evaluate_issue", lambda *a: _evaluation())
+    assert main(["issue-automation", "evaluate", "--issue", "55"]) == 0
+    decision = json.loads(capsys.readouterr().out)
+    assert decision["state"] == "solve"
+    assert decision["pr_title"] == "fix: Conventional commits bug"
+
+    monkeypatch.setattr(issue_automation, "fetch_issue", lambda number: {"number": number})
+    monkeypatch.setattr(issue_automation, "context", lambda issue, max_bytes: "briefing\n")
+    assert main(["issue-automation", "context", "--issue", "55"]) == 0
+    assert capsys.readouterr().out == "briefing\n"
+
+    target = tmp_path / "nested" / "issue.md"
+    assert main(["issue-automation", "context", "--issue", "55", "--output", str(target)]) == 0
+    assert target.read_text(encoding="utf-8") == "briefing\n"
+    assert "wrote 9 bytes" in capsys.readouterr().out
+
+    state = issue_automation.IssueState(issue=55, fingerprint="abc", attempts=1)
+    calls = []
+    monkeypatch.setattr(
+        issue_automation,
+        "record",
+        lambda number, payload: calls.append((number, payload)) or state,
+    )
+    payload = tmp_path / "payload.json"
+    payload.write_text('{"solved": true}')
+    assert (
+        main(["issue-automation", "record-solution", "--issue", "55", "--input", str(payload)]) == 0
+    )
+    assert json.loads(capsys.readouterr().out)["attempts"] == 1
+    assert calls == [(55, {"solved": True})]
+
+    monkeypatch.setattr(issue_automation, "eligible_issues", lambda cfg: [_evaluation()])
+    assert main(["issue-automation", "list-eligible"]) == 0
+    assert [item["issue"] for item in json.loads(capsys.readouterr().out)] == [55]
+
+    monkeypatch.setattr(issue_automation, "ensure_labels", lambda: calls.append("labels"))
+    assert main(["issue-automation", "ensure-labels"]) == 0
+    assert calls[-1] == "labels"
+
+
+def test_issue_automation_cli_reports_failures(repo, monkeypatch, capsys):
+    def boom(*a, **k):
+        raise RuntimeError("gh issue view: not found")
+
+    monkeypatch.setattr(issue_automation, "evaluate_issue", boom)
+    assert main(["issue-automation", "evaluate", "--issue", "55"]) == 1
+    assert "not found" in capsys.readouterr().err
+
+    assert main(["issue-automation", "record-solution", "--issue", "55", "--input", "[]"]) == 1
+    assert "must be an object" in capsys.readouterr().err
 
 
 def test_api_and_mcp_surface_failures_return_nonzero(repo, monkeypatch, capsys):
