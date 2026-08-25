@@ -5,6 +5,16 @@ This file follows Keep a Changelog and semantic versioning conventions.
 
 ## Unreleased
 
+- Normalize formatting deterministically in the repair job. The repair agent holds no
+  shell, so it cannot run a formatter: it hand-formats, guesses the line length, fails the
+  lint gate, and the next attempt reformats the other way — a loop that spends the whole
+  repair budget without converging. The trusted step now runs the repository's own declared
+  formatters, which read their settings from its configuration rather than from a guess.
+- Reconcile the `ruff` and `isort` import rules, which were mutually unsatisfiable: each
+  rejected the other's output for a module imported both plainly and under an alias, so no
+  number of attempts could make such a file green. A test now proves the two agree and do
+  not oscillate.
+
 - Bring open branches forward automatically whenever the integration branch moves, so a
   conflict never accumulates. Automation-owned branches are rebased; every other branch,
   fork included, is merged forward through GitHub's own update-branch endpoint, which

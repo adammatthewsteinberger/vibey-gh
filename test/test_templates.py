@@ -511,6 +511,62 @@ def test_every_rendered_run_block_is_valid_shell(path):
             assert result.returncode == 0, f"{path.name}:{job}:{step.get('name')}: {result.stderr}"
 
 
+def test_the_configured_formatters_agree_with_each_other(tmp_path):
+    """`ruff` and `isort` both enforce import order, and left unmatched they disagree.
+
+    A repository whose formatters reject each other's output cannot be made green by any
+    number of attempts — which is exactly how an automated repair budget gets spent
+    without converging. The shape below is the one that first exposed it: a module
+    imported both plainly and under an alias.
+    """
+    import shutil
+    import subprocess
+
+    root = Path(__file__).resolve().parent.parent
+    if not shutil.which("ruff") or not shutil.which("isort"):  # pragma: no cover
+        pytest.skip("formatters are not installed")
+    shutil.copy(root / "pyproject.toml", tmp_path / "pyproject.toml")
+    probe = tmp_path / "probe.py"
+    probe.write_text(
+        "from __future__ import annotations\n\n"
+        "from vibey_gh import github_release, merge_train\n"
+        "from vibey_gh import realign as realign_mod\n"
+        "from vibey_gh import reconcile\n\n"
+        "USED = (github_release, merge_train, realign_mod, reconcile)\n",
+        encoding="utf-8",
+    )
+
+    def run(*command):
+        return subprocess.run(command, cwd=tmp_path, capture_output=True, check=False)
+
+    run("isort", "-q", str(probe))
+    run("ruff", "check", "--fix", "-q", str(probe))
+    run("isort", "-q", str(probe))
+    settled = probe.read_text(encoding="utf-8")
+
+    assert run("ruff", "check", str(probe)).returncode == 0, "ruff rejects isort's output"
+    assert run("isort", "--check-only", str(probe)).returncode == 0, "isort rejects ruff's"
+    # And the pair is stable: another pass of either changes nothing.
+    run("ruff", "check", "--fix", "-q", str(probe))
+    run("isort", "-q", str(probe))
+    assert probe.read_text(encoding="utf-8") == settled, "the formatters oscillate"
+
+
+def test_the_repair_job_normalizes_formatting_it_cannot_ask_the_agent_to_run():
+    """The agent has no shell, so formatting is the one failure it cannot fix itself."""
+    text = (WORKFLOWS / "pr-automation.yml").read_text(encoding="utf-8")
+    assert "Normalize formatting deterministically" in text
+    assert "working-directory: target" in text
+    assert "ruff check --fix ." in text
+    assert "isort ." in text
+    assert "black ." in text
+    # It must read the repository's own settings rather than guess, and run before the
+    # commit that publishes the repair.
+    assert text.index("Normalize formatting") < text.index("Publish one guarded repair commit")
+    assert "python -m pip install --quiet -e ./target" not in text
+    assert "do not execute repository code" in text.lower()
+
+
 @pytest.mark.parametrize("name", ["pre-push", "commit-msg"])
 def test_every_shipped_hook_is_valid_shell(name):
     import subprocess

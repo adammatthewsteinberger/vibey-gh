@@ -13,8 +13,14 @@ from pathlib import Path
 
 import pytest
 
-from vibey_gh import github_release, issue_automation, merge_train, pr_automation
-from vibey_gh import realign as realign_mod
+from vibey_gh import (
+    github_release,
+    issue_automation,
+    merge_train,
+    pr_automation,
+    realign as realign_mod,
+    reconcile,
+)
 from vibey_gh.cli import main
 from vibey_gh.config import load_config
 from vibey_gh.merge_train import Verdict
@@ -511,8 +517,6 @@ def test_self_heal_cli_sweeps_or_targets_one_pull_request(repo, monkeypatch, cap
 
 
 def test_reconcile_branches_cli_reports_each_decision(repo, monkeypatch, capsys):
-    from vibey_gh import reconcile
-
     monkeypatch.setattr(
         reconcile,
         "reconcile",
@@ -527,8 +531,6 @@ def test_reconcile_branches_cli_reports_each_decision(repo, monkeypatch, capsys)
 
 
 def test_reconcile_branches_cli_reports_failures(repo, monkeypatch, capsys):
-    from vibey_gh import reconcile
-
     def boom(*a, **k):
         raise ValueError("refusing to delete protected or unsafe branch 'develop'")
 
