@@ -498,6 +498,33 @@ def test_issue_automation_cli_reports_failures(repo, monkeypatch, capsys):
     assert "must be an object" in capsys.readouterr().err
 
 
+def test_reconcile_branches_cli_reports_each_decision(repo, monkeypatch, capsys):
+    from vibey_gh import reconcile
+
+    monkeypatch.setattr(
+        reconcile,
+        "reconcile",
+        lambda cfg, dry_run: [
+            {"pr": 1, "branch": "vibey-gh/a", "action": "close", "reason": "duplicate"}
+        ],
+    )
+    assert main(["reconcile-branches", "--dry-run"]) == 0
+    out = capsys.readouterr().out
+    assert "#1 (vibey-gh/a): close — duplicate" in out
+    assert "reconciled 1 open pull request(s)" in out
+
+
+def test_reconcile_branches_cli_reports_failures(repo, monkeypatch, capsys):
+    from vibey_gh import reconcile
+
+    def boom(*a, **k):
+        raise ValueError("refusing to delete protected or unsafe branch 'develop'")
+
+    monkeypatch.setattr(reconcile, "reconcile", boom)
+    assert main(["reconcile-branches"]) == 1
+    assert "refusing to delete" in capsys.readouterr().err
+
+
 def test_api_and_mcp_surface_failures_return_nonzero(repo, monkeypatch, capsys):
     from vibey_gh import surfaces
 

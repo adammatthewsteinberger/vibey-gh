@@ -1,0 +1,365 @@
+# Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), Developed by [Adam Matthew Steinberger](https://hire.adam.matthewsteinberger.com/) ([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/)).
+"""Reconciling branches stranded by a realign rewrite.
+
+This module rewrites and deletes branches, so most of what matters here is what it
+*refuses* to touch. A permanent branch must be unreachable from every mutating path, a
+fork must never be mutated at all, and a contributor's own work must survive untouched no
+matter how inconvenient its conflict is.
+"""
+
+from __future__ import annotations
+
+import subprocess
+from pathlib import Path
+
+import pytest
+
+from vibey_gh import reconcile as rc
+from vibey_gh.config import GhConfig, RealignConfig
+
+
+def cfg(tmp_path: Path, **realign) -> GhConfig:
+    return GhConfig(root=tmp_path, realign=RealignConfig(**realign))
+
+
+def facts(**changes) -> rc.BranchFacts:
+    value = dict(number=7, branch="vibey-gh/issue/1-abc", fork=False, unique_commits=1)
+    value.update(changes)
+    return rc.BranchFacts(**value)
+
+
+def completed(code=0, out="", err=""):
+    return subprocess.CompletedProcess([], code, out, err)
+
+
+# ------------------------------------------------------------------------ policy
+
+
+@pytest.mark.parametrize(
+    "kwargs,match",
+    [
+        ({"automation_prefixes": ()}, "must not be empty"),
+        ({"automation_prefixes": ("a", "a")}, "must be unique"),
+        ({"automation_prefixes": (" ",)}, "must be non-empty"),
+        ({"automation_prefixes": ("-bad/",)}, "safe ref prefixes"),
+        ({"automation_prefixes": ("/bad/",)}, "safe ref prefixes"),
+        ({"automation_prefixes": ("a/../b",)}, "safe ref prefixes"),
+        ({"automation_prefixes": ("a:b",)}, "safe ref prefixes"),
+    ],
+)
+def test_invalid_realign_configuration_is_rejected(kwargs, match):
+    with pytest.raises(ValueError, match=match):
+        RealignConfig(**kwargs)
+
+
+def test_an_empty_prefix_list_is_allowed_when_reconciliation_is_off():
+    assert RealignConfig(reconcile_branches=False, automation_prefixes=()).automation_prefixes == ()
+
+
+@pytest.mark.parametrize("branch", ["develop", "main", "", "-x", "a:b", "a/../b"])
+def test_no_permanent_or_unsafe_ref_is_ever_deletable_or_rebasable(tmp_path, branch):
+    config = cfg(tmp_path)
+    assert not rc.deletable(branch, config)
+    assert not rc.rebasable(branch, config)
+
+
+def test_a_fork_branch_is_never_deletable(tmp_path):
+    assert not rc.deletable("feature", cfg(tmp_path), fork=True)
+    assert rc.deletable("feature", cfg(tmp_path))
+
+
+def test_a_configured_permanent_branch_is_protected_under_its_own_name(tmp_path):
+    config = GhConfig(root=tmp_path, integration_branch="trunk", release_branch="ship")
+    assert not rc.deletable("trunk", config)
+    assert not rc.deletable("ship", config)
+    # The literal defaults stay denied independently, as defence in depth.
+    assert not rc.deletable("develop", config)
+    assert not rc.deletable("main", config)
+
+
+def test_a_fully_duplicated_branch_is_closed_and_deleted(tmp_path):
+    decision = rc.decide(facts(unique_commits=0), cfg(tmp_path))
+    assert decision.action == rc.CLOSE
+    assert decision.delete_branch
+    assert "already upstream by patch identity" in decision.reason
+    assert "deleted its branch" in decision.describe()
+
+
+def test_deletion_and_closing_are_each_independently_configurable(tmp_path):
+    kept = rc.decide(facts(unique_commits=0), cfg(tmp_path, delete_duplicate_branches=False))
+    assert kept.action == rc.CLOSE and not kept.delete_branch
+    assert "deleted its branch" not in kept.describe()
+
+    left = rc.decide(facts(unique_commits=0), cfg(tmp_path, close_duplicates=False))
+    assert left.action == rc.LEAVE and "disabled" in left.reason
+
+
+def test_an_automation_branch_with_real_work_is_rebased(tmp_path):
+    decision = rc.decide(facts(unique_commits=2), cfg(tmp_path))
+    assert decision.action == rc.REBASE
+    assert "2 unique commit(s)" in decision.reason
+
+
+def test_a_contributor_branch_with_real_work_is_left_alone_and_told_why(tmp_path):
+    decision = rc.decide(facts(branch="feature/mine", unique_commits=1), cfg(tmp_path))
+    assert decision.action == rc.LEAVE and decision.notify
+    assert "left for its author" in decision.reason
+
+    quiet = rc.decide(
+        facts(branch="feature/mine"), cfg(tmp_path, notify_contributor_branches=False)
+    )
+    assert quiet.action == rc.LEAVE and not quiet.notify
+
+
+@pytest.mark.parametrize(
+    "changes,reason",
+    [
+        ({"fork": True}, "fork branch is never mutated"),
+        ({"branch": "develop"}, "permanent and unsafe"),
+        ({"branch": "-hostile"}, "permanent and unsafe"),
+    ],
+)
+def test_untouchable_branches_are_left_regardless_of_their_contents(tmp_path, changes, reason):
+    decision = rc.decide(facts(unique_commits=0, **changes), cfg(tmp_path))
+    assert decision.action == rc.LEAVE and reason in decision.reason
+
+
+def test_reconciliation_can_be_switched_off_entirely(tmp_path):
+    assert rc.decide(facts(), cfg(tmp_path, reconcile_branches=False)).action == rc.LEAVE
+    assert rc.reconcile(cfg(tmp_path, reconcile_branches=False)) == []
+
+
+def test_prefixes_decide_what_counts_as_automation_owned(tmp_path):
+    config = cfg(tmp_path, automation_prefixes=("bots/", "vibey-gh/"))
+    assert rc.automation_owned("bots/x", config)
+    assert rc.automation_owned("vibey-gh/issue/1", config)
+    assert not rc.automation_owned("feature/x", config)
+
+
+# -------------------------------------------------------------------------- git
+
+
+def test_patch_identity_decides_what_counts_as_unique(tmp_path, monkeypatch):
+    config = cfg(tmp_path)
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: completed(out="+ aaa\n- bbb\n+ ccc\n"))
+    assert rc.unique_commits(config, "topic") == 2
+
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: completed(out="- bbb\n"))
+    assert rc.unique_commits(config, "topic") == 0
+
+    # An unreadable ref must never be reported as "nothing unique", which would close a PR.
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: completed(1, err="bad ref"))
+    assert rc.unique_commits(config, "topic") == 1
+
+
+def test_measure_only_runs_git_for_branches_that_could_be_acted_on(tmp_path, monkeypatch):
+    config = cfg(tmp_path)
+    monkeypatch.setattr(rc, "unique_commits", lambda c, b: 5)
+    assert rc.measure(config, facts()).unique_commits == 5
+    for skipped in (facts(fork=True), facts(branch="develop"), facts(branch="-x")):
+        assert rc.measure(config, skipped) is skipped
+
+
+def test_rebase_replays_a_branch_and_refuses_to_force_over_newer_work(tmp_path, monkeypatch):
+    config = cfg(tmp_path)
+    calls: list[list[str]] = []
+
+    def run(args, **kwargs):
+        calls.append(args)
+        if args[:2] == ["git", "rev-parse"]:
+            remote = any(str(a).startswith("origin/") for a in args)
+            return completed(out=("old\n" if remote else "new\n"))
+        return completed()
+
+    monkeypatch.setattr(subprocess, "run", run)
+    changed, detail = rc.rebase_branch(config, "vibey-gh/issue/1")
+    assert changed and "onto the new tip" in detail
+    pushed = next(c for c in calls if c[:2] == ["git", "push"])
+    assert "--force-with-lease=refs/heads/vibey-gh/issue/1:old" in pushed
+    assert "HEAD:refs/heads/vibey-gh/issue/1" in pushed
+    assert not any("--delete" in " ".join(c) for c in calls)
+
+
+@pytest.mark.parametrize("branch", ["develop", "main", "-x", "a:b"])
+def test_rebase_refuses_a_protected_or_unsafe_branch(tmp_path, branch):
+    with pytest.raises(ValueError, match="refusing to rebase"):
+        rc.rebase_branch(cfg(tmp_path), branch)
+
+
+@pytest.mark.parametrize("branch", ["develop", "main", "-x", "a:b"])
+def test_delete_refuses_a_protected_or_unsafe_branch(tmp_path, branch):
+    with pytest.raises(ValueError, match="refusing to delete"):
+        rc.delete_branch(cfg(tmp_path), branch)
+
+
+def test_rebase_reports_every_way_it_can_decline(tmp_path, monkeypatch):
+    config = cfg(tmp_path)
+
+    def responder(**outcomes):
+        def run(args, **kwargs):
+            if args[:2] == ["git", "rev-parse"]:
+                return completed(out=outcomes.get("rev", "old") + "\n")
+            for key in ("checkout", "rebase", "push"):
+                if args[1] == key and outcomes.get(key):
+                    return completed(1, err="boom")
+            return completed()
+
+        return run
+
+    monkeypatch.setattr(subprocess, "run", responder(rev=""))
+    assert rc.rebase_branch(config, "vibey-gh/a") == (False, "branch no longer exists")
+
+    monkeypatch.setattr(subprocess, "run", responder(checkout=True))
+    assert rc.rebase_branch(config, "vibey-gh/a")[1] == "could not check the branch out"
+
+    monkeypatch.setattr(subprocess, "run", responder(rebase=True))
+    assert "conflicted" in rc.rebase_branch(config, "vibey-gh/a")[1]
+
+    # Identical before and after means the branch was already current.
+    monkeypatch.setattr(subprocess, "run", responder())
+    assert rc.rebase_branch(config, "vibey-gh/a") == (False, "already on the current tip")
+
+    def diverged(args, **kwargs):
+        if args[:2] == ["git", "rev-parse"]:
+            return completed(out=("old\n" if "origin/" in " ".join(args) else "new\n"))
+        return completed(1, err="stale") if args[1] == "push" else completed()
+
+    monkeypatch.setattr(subprocess, "run", diverged)
+    assert "push refused" in rc.rebase_branch(config, "vibey-gh/a")[1]
+
+
+# ------------------------------------------------------------------- gh adapters
+
+
+def test_open_pull_requests_reads_branch_ownership(monkeypatch, tmp_path):
+    monkeypatch.setenv("GH_REPO", "o/r")
+    monkeypatch.setattr(
+        rc.github_state,
+        "gh_json",
+        lambda *a: [
+            {"number": 1, "headRefName": "vibey-gh/issue/1", "isCrossRepository": False},
+            {"number": 2, "headRefName": "theirs", "isCrossRepository": True},
+        ],
+    )
+    listed = rc.open_pull_requests(cfg(tmp_path))
+    assert [(f.number, f.fork) for f in listed] == [(1, False), (2, True)]
+
+    monkeypatch.setattr(rc.github_state, "gh_json", lambda *a: None)
+    assert rc.open_pull_requests(cfg(tmp_path)) == []
+
+
+def test_closing_explains_itself_before_it_closes(monkeypatch, tmp_path):
+    monkeypatch.setenv("GH_REPO", "o/r")
+    calls = []
+    monkeypatch.setattr(subprocess, "run", lambda args, **k: calls.append(args) or completed())
+    rc.close_pull_request(cfg(tmp_path), rc.Decision(3, "b", rc.CLOSE, "why"))
+    assert calls[0][:3] == ["gh", "pr", "comment"]
+    assert "already on" in calls[0][-1] and "nothing is lost" in calls[0][-1]
+    assert calls[1][:3] == ["gh", "pr", "close"]
+
+
+def test_a_contributor_is_told_how_to_recover_their_own_branch(monkeypatch, tmp_path):
+    monkeypatch.setenv("GH_REPO", "o/r")
+    calls = []
+    monkeypatch.setattr(subprocess, "run", lambda args, **k: calls.append(args) or completed())
+    rc.notify(cfg(tmp_path), rc.Decision(4, "feature/x", rc.LEAVE, "why", notify=True))
+    body = calls[0][-1]
+    assert "git rebase origin/develop" in body
+    assert "left the branch untouched" in body
+
+
+def test_delete_branch_reports_whether_github_accepted_it(monkeypatch, tmp_path):
+    monkeypatch.setenv("GH_REPO", "o/r")
+    monkeypatch.setattr(subprocess, "run", lambda args, **k: completed())
+    assert rc.delete_branch(cfg(tmp_path), "vibey-gh/issue/1") is True
+    monkeypatch.setattr(subprocess, "run", lambda args, **k: completed(1))
+    assert rc.delete_branch(cfg(tmp_path), "vibey-gh/issue/1") is False
+
+
+# ----------------------------------------------------------------- orchestration
+
+
+def test_reconcile_applies_one_action_per_pull_request(monkeypatch, tmp_path):
+    config = cfg(tmp_path)
+    monkeypatch.setattr(
+        rc,
+        "open_pull_requests",
+        lambda c: [
+            rc.BranchFacts(1, "vibey-gh/issue/dup"),
+            rc.BranchFacts(2, "vibey-gh/issue/work"),
+            rc.BranchFacts(3, "feature/theirs"),
+            rc.BranchFacts(4, "theirs", fork=True),
+        ],
+    )
+    counts = {"vibey-gh/issue/dup": 0, "vibey-gh/issue/work": 2, "feature/theirs": 1}
+    monkeypatch.setattr(rc, "unique_commits", lambda c, b: counts[b])
+    done: list[str] = []
+    monkeypatch.setattr(
+        rc, "rebase_branch", lambda c, b: done.append(f"rebase {b}") or (True, "ok")
+    )
+    monkeypatch.setattr(rc, "close_pull_request", lambda c, d: done.append(f"close {d.branch}"))
+    monkeypatch.setattr(rc, "delete_branch", lambda c, b: done.append(f"delete {b}") or True)
+    monkeypatch.setattr(rc, "notify", lambda c, d: done.append(f"notify {d.branch}"))
+
+    outcomes = rc.reconcile(config)
+    assert [o["action"] for o in outcomes] == [rc.CLOSE, rc.REBASE, rc.LEAVE, rc.LEAVE]
+    assert done == [
+        "close vibey-gh/issue/dup",
+        "delete vibey-gh/issue/dup",
+        "rebase vibey-gh/issue/work",
+        "notify feature/theirs",
+    ]
+    assert outcomes[0]["deleted"] is True
+    assert outcomes[1]["applied"] is True and outcomes[1]["detail"] == "ok"
+    assert outcomes[2]["notified"] is True
+    # The fork is reported but never acted on.
+    assert "applied" not in outcomes[3] and "notified" not in outcomes[3]
+
+
+def test_a_closed_duplicate_keeps_its_branch_when_deletion_is_disabled(monkeypatch, tmp_path):
+    monkeypatch.setattr(rc, "open_pull_requests", lambda c: [rc.BranchFacts(1, "vibey-gh/a")])
+    monkeypatch.setattr(rc, "unique_commits", lambda c, b: 0)
+    monkeypatch.setattr(rc, "close_pull_request", lambda c, d: None)
+    monkeypatch.setattr(
+        rc, "delete_branch", lambda c, b: pytest.fail("deletion is disabled by configuration")
+    )
+    outcome = rc.reconcile(cfg(tmp_path, delete_duplicate_branches=False))[0]
+    assert outcome["action"] == rc.CLOSE and outcome["applied"] is True
+    assert "deleted" not in outcome
+
+
+def test_a_dry_run_decides_without_touching_anything(monkeypatch, tmp_path):
+    monkeypatch.setattr(rc, "open_pull_requests", lambda c: [rc.BranchFacts(1, "vibey-gh/a")])
+    monkeypatch.setattr(rc, "unique_commits", lambda c, b: 0)
+
+    def exploded(*a, **k):
+        pytest.fail("dry run must not mutate")
+
+    monkeypatch.setattr(rc, "close_pull_request", exploded)
+    monkeypatch.setattr(rc, "delete_branch", exploded)
+    monkeypatch.setattr(rc, "rebase_branch", exploded)
+    outcomes = rc.reconcile(cfg(tmp_path), dry_run=True)
+    assert outcomes[0]["action"] == rc.CLOSE and "applied" not in outcomes[0]
+
+
+def test_realign_reconciles_the_branches_its_rewrite_stranded(monkeypatch, tmp_path):
+    from vibey_gh import realign as realign_mod
+
+    config = cfg(tmp_path)
+
+    # `realign` only pushes when the two branches differ but their trees are identical.
+    def run(args, **kwargs):
+        if args[:2] == ["git", "rev-parse"]:
+            return completed(out=("dev\n" if args[-1].endswith("develop") else "rel\n"))
+        return completed()
+
+    monkeypatch.setattr(subprocess, "run", run)
+    monkeypatch.setattr(
+        realign_mod.reconcile,
+        "reconcile",
+        lambda c: [{"pr": 9, "branch": "vibey-gh/issue/x", "action": rc.CLOSE}],
+    )
+    changed, message = realign_mod.realign(config)
+    assert changed
+    assert "realigned to main" in message
+    assert "9 (vibey-gh/issue/x): close" in message

@@ -21,6 +21,7 @@ from vibey_gh import (
     pr_automation,
     promote,
     realign,
+    reconcile,
     surfaces,
     versioning,
 )
@@ -318,6 +319,21 @@ def _realign(args) -> int:
     return 0
 
 
+def _reconcile(args) -> int:
+    cfg = load_config()
+    try:
+        outcomes = reconcile.reconcile(cfg, dry_run=args.dry_run)
+    except (RuntimeError, ValueError, json.JSONDecodeError) as exc:
+        print(f"vibey-gh: {exc}", file=sys.stderr)
+        return 1
+    for outcome in outcomes:
+        print(
+            f"  #{outcome['pr']} ({outcome['branch']}): {outcome['action']} — {outcome['reason']}"
+        )
+    print(f"vibey-gh: reconciled {len(outcomes)} open pull request(s)")
+    return 0
+
+
 def _surface(args) -> int:
     try:
         arguments = json.loads(args.arguments)
@@ -522,6 +538,13 @@ def main(argv: list[str] | None = None) -> int:
 
     r = sub.add_parser("realign", help="realign the integration branch with the release branch")
     r.set_defaults(func=_realign)
+
+    rec = sub.add_parser(
+        "reconcile-branches",
+        help="rebase, close, or leave open branches stranded by a realign rewrite",
+    )
+    rec.add_argument("--dry-run", action="store_true", help="decide without mutating anything")
+    rec.set_defaults(func=_reconcile)
 
     for surface in ("api", "mcp", "sdk", "webhook"):
         adapter = sub.add_parser(surface, help=f"invoke a capability through the {surface} adapter")

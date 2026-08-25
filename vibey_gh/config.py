@@ -172,6 +172,33 @@ class IssueAutomationConfig:
 
 
 @dataclass(frozen=True)
+class RealignConfig:
+    """What happens to open topic branches when realign rewrites the integration branch.
+
+    Realign replaces commits with rewritten copies, which strands any branch cut from one
+    of them. These keys decide how much the automation may do about that on its own —
+    rewriting and deleting branches is exactly the kind of thing an adopting repository
+    should be able to switch off without editing code.
+    """
+
+    reconcile_branches: bool = True
+    automation_prefixes: tuple[str, ...] = ("vibey-gh/",)
+    close_duplicates: bool = True
+    delete_duplicate_branches: bool = True
+    notify_contributor_branches: bool = True
+
+    def __post_init__(self) -> None:
+        _unique_nonempty("realign.automation_prefixes", self.automation_prefixes)
+        if self.reconcile_branches and not self.automation_prefixes:
+            raise ValueError("realign.automation_prefixes must not be empty when reconciling")
+        if any(
+            prefix.startswith(("-", "/")) or ":" in prefix or ".." in prefix
+            for prefix in self.automation_prefixes
+        ):
+            raise ValueError("realign.automation_prefixes entries must be safe ref prefixes")
+
+
+@dataclass(frozen=True)
 class GithubReleaseConfig:
     enabled: bool = True
     tag_prefix: str = "v"
@@ -268,6 +295,7 @@ class GhConfig:
     trusted_authors: tuple[str, ...] = ()
     pr_automation: PrAutomationConfig = PrAutomationConfig()
     issue_automation: IssueAutomationConfig = IssueAutomationConfig()
+    realign: RealignConfig = RealignConfig()
     github_release: GithubReleaseConfig = GithubReleaseConfig()
     repository_profile: RepositoryProfileConfig = RepositoryProfileConfig()
     documentation: DocumentationConfig = DocumentationConfig()
@@ -325,6 +353,7 @@ def load_config(root: Path | None = None) -> GhConfig:
     auto = data.get("pr_automation", {})
     observability = auto.get("observability", {})
     issues = data.get("issue_automation", {})
+    realigning = data.get("realign", {})
     release = data.get("github_release", {})
     profile = data.get("repository_profile", {})
     documentation = data.get("documentation", {})
@@ -371,6 +400,15 @@ def load_config(root: Path | None = None) -> GhConfig:
             open_pull_request=issues.get("open_pull_request", True),
             draft_pull_request=issues.get("draft_pull_request", True),
             retain_schedule_backstop=issues.get("retain_schedule_backstop", True),
+        ),
+        realign=RealignConfig(
+            reconcile_branches=realigning.get("reconcile_branches", True),
+            automation_prefixes=tuple(
+                realigning.get("automation_prefixes", RealignConfig().automation_prefixes)
+            ),
+            close_duplicates=realigning.get("close_duplicates", True),
+            delete_duplicate_branches=realigning.get("delete_duplicate_branches", True),
+            notify_contributor_branches=realigning.get("notify_contributor_branches", True),
         ),
         github_release=GithubReleaseConfig(
             enabled=release.get("enabled", True),

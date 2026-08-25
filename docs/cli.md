@@ -26,6 +26,7 @@ transport failure. Run `vibey-gh COMMAND --help` for argparse's generated refere
 | `github-release` | required `--target SHA`; optional `--version VERSION` | Create or reuse an immutable tag and GitHub Release. |
 | `promote` | `--method rebase\|squash\|merge`, `--dry-run`, `--wait` or `--no-wait`, `--summary FILE` | Open/reuse the integration-to-release PR. Event-driven `--no-wait` is the default. |
 | `realign` | none | Bring the integration branch forward after release without rewriting it. |
+| `reconcile-branches` | `--dry-run` | Rebase, close, or leave each open pull-request branch stranded by a realign rewrite. `--dry-run` decides without mutating anything. Realign calls this itself; the command exists for recovery and inspection. |
 | `api`, `mcp`, `sdk` | `CAPABILITY`, `--arguments JSON_ARRAY` | Invoke a canonical capability through that adapter. |
 | `webhook` | `CAPABILITY`, `--arguments JSON_ARRAY`, required `--delivery ID` | Sign and dispatch locally using `VIBEY_GH_WEBHOOK_SECRET`; claims persist by default. |
 

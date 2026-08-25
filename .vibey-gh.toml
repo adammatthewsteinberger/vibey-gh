@@ -36,6 +36,13 @@ sanitized_progress = true
 archive_execution_file = true
 allow_private_full_output = false
 
+[realign]
+reconcile_branches = true
+automation_prefixes = ["vibey-gh/"]
+close_duplicates = true
+delete_duplicate_branches = true
+notify_contributor_branches = true
+
 [issue_automation]
 enabled = true
 model = "claude-sonnet-5"

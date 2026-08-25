@@ -5,6 +5,14 @@ This file follows Keep a Changelog and semantic versioning conventions.
 
 ## Unreleased
 
+- Reconcile open topic branches after realign rewrites the integration branch. A branch
+  cut from a replaced commit previously reported a conflict covering work that had already
+  landed, through nobody's fault. Realign now closes and deletes a branch whose commits are
+  all upstream by patch identity, rebases an automation-owned branch that carries real
+  work, and leaves a contributor's branch untouched with an explanatory comment. Every
+  action is individually configurable through `[realign]`, and no permanent, fork, or
+  unsafe ref can reach a mutating path.
+
 - Resolve conflicts on draft pull requests instead of stranding them. Conflict is now
   classified before draft status: a conflicted draft could never be promoted, because
   promotion requires a clean merge, and conflict resolution never ran because it was a
