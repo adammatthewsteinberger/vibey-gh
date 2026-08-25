@@ -17,6 +17,7 @@ from typing import Any, cast
 
 from vibey_gh import github_state
 from vibey_gh.config import GhConfig, normalise_actor
+from vibey_gh.issue_automation import sanitize
 
 STATE_MARKER = "vibey-gh-pr-automation"
 EXTERNAL_REPAIR_LABEL = "vibey-gh:external-repair"
@@ -387,8 +388,10 @@ def mirror_fork(number: int, cfg: GhConfig) -> dict[str, Any]:
     )
     if push.returncode:
         raise RuntimeError(f"could not publish repair branch: {push.stderr.strip()}")
+    author = sanitize(str((pr.get("author") or {}).get("login", "")), limit=100)
+    title = sanitize(str(pr.get("title", "")), limit=200)
     body = (
-        f"Repository-owned repair continuation of #{number} from @{(pr.get('author') or {}).get('login', '')}.\n\n"
+        f"Repository-owned repair continuation of #{number} from @{author}.\n\n"
         f"Original head: `{head}`. The original contributor retains attribution; this branch "
         "exists only because privileged automation cannot write to a contributor fork."
     )
@@ -402,7 +405,7 @@ def mirror_fork(number: int, cfg: GhConfig) -> dict[str, Any]:
             "--head",
             branch,
             "--title",
-            f"Repair #{number}: {pr.get('title', '')}",
+            f"Repair #{number}: {title}",
             "--body",
             body,
         ],
