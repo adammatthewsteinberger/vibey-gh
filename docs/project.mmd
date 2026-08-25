@@ -183,7 +183,9 @@ flowchart TB
   Release --> ReleaseRepair
   ReleaseSurfaces --> ReleaseRepair
   ReleaseRepair --> Guard
-  Fingerprints --> CI
+  Fingerprints --> Provenance
+  Fingerprints --> Docs
+  CapabilitySurfaces --> APIDrift
   Documentation --> Docs
   Guard --> Fingerprints
   CLI --> Debugging
