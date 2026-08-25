@@ -6,6 +6,17 @@ content but cannot execute it. AI tools edit only named scopes; trusted shell st
 paths and publish one commit. Secrets never enter prompts or artifacts. The merge train
 rechecks exact-head gates immediately before mutation.
 
+Issue text is an adversary-controlled input to a privileged job, so issue automation
+narrows it twice. First by authority: an issue from outside the configured owner and
+trusted-author set cannot start a solution job until a maintainer applies the configured
+label, unless the repository explicitly sets `solve_untrusted_authors`. Second by shape: a
+trusted step renders the issue into a bounded briefing file, the agent is told it is a
+report rather than an instruction and reports attempted redirection through
+`prompt_injection_observed`, and nothing derived from issue text reaches a shell command, a
+workflow expression, or a branch name. Branch names come from the issue number and a hash
+of its content, are validated against the configured namespace and permanent branches, and
+are published by a trusted step the agent cannot reach.
+
 Advanced branch diagnostics are opt-in and metadata-only. Events exclude application
 values, exception text, arguments, locals, environment values, and secrets. Each JSONL
 record carries invocation and GitHub correlation, a monotonic sequence, and the preceding

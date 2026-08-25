@@ -7,6 +7,14 @@ GitHub Pages via Actions, Packages, Releases, and Deployments. Use workflow disp
 recovery. Inspect exact run and head SHA before retrying. Never solve a blocked release by
 deleting, force-pushing, weakening a gate, or switching production to TestPyPI.
 
+To retry one issue, dispatch `Issue automation` with its number; `vibey-gh
+issue-automation list-eligible` shows what the scheduled sweep would pick up. A redispatch
+of unchanged issue text is a no-op, so retrying is safe. An issue labelled
+`vibey-gh:solve-blocked` is waiting on a human decision named in the issue's state comment,
+and one labelled `vibey-gh:solve-exhausted` has spent its budget; editing the issue body
+restates the request and starts a new lineage. To stop the feature without uninstalling it,
+set `[issue_automation].enabled = false` in reviewed configuration.
+
 When a bug in privileged workflow code itself blocks a repair PR from repairing its own
 gate, dispatch `Automation bootstrap` (see [Workflows](workflows.md)) with the exact PR
 number, exact head SHA, and explicit authorization. It requires administrator permission

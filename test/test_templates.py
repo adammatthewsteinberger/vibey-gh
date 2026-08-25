@@ -17,7 +17,7 @@ import pytest
 import yaml
 
 from vibey_gh.config import load_config
-from vibey_gh.install import TEMPLATES, WORKFLOWS, installed
+from vibey_gh.install import TEMPLATES, WORKFLOWS, installed, render_workflow
 
 WORKFLOW_TEMPLATES = sorted(WORKFLOWS.glob("*.yml"))
 REPO_WORKFLOWS = sorted(
@@ -44,7 +44,7 @@ def test_every_claude_json_schema_survives_argument_tokenization():
             assert schema["type"] == "object"
             assert schema["properties"]
             schemas.append((path.name, schema))
-    assert len(schemas) == 5
+    assert len(schemas) == 6
 
 
 @pytest.mark.parametrize("path", REPO_WORKFLOWS, ids=lambda p: p.name)
@@ -165,7 +165,9 @@ def test_security_and_api_drift_workflows_are_real_managed_gates():
     assert "gitdir: $GITHUB_WORKSPACE/target/.git" not in text
     assert "TRUSTED: ${{ needs.evaluate.outputs.trusted }}" not in text
     assert '[ "$STATE" = ready ] || [ "$STATE" = review ]' in text
-    assert '[ "$REVIEW_PASSED" = true ]' in text
+    # Only an explicit `true` verdict may pass the gate; every other value, including
+    # the empty string a failed review job leaves behind, fails closed.
+    assert re.search(r'case "\$REVIEW_PASSED" in\n\s+true\)\n\s+conclusion=success\n', text)
     assert "full_claude_output:" in text
     assert "Validate diagnostic output policy" in text
     assert "github.event.repository.visibility == 'private'" in text
@@ -201,7 +203,9 @@ def test_security_and_api_drift_workflows_are_real_managed_gates():
         assert f".{field} == true" in text
     assert "((.findings // []) | length == 0)" in text
     assert "Exact-head semantic review result:" in text
-    assert '[ "$REVIEW_PASSED" = true ]' in text
+    # Only an explicit `true` verdict may pass the gate; every other value, including
+    # the empty string a failed review job leaves behind, fails closed.
+    assert re.search(r'case "\$REVIEW_PASSED" in\n\s+true\)\n\s+conclusion=success\n', text)
 
 
 def test_branch_intake_reopens_a_reused_branch_name_without_duplicating_open_prs():
@@ -431,6 +435,25 @@ def test_ai_state_persistence_uses_the_native_github_token():
     assert text.count("GH_TOKEN: ${{ github.token }}") >= 6
 
 
+def test_a_review_that_returned_no_verdict_is_not_reported_as_a_source_defect():
+    """A failing gate whose summary says everything passed sends people hunting a bug
+    that is not there. An unfinished review is an operator failure and must read as one.
+    """
+    text = (WORKFLOWS / "pr-automation.yml").read_text(encoding="utf-8")
+    assert "REVIEW_RESULT: ${{ needs.review.result }}" in text
+    # Each review outcome gets its own honest title; only `true` may pass the gate.
+    assert 'case "$REVIEW_PASSED" in' in text
+    assert "conclusion=success" in text
+    assert 'title="PR automation: review findings"' in text
+    assert "returned actionable findings" in text
+    assert 'title="PR automation: review incomplete"' in text
+    assert "infrastructure or operator failure rather than a defect" in text
+    assert "API credit balance, credentials, or model availability" in text
+    assert '-f "output[title]=${title}"' in text
+    assert '-f "output[summary]=${summary} Run ' in text
+    assert "review_passed=${REVIEW_PASSED:-<none>}" in text
+
+
 def test_cancelled_or_pending_evaluations_cannot_publish_a_gate():
     text = (WORKFLOWS / "pr-automation.yml").read_text(encoding="utf-8")
     assert "pull_request_target:" in text
@@ -464,6 +487,28 @@ def test_new_branch_intake_is_draft_idempotent_and_excludes_permanent_branches()
     assert "__VIBEY_GH_INTEGRATION_BRANCH__" in text
     assert "__VIBEY_GH_RELEASE_BRANCH__" in text
     assert '"vibey-gh/repair/**"' in text
+    assert '"__VIBEY_GH_ISSUE_BRANCH_PREFIX__/**"' in text
+
+
+@pytest.mark.parametrize("path", WORKFLOW_TEMPLATES, ids=lambda p: p.name)
+def test_every_rendered_run_block_is_valid_shell(path):
+    """The same argument as the hooks: a broken script fails in somebody else's repo.
+
+    Templates are checked *rendered*, because a marker substituted into the middle of a
+    `case` arm or a quoted string is exactly where a syntax error would be introduced.
+    """
+    import subprocess
+
+    parsed = yaml.safe_load(render_workflow(path, load_config()))
+    for job, definition in parsed["jobs"].items():
+        for step in definition.get("steps", []):
+            script = step.get("run")
+            if not script:
+                continue
+            result = subprocess.run(
+                ["bash", "-n"], input=script, text=True, capture_output=True, check=False
+            )
+            assert result.returncode == 0, f"{path.name}:{job}:{step.get('name')}: {result.stderr}"
 
 
 @pytest.mark.parametrize("name", ["pre-push", "commit-msg"])

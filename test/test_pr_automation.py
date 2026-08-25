@@ -270,6 +270,8 @@ def test_repair_refspec_allows_forward_updates_including_protected_branches(bran
 
 def test_state_marker_round_trip_and_malformed_comments():
     assert pa.parse_state(["ordinary", "<!-- vibey-gh-pr-automation:{bad} -->"]) is None
+    # A well-formed payload from an older or foreign schema is not usable state.
+    assert pa.parse_state(['<!-- vibey-gh-pr-automation:{"attempts":1} -->']) is None
     state = pa.AutomationState("a", "b", 2, history=[{"kind": "repair"}])
     body = pa.state_body(state, " summary ")
     assert pa.parse_state([{"body": body}]) == state

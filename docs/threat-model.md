@@ -13,6 +13,21 @@ commit subjects; exact-head, linear-history, repository-ownership, and permanent
 guards all precede it. A fork, merge commit, stale event, or concurrent push fails closed.
 Operators must protect repository secrets and review ruleset changes.
 
+Published issues are a distinct adversary-controlled asset with a lower barrier than a
+fork PR: anyone with an account can create one, and the `issues` event runs privileged
+default-branch workflow code. The controls are authority, shape, and budget. Authority: the
+`solve` job runs only for an explicit `solve` decision from `vibey_gh.issue_automation`,
+which refuses an outside author's issue until a maintainer applies the configured label.
+Shape: issue text reaches the model only through a bounded briefing file written by a
+trusted step, labelled as an untrusted report, with the model holding no `Bash`, `gh`,
+`Agent`, or Git tool; branch names derive from the issue number and a SHA-256 of its
+content, and a trusted publisher independently re-validates the namespace, the
+permanent-branch denylist, and the update-only refspec before pushing. Budget: attempts are
+counted per content fingerprint, so a redispatch cannot spend the budget twice and a
+resource-exhaustion attempt through repeated events is bounded by `max_attempts`. The
+resulting pull request receives ordinary review, repair, and merge-train treatment; nothing
+about its origin exempts it.
+
 Fork PR heads are a distinct adversary-controlled asset: the fork owner controls the head
 commit but never receives privileged credentials. When a fork PR needs a repair it cannot
 receive directly, the `mirror-fork` job (`contents: write`, `issues: write`,

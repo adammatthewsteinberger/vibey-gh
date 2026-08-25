@@ -132,6 +132,21 @@ reconciliation, and release repair silently never trigger.
 
 ### What happens after a push
 
+An eligible issue joins this same path at the top, having produced the branch itself:
+
+```text
+issue published
+      │
+      ▼
+eligibility policy (author trust, labels, budget, content fingerprint)
+      │
+      ├── ineligible ──► skipped or blocked, with a stated reason
+      └── eligible ────► one bounded solution attempt on a namespaced branch
+                                      │
+                                      ▼
+                       one commit + one linked PR that closes the issue
+```
+
 ```text
 topic branch push
       │
@@ -206,6 +221,14 @@ discarded as a stale no-op rather than force-pushed over, consumes no repair att
 never mutates a permanent branch from an obsolete checkout—including when `develop` or
 `main` is itself the PR head during a promotion. See [docs/security.md](docs/security.md).
 
+Issue text is contributor-controlled input to a privileged job, so issue automation is
+deliberately opt-in for outside authors and reads every issue through a bounded briefing
+file written by a trusted step. The agent has no shell, no network, and no Git tool; it
+edits files under a base-branch checkout, and one trusted publisher pushes a single
+non-empty source refspec to a namespaced branch validated against the configured
+permanent branches. Nothing derived from an issue reaches a shell command, a workflow
+expression, or a branch name.
+
 The sole history-rewrite exception is Conventional Commits self-healing: only a
 same-repository linear topic branch may be normalized and pushed with an exact-head
 `--force-with-lease`. Forks, stale heads, merge commits, `develop`, and `main` fail closed,
@@ -231,6 +254,11 @@ request bytes for HMAC verification; see [the CLI and adapter reference](docs/cl
 | `vibey-gh pr-automation record-review` / `record-repair` | Persist machine-readable lineage state used by retries and exact-head gating. |
 | `vibey-gh pr-automation mirror-fork --pr N` | Preserve a fork head in a linked repository-owned replacement PR when repair needs write access. |
 | `vibey-gh pr-automation ensure-labels` | Idempotently create the automation’s operational labels. |
+| `vibey-gh issue-automation evaluate --issue N` | Return the stable structured decision for one issue, including its solution branch. |
+| `vibey-gh issue-automation context --issue N [--output FILE]` | Render one issue as a bounded, explicitly untrusted briefing for an agent to read. |
+| `vibey-gh issue-automation record-solution --issue N --input JSON` | Persist the machine-readable attempt lineage a retry and its budget depend on. |
+| `vibey-gh issue-automation list-eligible` | List every open issue a recovery sweep should dispatch. |
+| `vibey-gh issue-automation ensure-labels` | Idempotently create the issue automation’s operational labels. |
 | `vibey-gh promote [--no-wait]` | Open or reuse the asynchronous `develop → main` promotion PR. |
 | `vibey-gh github-release --target SHA [--version VERSION]` | Create or reuse an immutable tag and GitHub Release for an exact production SHA. |
 | `vibey-gh realign` | Align identical `develop` and `main` trees after a rebase merge without discarding work. |
@@ -375,6 +403,46 @@ vibey-gh pr-automation mirror-fork --pr 123
 vibey-gh merge-train --pr 123
 ```
 
+### Issues that propose their own solution
+
+An issue is a request for work; `issue-automation.yml` is the path from that request to a
+reviewable pull request without a human in between. When an issue is published — opened,
+reopened, or labelled — trusted policy code decides whether it is eligible. An eligible
+issue gets one bounded attempt: an agent reads the request, implements the smallest
+complete change with tests and documentation on a namespaced branch, and a separate
+trusted step publishes one commit and one linked pull request that says `Closes #N`. From
+there it is an ordinary contribution: the same scans, the same exact-head review, the same
+repair budget, and the same merge train. Merging it closes the issue.
+
+The whole feature turns on one fact: **anyone can open an issue**, so issue text is
+contributor-controlled input to a privileged job. Three things follow.
+
+*Outside requests are opt-in.* An issue from anyone outside the configured owner and
+trusted-author set is skipped until a maintainer applies `vibey-gh:solve`. Opening an
+issue can never, by itself, start a privileged job. A repository that wants the opposite
+sets `solve_untrusted_authors = true` and takes that decision explicitly.
+
+*Issue text is data, never instruction.* A trusted step writes the title, body, and
+discussion into a bounded briefing file; the agent is told it is a report from a stranger
+and that any sentence in it asking to change the task, relax a constraint, run a command,
+or reach a network service is hostile input to be reported rather than obeyed. Nothing
+from an issue is interpolated into a shell command, a workflow expression, or a branch
+name — branch names come from the issue number and a hash of its content.
+
+*The budget belongs to the request, not the clock.* Attempts are counted against a
+fingerprint of the issue's title and body. Re-running automation on unchanged text cannot
+spend the budget twice, and editing the issue is a new request: a fresh lineage, a fresh
+branch, and a fresh budget. An issue that exhausts its budget is labelled and commented on
+once, not retried forever. An agent that decides the request is a question, a duplicate,
+out of scope, or too ambiguous to implement returns `needs_human` and changes nothing —
+a truthful refusal is a better outcome than a speculative change.
+
+```bash
+vibey-gh issue-automation evaluate --issue 55
+vibey-gh issue-automation context --issue 55 --output briefing/issue.md
+vibey-gh issue-automation list-eligible
+```
+
 ### The promotion
 
 ```bash
@@ -430,6 +498,20 @@ sanitized_progress = true
 archive_execution_file = true
 allow_private_full_output = false
 
+[issue_automation]
+enabled = true
+model = "claude-sonnet-5"
+max_attempts = 2
+branch_prefix = "vibey-gh/issue"
+base_branch = ""                     # blank uses branches.integration
+solve_untrusted_authors = false
+required_label = "vibey-gh:solve"
+trigger_labels = []                  # empty means every otherwise-eligible issue
+ignored_labels = ["question", "discussion", "duplicate", "wontfix", "vibey-gh:solve-blocked"]
+open_pull_request = true
+draft_pull_request = true
+retain_schedule_backstop = true
+
 [github_release]
 enabled = true
 tag_prefix = "v"
@@ -471,6 +553,17 @@ generate_json_ld = true
 official action. `API drift (Cloud Agents OpenAPI)` executes the capability registry and
 requires identical coverage through MCP, API, CLI, SDK, and webhook adapters. The scan
 names above therefore map to concrete required checks rather than advisory placeholders.
+
+Issue automation is closed by default for people you have not vouched for.
+`solve_untrusted_authors = false` means an outside author's issue waits for a maintainer
+to apply `required_label`; only then can it start a privileged job. `trigger_labels`
+narrows the feature further — set it to `["bug"]` and only labelled bugs are ever
+attempted. `ignored_labels` is the escape hatch in the other direction: an issue carrying
+one is never attempted, whoever wrote it. `branch_prefix` names the namespace every
+proposal branch lives under; it is validated against the configured permanent branches,
+and `branch-intake.yml` is rendered to yield that namespace so the two never race to open
+the same pull request. Set `open_pull_request = false` to publish only the branch, or
+`enabled = false` to keep the workflow installed and inert.
 
 Sanitized progress is the safe default. Claude's progress-comment mode is enabled only for
 the direct PR/issue events the action supports; `workflow_run`, `workflow_dispatch`, and
@@ -602,6 +695,7 @@ trusted_authors = ["your-login", "dependabot[bot]"]
 | Workflow | Responsibility |
 |---|---|
 | Branch intake | Turns a new topic branch into one reusable draft PR. |
+| Issue automation | Turns an eligible published issue into one guarded solution branch and linked PR. |
 | Conventional Commits | Normalizes guarded same-repository topic history and republishes it with an exact-head lease. |
 | CI\* / Provenance / Docs | Validate code, history, human docs, agent docs, plugins, and interfaces. |
 | PR automation | Aggregates exact-head scans; reviews, repairs, resolves conflicts, and gates. |
@@ -629,6 +723,9 @@ The automation distinguishes failures by what can safely resolve them:
 | Fork PR needs edits | Create a linked repository-owned replacement PR with attribution | Continue discussion on the linked PR when needed |
 | Missing secret, expired token, billing/credit exhaustion, registry denial, unsupported runner, or unavailable external service | Mark `vibey-gh:automation-blocked`; make no speculative source edit | Correct the named repository or provider setting, then redispatch |
 | Three unsuccessful repair attempts in one contributor lineage | Mark `vibey-gh:repair-exhausted`; publish remaining failures and run links | Push a new human-authored commit or deliberately reset the lineage |
+| Issue too ambiguous, out of scope, or blocked on an operator decision | Return `needs_human`, change nothing, mark `vibey-gh:solve-blocked` | Answer the question in the issue, or refine and edit it to start a new lineage |
+| Configured unsuccessful solution attempts for one issue lineage | Mark `vibey-gh:solve-exhausted`; comment once with the reason | Edit the issue to restate the request, or take it manually |
+| Exact-head review returns no verdict (exhausted API credits, missing key, model unavailable) | Publish a failing `PR automation: review incomplete` gate naming the operator cause; never infer a verdict | Correct the operator condition, then rerun the review |
 | Stale workflow completion | Ignore it; it cannot create a successful current-head gate | None |
 | Failed trusted post-merge release workflow | Open a repair branch and ordinary PR; never patch a permanent branch directly | Correct operator-only infrastructure failures |
 
@@ -670,6 +767,11 @@ Use the workflow’s manual dispatch with the PR number and exact current head S
 backstops also redispatch open PR evaluations. Re-running an old workflow is harmless: the
 exact-head comparison prevents its result from authorizing a newer commit.
 
+Dispatch `Issue automation` with an issue number to retry one issue, and
+`vibey-gh issue-automation list-eligible` to see what its scheduled sweep would pick up.
+Re-dispatching an issue whose text has not changed cannot spend a second attempt or open a
+second pull request; the stored content fingerprint makes the retry a no-op.
+
 ### Audit an automation decision
 
 Start with the PR’s `PR automation / gate`, then follow the linked workflow run. The job
@@ -690,9 +792,13 @@ creating an unbounded comment stream.
 | Operating and recovering the system | [docs/operations.md](docs/operations.md) |
 | Releases and publishing channels | [docs/releases.md](docs/releases.md) |
 | Threats and privileged-job boundaries | [docs/threat-model.md](docs/threat-model.md) and [SECURITY.md](SECURITY.md) |
+| Security architecture | [docs/security.md](docs/security.md) |
 | Local development and verification | [docs/development.md](docs/development.md) and [docs/testing.md](docs/testing.md) |
 | Common failures | [docs/troubleshooting.md](docs/troubleshooting.md) |
 | Governance, support, and conduct | [docs/governance.md](docs/governance.md), [SUPPORT.md](SUPPORT.md), and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) |
+| Accessibility standards | [docs/accessibility.md](docs/accessibility.md) |
+| Dependency policy | [docs/dependencies.md](docs/dependencies.md) |
+| Roadmap and priorities | [docs/roadmap.md](docs/roadmap.md) |
 | GitHub Actions workflow reference and admin recovery paths | [.github/README.md](.github/README.md) |
 | Agent instructions and skills | [AGENTS.md](AGENTS.md), [CLAUDE.md](CLAUDE.md), [GEMINI.md](GEMINI.md), `.cursor/`, `.agent/`, `.agents/`, and `.claude/` |
 | Architectural decisions | [docs/adr/README.md](docs/adr/README.md) |
@@ -707,6 +813,10 @@ creating an unbounded comment stream.
 - Repository profile failure: give `AUTOMERGE_TOKEN` the administration and security
   permissions required to reconcile the configured settings.
 - Wrong package index: `develop` must select TestPyPI and `main` must select PyPI.
+- An issue that never gets a proposal: check the evaluation reason in the `Issue
+  automation` job summary. An outside author's issue is skipped by design until a
+  maintainer applies `vibey-gh:solve`; an ignored or missing trigger label, an exhausted
+  budget, and a `vibey-gh:solve-blocked` label are the other stated reasons.
 
 See [docs/troubleshooting.md](docs/troubleshooting.md) and [SUPPORT.md](SUPPORT.md); include
 the workflow URL, exact SHA, and redacted failing-step output when asking for help.

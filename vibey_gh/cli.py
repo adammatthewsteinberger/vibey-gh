@@ -16,6 +16,7 @@ from vibey_gh import (
     fingerprints,
     github_release,
     install,
+    issue_automation,
     merge_train,
     pr_automation,
     promote,
@@ -225,6 +226,42 @@ def _pr_automation(args) -> int:
     return 0
 
 
+def _issue_automation(args) -> int:
+    cfg = load_config()
+    try:
+        if args.action == "evaluate":
+            print(issue_automation.evaluate_issue(args.issue, cfg).to_json())
+        elif args.action == "context":
+            document = issue_automation.context(
+                issue_automation.fetch_issue(args.issue), max_bytes=args.max_bytes
+            )
+            if args.output:
+                args.output.parent.mkdir(parents=True, exist_ok=True)
+                args.output.write_text(document, encoding="utf-8")
+                print(f"vibey-gh: wrote {len(document.encode())} bytes to {args.output}")
+            else:
+                print(document, end="")
+        elif args.action == "record-solution":
+            state = issue_automation.record(args.issue, _read_json(args.input))
+            print(json.dumps(asdict(state), sort_keys=True))
+        elif args.action == "list-eligible":
+            print(
+                json.dumps(
+                    [json.loads(item.to_json()) for item in issue_automation.eligible_issues(cfg)],
+                    sort_keys=True,
+                )
+            )
+        elif args.action == "ensure-labels":
+            issue_automation.ensure_labels()
+            print("vibey-gh: issue automation labels are ready")
+        else:  # pragma: no cover - argparse constrains this
+            raise ValueError(f"unknown action: {args.action}")
+    except (OSError, RuntimeError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        print(f"vibey-gh: {exc}", file=sys.stderr)
+        return 1
+    return 0
+
+
 def _github_release(args) -> int:
     cfg = load_config()
     try:
@@ -422,6 +459,37 @@ def main(argv: list[str] | None = None) -> int:
     mirror.set_defaults(func=_pr_automation)
     labels = automation_sub.add_parser("ensure-labels", help="create or update automation labels")
     labels.set_defaults(func=_pr_automation)
+
+    issues = sub.add_parser(
+        "issue-automation", help="evaluate issues and persist autonomous solution state"
+    )
+    issues_sub = issues.add_subparsers(dest="action", required=True)
+    issue_evaluate = issues_sub.add_parser("evaluate", help="classify one issue")
+    issue_evaluate.add_argument("--issue", type=int, required=True)
+    issue_evaluate.set_defaults(func=_issue_automation)
+    issue_context = issues_sub.add_parser(
+        "context", help="render one issue as a bounded, explicitly untrusted briefing"
+    )
+    issue_context.add_argument("--issue", type=int, required=True)
+    issue_context.add_argument("--output", type=Path, help="write here instead of stdout")
+    issue_context.add_argument(
+        "--max-bytes", type=int, default=issue_automation.DEFAULT_CONTEXT_BYTES
+    )
+    issue_context.set_defaults(func=_issue_automation)
+    issue_record = issues_sub.add_parser(
+        "record-solution", help="persist a structured solution attempt"
+    )
+    issue_record.add_argument("--issue", type=int, required=True)
+    issue_record.add_argument("--input", required=True, help="JSON object, file, or - for stdin")
+    issue_record.set_defaults(func=_issue_automation)
+    issue_list = issues_sub.add_parser(
+        "list-eligible", help="every open issue a recovery sweep should dispatch"
+    )
+    issue_list.set_defaults(func=_issue_automation)
+    issue_labels = issues_sub.add_parser(
+        "ensure-labels", help="create or update issue automation labels"
+    )
+    issue_labels.set_defaults(func=_issue_automation)
 
     release = sub.add_parser(
         "github-release", help="idempotently create an immutable version tag and GitHub Release"

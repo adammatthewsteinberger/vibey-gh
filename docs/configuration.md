@@ -55,6 +55,32 @@ Raw output additionally requires a manual `workflow_dispatch` with
 `full_claude_output = true`. Event-triggered runs can never enable it, and the workflow
 fails closed when repository visibility is not private.
 
+## `[issue_automation]`
+
+Turns a published issue into a reviewable pull request. Every field exists because an
+adopting repository could reasonably disagree with the default; the defaults themselves are
+closed, because anyone with a GitHub account can open an issue.
+
+| Field | Type / default | Meaning |
+|---|---|---|
+| `enabled` | boolean / `true` | Enable evaluation and autonomous solution proposals. `false` keeps the workflow installed and inert. |
+| `model` | string / `claude-sonnet-5` | Model used to design and implement the proposed solution. |
+| `max_attempts` | integer / `2` (1–10) | Solution budget per issue content lineage. |
+| `branch_prefix` | string / `vibey-gh/issue` | Namespace every proposal branch lives under. Validated against the configured permanent branches and rendered into `branch-intake.yml`'s ignore list. |
+| `base_branch` | string / empty | Branch a solution is built on. Blank uses `branches.integration`. |
+| `solve_untrusted_authors` | boolean / `false` | Permit issues from outside the owner/trusted-author set without a maintainer label. |
+| `required_label` | string / `vibey-gh:solve` | Label that opts an outside author's issue in. Empty disables that path entirely. |
+| `trigger_labels` | string list / empty | When set, only issues carrying one of these labels are ever attempted. |
+| `ignored_labels` | string list / question, discussion, duplicate, wontfix, `vibey-gh:solve-blocked` | Issues carrying one of these are never attempted, whoever wrote them. |
+| `open_pull_request` | boolean / `true` | Open a linked pull request after publishing the branch. |
+| `draft_pull_request` | boolean / `true` | Open that pull request as a draft, letting PR automation promote it when its exact head is green. |
+| `retain_schedule_backstop` | boolean / `true` | Retain the scheduled recovery sweep beside the event triggers. |
+
+An issue's attempt budget is keyed to a SHA-256 fingerprint of its title and body, so
+re-running automation on unchanged text cannot spend the budget twice and editing the issue
+starts a fresh lineage. Managed labels are `vibey-gh:solve`, `vibey-gh:solving`,
+`vibey-gh:solution-proposed`, `vibey-gh:solve-exhausted`, and `vibey-gh:solve-blocked`.
+
 ## `[github_release]`
 
 | Field | Type / default | Meaning |

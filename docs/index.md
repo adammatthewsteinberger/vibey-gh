@@ -8,6 +8,15 @@ production.</p>
 
 <div class="feature-card" markdown>
 
+### Resolve
+
+An eligible published issue becomes one guarded solution branch and a linked pull request,
+without a human in between.
+
+</div>
+
+<div class="feature-card" markdown>
+
 ### Repair
 
 Failed scans are diagnosed, repaired on a guarded branch, and sent back through the full

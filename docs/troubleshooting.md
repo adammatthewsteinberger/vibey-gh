@@ -6,6 +6,22 @@
   every independent policy gate passes and the owner explicitly authorizes it.
 - An empty Anthropic key means it was configured as an environment secret instead of a
   repository secret for a job without that environment.
+- An issue that never receives a proposal is almost always a stated eligibility decision
+  rather than a failure: read the `Issue automation` job summary. An issue from an author
+  outside `[merge_train].owner` and `trusted_authors` is skipped until a maintainer applies
+  the configured `required_label`, and a configured ignored label, an absent trigger label,
+  an exhausted budget, or a `vibey-gh:solve-blocked` label each produce their own reason.
+- An issue labelled `vibey-gh:solve-blocked` means the attempt returned `needs_human`: the
+  request needs a human decision, named in the issue's state comment. Answer it in the
+  issue, then edit the body to restate the request — editing starts a new attempt lineage.
+- A redispatched `Issue automation` run that does nothing is working correctly. Attempts
+  are keyed to a fingerprint of the issue's title and body, so unchanged text cannot spend
+  a second attempt or open a second pull request.
+- A `PR automation / gate` failure titled `review incomplete` means every scan passed but
+  the exact-head review never returned a verdict. Read the review job log: the usual causes
+  are an exhausted Anthropic credit balance, a missing or expired `ANTHROPIC_API_KEY`, or
+  model unavailability. The gate deliberately fails closed rather than inferring a verdict,
+  so correct the operator condition and rerun the review — do not merge past it.
 - Package verification should query the GHCR manifest, not account package listing APIs.
 - Pages 404s require a successful deployment containing an `index.html` at each channel.
 - A `vibey-gh check` failure printed as `debug logging: <path>: cannot validate branch

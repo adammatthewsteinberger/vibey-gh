@@ -6,7 +6,9 @@ compares the PR head with the SHA that was evaluated. A concurrent update conver
 run into a successful stale no-op; it never force-pushes, overwrites newer work, consumes a
 repair attempt, or mutates a permanent branch from an obsolete checkout.
 
-Branch intake opens draft PRs. CI and provenance validate code. Documentation validates
+Issue automation turns an eligible published issue into one guarded solution branch and
+linked pull request, which then enters this same path with no exemption. Branch intake
+opens draft PRs. CI and provenance validate code. Documentation validates
 the complete docs contract and periodically authors guarded refresh PRs. PR automation
 aggregates exact-head scans, reviews outside contributions, repairs failures, and resolves
 conflicts. The merge train squash-merges to develop and rebase-merges promotions to main.
@@ -23,6 +25,39 @@ key off a `workflow_run` named `Release` (and `release-repair.yml` also watches 
 `Release` workflow that runs on `develop`/`main`, derives the version with `vibey-gh
 version --apply`, builds, and publishes through the `testpypi`/`pypi` trusted-publishing
 environments is what the rest of this reference assumes exists.
+
+## Issue automation
+
+`Issue automation` runs on `issues` (`opened`, `reopened`, `labeled`), `workflow_dispatch`
+with an issue number, and — when `[issue_automation].retain_schedule_backstop` is set — a
+twice-daily recovery sweep that dispatches only the issues `vibey-gh issue-automation
+list-eligible` reports.
+
+The `evaluate` job holds `contents: read` and `issues: read`. It runs trusted default-branch
+workflow code, installs the published `vibey-gh` package (never the adopting repository's
+own package), and emits one structured decision: `solve`, `skip`, or `blocked`, each with a
+stated reason. Only `solve` starts the privileged `solve` job; `blocked` labels and comments
+once through the `exhausted` job.
+
+The `solve` job checks out trusted automation under `automation/` and the configured base
+branch under `target/` with `persist-credentials: false`. A trusted step renders the issue
+into `briefing/issue.md`; the pinned Claude Code Action then runs from a disposable
+credential-free Git context with `Read,Glob,Grep,Edit,Write` and no `Bash`, `gh`, or
+`Agent` tool, and is told the briefing is an untrusted report rather than an instruction.
+It edits files only.
+
+Publication is a separate trusted step that validates the branch against the configured
+namespace and the permanent branches, normalizes provenance headers with
+`vibey-gh check --ci --apply`, commits with the repository's own configured trailer from
+`vibey-gh trailer`, pushes one non-empty-source refspec, and opens one linked pull request
+containing `Closes #N`. It publishes nothing when the agent returned `solved=false` or
+produced no diff. `branch-intake.yml` is rendered to ignore the same namespace so the two
+never race. From there the proposal is an ordinary pull request with no exemption from
+scans, review, repair, or the merge train.
+
+Attempts are budgeted per issue content fingerprint and stored in one machine-readable
+issue comment, so a redispatch of unchanged text is a no-op and an edit starts a new
+lineage.
 
 ## CodeQL
 
@@ -50,6 +85,149 @@ rewritten history with an exact-SHA `--force-with-lease`. It refuses forks, merg
 stale heads, and any branch named by the configured integration or release branch; the
 literal `develop` and `main` names are denied independently as defense in depth. It never
 deletes a branch. The resulting synchronize event reruns all ordinary scans.
+
+## Branch intake
+
+`Branch intake` runs on every push whose branch is not `develop`, `main`, or under the
+`vibey-gh/repair/` or `vibey-gh/issue/` namespaces — issue automation and repair publish
+their own linked pull requests, and intake must not race them. With `contents: read` and
+`pull-requests: write`, it opens exactly one draft pull request against `develop` for a
+branch that has no open PR yet. This intentionally runs on every push rather than once per
+branch name: a branch name reused after its previous PR merged must still get a fresh
+draft, since a historical closed PR must never suppress intake for the new lineage.
+
+## CI
+
+`CI` and `Release` are the two workflows `vibey-gh install` never renders, because every
+repository's build, test, and publish steps differ; they must exist under those exact
+names because other release workflows key off a `workflow_run` named `Release` (and
+`release-repair.yml` also watches `CI`). `CI` runs on push and pull request against
+`develop` and `main` with the default read-only token. Its `test` job runs pytest across
+Python 3.11–3.13; `lint` runs Black, isort, Ruff, and mypy, then dogfoods the managed
+automation by asserting `vibey_gh.install.installed()` reports no drift between the
+repository's rendered workflows and its configuration; `build` builds the wheel and sdist,
+checks them with `twine check`, and asserts every managed template and release theme asset
+is packaged inside the wheel. `CI` is one of the required `scan_workflows` entries PR
+automation aggregates.
+
+## Provenance
+
+`Provenance` runs on push to every branch and on every pull request, with read-only
+`contents: read`. It installs the tooling (from source when the repository under test is
+`vibey-gh`/`vibey-bootstrap` itself, otherwise the published package) and runs `vibey-gh
+check --ci`, which performs the fingerprint and Conventional Commits verification that is
+the server-side half of the provenance rule — backstopping the pre-push hook, which lives
+in a clone and can be skipped with `--no-verify` or simply never installed. A promotion PR
+from `develop` into `main` checks provenance without rewriting or re-auditing
+already-admitted history; an ordinary PR checks only the commits it adds, via `--commits
+BASE_SHA..HEAD`.
+
+## Docs (documentation contract and maintenance)
+
+`Docs` (workflow file `documentation.yml`) runs on pull request, push to `develop`/`main`,
+a weekly Monday 07:23 UTC schedule, and manual dispatch. Its `contract` job holds
+read-only `contents: read` and runs `vibey-gh check --ci` — the same fingerprint-checking
+entry point `Provenance` uses — to verify every required documentation surface exists and
+is current. Its `maintain` job runs only on schedule or `workflow_dispatch`, holds
+`contents: write`, `id-token: write`, and `pull-requests: write`, checks out `develop`
+onto a fresh `vibey-gh/docs/refresh-<run_id>` branch, and runs the pinned Claude Code
+Action as a comprehensive documentation author restricted to `Read,Glob,Grep,Edit,Write`.
+The job fails unless Claude's structured result reports `complete=true` with zero
+`gaps_remaining`; only then does a trusted step commit, push the branch, and open one pull
+request against `develop`.
+
+## PR automation
+
+`PR automation` is the aggregation, review, repair, and merge-gating hub. It triggers on
+`pull_request_target` (opened, reopened, synchronize, ready-for-review) against
+`develop`/`main`; on completion of `CI`, `Provenance`, `CodeQL`, `Docs`, and `API drift
+(Cloud Agents OpenAPI)`; on a six-hourly recovery schedule; and on manual dispatch.
+Top-level permissions are `actions: read`, `checks: read`, `contents: read`, and
+`pull-requests: read`, with individual jobs elevating further. `evaluate` resolves the PR
+and its exact head SHA and calls `vibey-gh pr-automation evaluate` to compute an aggregate
+`state` (`ready`, `review`, `repair`, `conflict`, `blocked`, or `pending`). `review`
+(when state is `ready` or `review`) checks out the untrusted head read-only beside trusted
+automation and runs the pinned Claude Code Action, restricted to `Read,Glob,Grep` plus a
+scoped inline-comment tool and read-only `gh pr` commands, to produce the structured
+semantic review this repair task itself receives as input. `mirror-fork` opens a
+repository-owned replacement PR when a fork needs repair or has a conflict. `repair`
+collects exact-head failed-check evidence into `diagnostics/`, runs Claude with
+`Read,Glob,Grep,Edit,Write` and no execution tools, and — only when the branch is still at
+the expected head — publishes one commit back to the PR branch. `resolve-conflict`
+materializes a same-repository merge conflict, lets Claude edit only the conflicting
+paths, and publishes one resolution commit. `escalate` labels and comments once when the
+repair-attempt budget is exhausted. `gate` publishes the final `PR automation / gate`
+check run for the exact head and, on success, dispatches `merge-train.yml`.
+
+## Merge train
+
+`Merge train` runs on completion of `PR automation`, a weekly Monday recovery schedule,
+and manual dispatch (optionally scoped to one PR, optionally `dry_run`). With `actions:
+read`, `contents: write`, and `pull-requests: write`, it resolves the gated PR and runs
+`vibey-gh merge-train`, which squash-merges every currently ready PR into `develop`.
+
+## Promote
+
+`Promote` (workflow file `promote-to-main.yml`) runs on completion of `Merge train`, a
+weekly Monday schedule, and manual dispatch. With `contents: write` and `pull-requests:
+write`, it runs `vibey-gh promote`, which compares `develop` and `main` by tree content
+rather than commit count, derives the next version, and opens or reuses a promotion pull
+request; that PR then goes through the same scans, `PR automation` gate, and a rebase
+merge to `main` as any other change. `AUTOMERGE_TOKEN` is required here because a
+ruleset-required approving review cannot be satisfied by the default `GITHUB_TOKEN`.
+
+## Release
+
+`Release` (not a managed template) runs on push to `main` and `develop` with read-only
+`contents: read`. Its `build` job dogfoods `vibey_gh.install.installed()` before
+publishing, stamps a `--dev` version on `develop` builds via `vibey-gh version --apply`,
+and builds the wheel and sdist. `testpypi` (needs `build`, `develop` only) and `pypi`
+(needs `build`, `main` only) each hold `id-token: write` and publish through
+trusted-publishing environments pinned to their respective branch. `realign` (needs
+`build` and `pypi`, `main` only, `contents: write`) runs `vibey-gh realign` to converge
+`develop` back onto `main` when their trees are content-identical; it never force-pushes
+over unmerged `develop` work and skips gracefully when `AUTOMERGE_TOKEN` is absent.
+
+## GitHub Release
+
+`GitHub Release` runs on completion of `Release` (only when it succeeded on `main`) or
+manual dispatch with an explicit target SHA. With `contents: write`, it checks out the
+exact released commit and runs `vibey-gh github-release --target <sha>` to create an
+immutable tag and an idempotent GitHub Release for that commit.
+
+## Release surfaces
+
+`Release surfaces` runs on completion of `Release` on `develop` or `main`, or manual
+dispatch naming a channel and a source run. Its `context` job resolves the channel;
+`package` (`actions: read`, `contents: read`, `packages: write`) publishes the built wheel
+and sdist as an OCI artifact to GitHub Packages, tagged with the channel and `latest` on
+`main`; `docs` (`actions: read`, `contents: read`, `pages: write`, `id-token: write`)
+builds a branch-specific ProperDocs site with the managed release theme and deploys it to
+the shared `github-pages` environment under a channel-specific path, restoring the other
+channel's existing site alongside it.
+
+## Repository profile
+
+`Repository profile` runs on completion of `Release surfaces` or manual dispatch, with
+read-only `actions: read`, `contents: read`, `deployments: read`, and `packages: read`. It
+reconciles the repository's description, homepage, topics, and collaboration/security
+settings to the configured values, then verifies the public release surfaces are actually
+live: the Pages homepage responds, at least one release and one deployment exist, the
+GHCR package is reachable, and `develop`/`main` remain protected.
+
+## Release repair
+
+`Release repair` runs on completion of `CI`, `Provenance`, `Release`, `Release surfaces`,
+or `GitHub Release` on `develop` or `main`, only when that run's conclusion was `failure`.
+With `contents: write`, `id-token: write`, `issues: write`, `pull-requests: write`, and
+read-only `actions`/`checks`, it first confirms the branch is still at the failed SHA (a
+stale failure is a no-op) and that no repair branch already exists for that run. It checks
+out the exact failed revision, runs Claude in a credential-free context restricted to
+`Read,Glob,Grep,Edit,Write` plus read-only CI-log tools, and — only when the structured
+result reports `fixable=true` and the branch is still current — publishes one commit to a
+new `vibey-gh/repair/release-<branch>-<run_id>` branch and opens an ordinary pull request
+that re-enters the same scans, review, and merge train as any other change. It never
+pushes directly to or deletes a permanent branch.
 
 ## Automation bootstrap
 
