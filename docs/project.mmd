@@ -35,6 +35,7 @@ flowchart TB
     CapabilitySurfaces["Capability surfaces (vibey_gh.surfaces)"]
     ReleaseSurfaces[Release surfaces publishing]
     Realign[Realign released branches]
+    Reconcile["Stranded-branch reconciliation (vibey_gh.reconcile)"]
   end
 
   subgraph Security["Security Boundary"]
@@ -77,6 +78,8 @@ flowchart TB
     RepositoryProfile[Repository profile]
     ReleaseRepair[Release repair]
     Conflict[Guarded same-repository conflict resolution]
+    BranchSync[Branch sync]
+    SelfHeal[Self-heal spent repair budgets]
   end
 
   Maintainer --> CLI
@@ -190,3 +193,11 @@ flowchart TB
   Guard --> Fingerprints
   CLI --> Debugging
   Debugging --> Fingerprints
+  Develop -->|push| BranchSync
+  BranchSync --> Reconcile
+  Reconcile -->|rebase or delete: force-with-lease and exact-ref guards| Guard
+  Reconcile -->|close duplicate or leave with a comment| PullRequest
+  Reconcile -->|forward-merge only, never rewritten| Fork
+  BranchSync --> SelfHeal
+  SelfHeal -->|refill a repair-exhausted PR's budget| PRAutomation
+  SelfHeal --> PullRequest

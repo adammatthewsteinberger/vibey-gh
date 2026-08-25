@@ -13,6 +13,28 @@ commit subjects; exact-head, linear-history, repository-ownership, and permanent
 guards all precede it. A fork, merge commit, stale event, or concurrent push fails closed.
 Operators must protect repository secrets and review ruleset changes.
 
+An outside author cannot steer automation at a permanent branch from either end. GitHub
+already refuses them write access; behind that, `evaluate` terminally blocks any untrusted
+pull request whose head ref is the configured integration or release branch (whose repair
+push would land there) and any aimed at the release branch, which must only ever receive a
+promotion. Blocked is terminal, so no review, repair, conflict resolution, or gate runs for
+either shape. A fork is moved forward only through GitHub's update-branch endpoint, which
+merges rather than rewrites and succeeds only where the contributor enabled maintainer
+edits; rebasing, closing, and deleting a fork are unreachable under every configuration.
+
+Branch reconciliation after realign is the second deliberate force-update path, and the
+only automated deletion path besides merged-topic cleanup. Both are confined by
+`vibey_gh.reconcile.deletable()`, which refuses the configured integration and release
+branches, the literal `develop` and `main` independently, every fork branch, and any ref
+that is empty, begins with `-`, or contains `:` or `..`. `rebase_branch()` and
+`delete_branch()` each re-check that predicate and raise rather than proceed, so no caller
+can reach a protected ref by passing one in. Rebases publish with an exact-SHA
+`--force-with-lease`, so a branch that moved in the meantime refuses the push instead of
+being overwritten. A pull request is closed only when `git cherry` reports that every one
+of its commits is already upstream by patch identity; a ref that cannot be read reports
+unique work instead, so an unreadable branch fails closed. A contributor's branch carrying
+unique work is never rewritten, deleted, or closed — it receives a comment.
+
 Published issues are a distinct adversary-controlled asset with a lower barrier than a
 fork PR: anyone with an account can create one, and the `issues` event runs privileged
 default-branch workflow code. The controls are authority, shape, and budget. Authority: the

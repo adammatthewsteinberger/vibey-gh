@@ -19,6 +19,7 @@ import subprocess
 from dataclasses import dataclass
 from typing import Any, cast
 
+from vibey_gh import reconcile
 from vibey_gh.config import GhConfig, normalise_actor
 from vibey_gh.pr_automation import BLOCKED_LABEL, EXHAUSTED_LABEL, EXTERNAL_REPAIR_LABEL
 
@@ -225,9 +226,9 @@ def method_for(pr: dict, cfg: GhConfig, default: str = "squash") -> str:
 
 def should_delete_head(pr: dict, cfg: GhConfig) -> bool:
     """Delete merged topic branches, never permanent or contributor-fork branches."""
-    head = str(pr.get("headRefName") or "")
-    permanent = {"main", "develop", cfg.integration_branch, cfg.release_branch}
-    return bool(head) and head not in permanent and not pr.get("isCrossRepository", False)
+    return reconcile.deletable(
+        str(pr.get("headRefName") or ""), cfg, fork=bool(pr.get("isCrossRepository", False))
+    )
 
 
 def delete_head_branch(pr: dict) -> bool:

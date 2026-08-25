@@ -21,6 +21,15 @@ number, exact head SHA, and explicit authorization. It requires administrator pe
 and every independent gate already passing on that SHA, and it is the only path that
 squash-merges to `develop` without an ordinary PR automation review.
 
+To preview what `Branch sync` would rebase, close, update, or leave without mutating
+anything, dispatch it manually with `dry_run = true`; the decisions are printed to the run
+summary. The nightly schedule run of its `heal` job refills the repair budget of every pull
+request labeled `vibey-gh:repair-exhausted`, up to `branch_sync.max_self_heals` times per
+lineage, and re-dispatches `PR automation` against each healed PR's exact head SHA. Once
+that budget is spent for a lineage, the label stays and only a human — typically by pushing
+a new commit or editing the PR — starts a fresh lineage. See [Workflows](workflows.md) and
+`[branch_sync]` in [Configuration](configuration.md).
+
 When Conventional Commits rewrites a topic branch, synchronize the local checkout before
 new work. Preserve unpushed work first, then use `git fetch origin` and rebase it onto the
 new remote head; if there is no unpushed work, reset the local topic branch to its explicit

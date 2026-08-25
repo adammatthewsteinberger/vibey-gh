@@ -194,7 +194,192 @@ def test_evaluation_ignores_own_checks_and_accepts_context_shape(tmp_path):
         cfg(tmp_path),
         expected_sha="abc",
     )
-    assert result.state == "ready"
+    # Reaching the review stage is what proves the rollup was read correctly: the two own
+    # checks were ignored and the legacy `context` entry counted as a real passing scan.
+    assert result.state == "review"
+
+
+def test_a_conflicted_draft_is_resolved_rather_than_stranded(tmp_path):
+    """The deadlock: `ready_draft` will not promote a conflicted draft *because* it
+    conflicts, and conflict resolution never ran *because* it was a draft. Every
+    branch-intake and issue-solution pull request starts as a draft, so this stranded all
+    of them.
+    """
+    config = cfg(tmp_path)
+    conflicted = pr(isDraft=True, mergeable="CONFLICTING")
+    decision = pa.evaluate(conflicted, config, expected_sha="abc")
+    assert decision.state == "conflict"
+    assert decision.repair_attempt == 1
+
+    # A fork draft still stays untouched: its conflict path closes the contributor's PR.
+    fork = pr(isDraft=True, mergeable="CONFLICTING", isCrossRepository=True)
+    assert pa.evaluate(fork, config, expected_sha="abc").state == "pending"
+    # Once that fork PR is ready for review, the ordinary replacement path applies again.
+    ready_fork = pr(mergeable="CONFLICTING", isCrossRepository=True)
+    assert pa.evaluate(ready_fork, config, expected_sha="abc").state == "conflict"
+
+    # An ordinary draft with no conflict is still nonterminal.
+    assert pa.evaluate(pr(isDraft=True), config, expected_sha="abc").state == "pending"
+
+    # Operator control still outranks conflict resolution for a draft.
+    blocked = pr(isDraft=True, mergeable="CONFLICTING", labels=[{"name": pa.BLOCKED_LABEL}])
+    assert pa.evaluate(blocked, config, expected_sha="abc").state == "blocked"
+    spent = pa.AutomationState("abc", "abc", attempts=3)
+    exhausted = pa.evaluate(conflicted, config, expected_sha="abc", stored=spent)
+    assert exhausted.state == "blocked"
+    assert "conflict resolution budget is exhausted" in exhausted.reason
+
+
+def test_an_outside_author_can_never_steer_automation_at_a_permanent_branch(tmp_path):
+    """GitHub already refuses them write access; this is the defence behind that.
+
+    Both shapes are terminal, so no review, repair, conflict resolution, or gate runs —
+    automation simply never acts on a pull request from an outside author that points at
+    a permanent branch from either end.
+    """
+    config = cfg(tmp_path)
+    outsider = {"login": "stranger"}
+
+    for head in ("develop", "main", config.integration_branch, config.release_branch):
+        decision = pa.evaluate(
+            pr(author=outsider, headRefName=head, statusCheckRollup=[check()]),
+            config,
+            expected_sha="abc",
+        )
+        assert decision.state == "blocked"
+        assert "may not propose from" in decision.reason
+
+    for base in ("main", config.release_branch):
+        decision = pa.evaluate(
+            pr(author=outsider, baseRefName=base, statusCheckRollup=[check()]),
+            config,
+            expected_sha="abc",
+        )
+        assert decision.state == "blocked"
+        assert "may not target" in decision.reason
+
+    # A trusted author still promotes normally: the promotion PR's head IS the
+    # integration branch, and blocking that would stop every release.
+    promotion = pr(headRefName="develop", baseRefName="main", statusCheckRollup=[check()])
+    assert pa.evaluate(promotion, config, expected_sha="abc").state != "blocked"
+    # And an outside author's ordinary contribution is unaffected.
+    ordinary = pr(author=outsider, headRefName="feature/x", statusCheckRollup=[check()])
+    assert pa.evaluate(ordinary, config, expected_sha="abc").state != "blocked"
+
+
+def test_the_review_loop_is_bounded_for_a_trusted_author_too(tmp_path):
+    """The workflow reviews every author, so every author's review loop needs a budget.
+
+    A trusted author previously fell straight through to `ready`, leaving the
+    review-to-repair cycle in the workflow with nothing bounding it at all.
+    """
+    config = cfg(tmp_path, max_repair_attempts=2)
+    green = pr(statusCheckRollup=[check()])
+    assert pa._trusted(green, config), "fixture must be a trusted author for this test"
+
+    below = pa.AutomationState("abc", "abc", attempts=1)
+    assert pa.evaluate(green, config, expected_sha="abc", stored=below).state == "review"
+
+    verdict = pa.AutomationState("abc", "abc", attempts=1, review_sha="abc", review_passed=False)
+    findings = pa.evaluate(green, config, expected_sha="abc", stored=verdict)
+    assert findings.state == "repair" and findings.repair_attempt == 2
+
+    spent = pa.AutomationState("abc", "abc", attempts=2)
+    blocked = pa.evaluate(green, config, expected_sha="abc", stored=spent)
+    assert blocked.state == "blocked"
+    assert "review repair budget is exhausted" in blocked.reason
+
+    passed = pa.AutomationState("abc", "abc", attempts=1, review_sha="abc", review_passed=True)
+    assert pa.evaluate(green, config, expected_sha="abc", stored=passed).state == "ready"
+
+
+def test_an_outside_author_with_review_disabled_still_reaches_ready(tmp_path):
+    config = cfg(tmp_path, review_untrusted_authors=False)
+    green = pr(author={"login": "stranger"}, statusCheckRollup=[check()])
+    assert pa.evaluate(green, config, expected_sha="abc", stored=None).state == "ready"
+
+
+def test_a_spent_repair_budget_can_be_refilled_a_bounded_number_of_times(monkeypatch, tmp_path):
+    """A budget that never refills turns a transient outage into a permanent stop; one
+    that refills forever is no budget. So the refill is itself budgeted."""
+    from vibey_gh.config import BranchSyncConfig
+
+    config = GhConfig(root=tmp_path, owner="owner", branch_sync=BranchSyncConfig(max_self_heals=2))
+    state = pa.AutomationState("abc", "abc", attempts=3)
+    current = pr(labels=[{"name": pa.EXHAUSTED_LABEL}], comments=[pa.state_body(state, "x")])
+    monkeypatch.setattr(pa, "fetch_pr", lambda number: current)
+    monkeypatch.setenv("GH_REPO", "o/r")
+    saved: list = []
+    monkeypatch.setattr(pa, "upsert_state", lambda *a: saved.append(a))
+    calls: list = []
+    monkeypatch.setattr(subprocess, "run", lambda args, **k: calls.append(args) or completed())
+
+    first = pa.self_heal(12, config)
+    assert first["healed"] and first["heal"] == 1
+    healed = saved[0][1]
+    assert healed.attempts == 0 and healed.heals == 1
+    assert healed.review_sha is None and healed.review_passed is None
+    assert [h["kind"] for h in healed.history][-1] == "self-heal"
+    assert any("--remove-label" in c for c in calls)
+
+    # The refill count rides in the same durable state, so it survives to bound the next.
+    spent = pa.AutomationState("abc", "abc", attempts=3, heals=2)
+    monkeypatch.setattr(
+        pa,
+        "fetch_pr",
+        lambda number: pr(
+            labels=[{"name": pa.EXHAUSTED_LABEL}], comments=[pa.state_body(spent, "x")]
+        ),
+    )
+    refused = pa.self_heal(12, config)
+    assert not refused["healed"] and "budget of 2 is spent" in refused["reason"]
+
+    monkeypatch.setattr(pa, "fetch_pr", lambda number: pr())
+    assert pa.self_heal(12, config) == {"pr": 12, "healed": False, "reason": "not exhausted"}
+
+
+def test_self_heal_starts_a_lineage_when_no_state_exists(monkeypatch, tmp_path):
+    monkeypatch.setenv("GH_REPO", "o/r")
+    monkeypatch.setattr(pa, "fetch_pr", lambda n: pr(labels=[{"name": pa.EXHAUSTED_LABEL}]))
+    saved: list = []
+    monkeypatch.setattr(pa, "upsert_state", lambda *a: saved.append(a))
+    monkeypatch.setattr(subprocess, "run", lambda args, **k: completed())
+    assert pa.self_heal(12, GhConfig(root=tmp_path))["healed"]
+    assert saved[0][1].lineage_sha == "abc"
+
+
+def test_exhausted_pull_requests_are_listed_by_label(monkeypatch, tmp_path):
+    monkeypatch.setenv("GH_REPO", "o/r")
+    captured: list = []
+    monkeypatch.setattr(
+        pa.github_state, "gh_json", lambda *a: captured.append(a) or [{"number": 4}, {"number": 9}]
+    )
+    assert pa.exhausted_pull_requests(GhConfig(root=tmp_path)) == [4, 9]
+    assert pa.EXHAUSTED_LABEL in captured[0]
+    monkeypatch.setattr(pa.github_state, "gh_json", lambda *a: None)
+    assert pa.exhausted_pull_requests(GhConfig(root=tmp_path)) == []
+
+
+def test_a_human_push_persists_a_fresh_attempt_budget():
+    """`evaluate` always computed the lineage reset; only the record never applied it."""
+    spent = pa.AutomationState(lineage_sha="old", current_sha="old", attempts=3)
+    pushed = pr(headRefOid="new", comments=[pa.state_body(spent, "x")])
+    fresh = pa.updated_state(pushed, {"head_sha": "new", "pass": True}, kind="review")
+    assert fresh.attempts == 0
+    assert fresh.lineage_sha == "new" and fresh.current_sha == "new"
+    assert [item["kind"] for item in fresh.history] == ["review"]
+
+    # A bot repair advances the head as it records, so it must NOT look like a new
+    # lineage — otherwise the budget would reset on every repair and bound nothing.
+    carried = pa.AutomationState(lineage_sha="new", current_sha="new", attempts=1)
+    repaired = pr(headRefOid="newer", comments=[pa.state_body(carried, "x")])
+    after = pa.updated_state(repaired, {"head_sha": "newer", "fixable": True}, kind="repair")
+    assert after.attempts == 2 and after.lineage_sha == "new" and after.current_sha == "newer"
+
+    # And a review recorded for the head that repair just produced continues the lineage.
+    again = pr(headRefOid="newer", comments=[pa.state_body(after, "x")])
+    continued = pa.updated_state(again, {"head_sha": "newer", "pass": False}, kind="review")
+    assert continued.attempts == 2 and continued.lineage_sha == "new"
 
 
 def test_evaluation_waits_when_no_scan_result_exists(tmp_path):

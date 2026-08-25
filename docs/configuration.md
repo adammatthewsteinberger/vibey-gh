@@ -55,6 +55,39 @@ Raw output additionally requires a manual `workflow_dispatch` with
 `full_claude_output = true`. Event-triggered runs can never enable it, and the workflow
 fails closed when repository visibility is not private.
 
+## `[branch_sync]`
+
+Keeps open branches current so conflicts never accumulate, and refills a spent repair
+budget a bounded number of times so a transient outage does not become a permanent stop.
+
+| Field | Type / default | Meaning |
+|---|---|---|
+| `enabled` | boolean / `true` | Run the sync and self-heal jobs at all. |
+| `update_contributor_branches` | boolean / `true` | Merge the integration branch forward into branches this automation does not own, using GitHub's own update-branch endpoint. Never a rewrite. |
+| `max_self_heals` | integer / `2` (0–10) | How many times one lineage's repair budget may be refilled before it stays exhausted for a human. `0` disables self-healing. |
+
+A fork is only ever moved *forward*, never rewritten: `update-branch` succeeds only where
+the contributor left "allow maintainer edits" enabled, so it carries their consent.
+Rebasing, closing, and deleting are unreachable for a fork under every setting.
+
+## `[realign]`
+
+Realign converges the integration branch onto the release branch with a lease-protected
+force update, which replaces commits with rewritten copies and strands any topic branch cut
+from one of them. These keys decide how much the automation may do about that unaided.
+
+| Field | Type / default | Meaning |
+|---|---|---|
+| `reconcile_branches` | boolean / `true` | Reconcile open pull-request branches after a realign rewrite. |
+| `automation_prefixes` | string list / `["vibey-gh/"]` | Branch prefixes this automation may rebase on its own. Everything else is a human's to rebase. |
+| `close_duplicates` | boolean / `true` | Close a pull request whose every commit is already upstream by patch identity. |
+| `delete_duplicate_branches` | boolean / `true` | Delete that branch too. Permanent, fork, and unsafe refs are refused by name regardless. |
+| `notify_contributor_branches` | boolean / `true` | Comment on a human's stranded branch with the rebase command instead of rewriting it. |
+
+Decisions use `git cherry`, which compares by patch identity, so a commit re-created
+upstream under a new SHA is correctly recognised as already present. A ref that cannot be
+read reports unique work rather than none, so an unreadable branch is never closed.
+
 ## `[issue_automation]`
 
 Turns a published issue into a reviewable pull request. Every field exists because an

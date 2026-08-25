@@ -90,6 +90,9 @@ def render_workflow(source: Path, cfg: GhConfig) -> str:
         "__VIBEY_GH_ALLOW_PRIVATE_FULL_OUTPUT__",
         "true" if cfg.pr_automation.observability.allow_private_full_output else "false",
     )
+    wanted = wanted.replace(
+        "__VIBEY_GH_SYNC_ENABLED__", "true" if cfg.branch_sync.enabled else "false"
+    )
     issues = cfg.issue_automation
     wanted = wanted.replace("__VIBEY_GH_ISSUE_ENABLED__", "true" if issues.enabled else "false")
     wanted = wanted.replace("__VIBEY_GH_ISSUE_MODEL__", issues.model)

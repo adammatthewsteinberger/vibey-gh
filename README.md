@@ -175,7 +175,9 @@ all configured scans settle for the exact head SHA
 ```
 
 Every new commit invalidates earlier evidence and starts evaluation for the new SHA. The
-repair budget is three attempts per contributor lineage by default. Bot-authored repair
+repair budget is three attempts per contributor lineage by default, and it covers every
+automated repair on that lineage — failing scans, merge conflicts, and review findings
+alike, for trusted and outside authors equally. Bot-authored repair
 commits do not reset it; a new human/contributor commit does.
 
 ### Your first successful run
@@ -262,6 +264,8 @@ request bytes for HMAC verification; see [the CLI and adapter reference](docs/cl
 | `vibey-gh promote [--no-wait]` | Open or reuse the asynchronous `develop → main` promotion PR. |
 | `vibey-gh github-release --target SHA [--version VERSION]` | Create or reuse an immutable tag and GitHub Release for an exact production SHA. |
 | `vibey-gh realign` | Align identical `develop` and `main` trees after a rebase merge without discarding work. |
+| `vibey-gh pr-automation self-heal [--pr N]` | Refill a spent repair budget, itself bounded so a permanent failure still stops. |
+| `vibey-gh reconcile-branches [--dry-run]` | Rebase, close, or leave each open branch stranded by a realign rewrite. |
 | `vibey-gh sdk|api|mcp|webhook CAPABILITY` | Invoke the same canonical capability through each supported public surface. |
 
 Run `vibey-gh --help` and read [docs/cli.md](docs/cli.md) for the full reference.
@@ -367,13 +371,21 @@ repository-owned replacement PR.
 first pushed. It ignores the integration branch, release branch, and automation-owned fork
 repair branches. Later pushes reuse the existing PR. Once the configured scans for the
 exact draft head are complete and green, PR automation marks it ready and immediately
-continues through review, repair, gating, and the merge train. Pending, failing, stale,
+continues through review, repair, gating, and the merge train. A conflicted draft is the
+one case that does not wait: conflicts are classified before draft status, because a draft
+that conflicts can never become ready — promotion requires a clean merge — so leaving it to
+`ready_draft` would strand it forever. Same-repository conflicted drafts therefore enter
+conflict resolution directly; fork drafts still wait, since their conflict path closes the
+contributor's pull request. Pending, failing, stale,
 conflicting, closed, and fork draft heads are no-ops; they are never promoted prematurely.
 
 `pr-automation.yml` reacts to configured scan-workflow completions, re-reads the entire
 current-head check rollup, and publishes an explicit check run on that exact SHA. It waits
 for pending scans, separates cancelled infrastructure from actionable failures, and allows
-at most three repair commits per contributor lineage. A new contributor commit starts a
+at most three repair commits per contributor lineage. Because every author's exact head
+is reviewed, the same budget bounds the review-to-repair cycle too: once it is spent the
+next evaluation blocks instead of dispatching another review. A new contributor commit
+starts a
 new lineage; bot repair pushes do not reset the counter.
 
 Conflicting same-repository PRs enter a bounded conflict-resolution job instead of failing
@@ -474,6 +486,25 @@ so the integration branch's tip is never an ancestor of it and a fast-forward is
 impossible — yet a ruleset with a strict up-to-date policy treats it as behind, which
 blocks the next promotion.
 
+Rewriting the integration branch strands every topic branch cut from a commit the rewrite
+replaced: the branch still holds the old copy, so Git reports a conflict for work that is
+already upstream, through nobody's fault. Realign therefore reconciles open pull requests
+straight afterwards, and the decision turns on patch identity rather than SHA — `git
+cherry` still recognises a commit that was re-created upstream under a new SHA.
+
+| What the branch carries | What happens |
+|---|---|
+| Nothing not already upstream | Its pull request is closed with an explanation and the branch is deleted |
+| Unique work on an automation-owned branch | Rebased onto the new tip; rebase drops the duplicated commits itself |
+| Unique work on anyone else's branch | Left exactly as it is, with a comment explaining the rebase they may want |
+| Anything on a fork | Never touched |
+
+No permanent branch can reach either mutating path: `deletable()` and `rebasable()` refuse
+the configured integration and release branches and the literal `develop` and `main`
+independently, and every rebase publishes with an exact-SHA `--force-with-lease`. Set
+`[realign].reconcile_branches = false` to keep the old behaviour, or turn off closing,
+deleting, or commenting individually.
+
 The guard is **tree equality, not ancestry**: this runs only when a diff between the two
 branches is empty, so it converges two identical contents onto one history and cannot
 discard work. If the integration branch has anything the release branch does not, it is
@@ -497,6 +528,13 @@ retain_schedule_backstop = true
 sanitized_progress = true
 archive_execution_file = true
 allow_private_full_output = false
+
+[realign]
+reconcile_branches = true            # reconcile open branches after a realign rewrite
+automation_prefixes = ["vibey-gh/"]  # branches this automation may rebase on its own
+close_duplicates = true              # close a PR whose commits are all already upstream
+delete_duplicate_branches = true     # and delete that branch; never a permanent one
+notify_contributor_branches = true   # comment on a human branch instead of rewriting it
 
 [issue_automation]
 enabled = true
@@ -698,6 +736,7 @@ trusted_authors = ["your-login", "dependabot[bot]"]
 |---|---|
 | Branch intake | Turns a new topic branch into one reusable draft PR. |
 | Issue automation | Turns an eligible published issue into one guarded solution branch and linked PR. |
+| Branch sync | Brings open branches forward on every merge; daily, refills a bounded number of spent repair budgets. |
 | Conventional Commits | Normalizes guarded same-repository topic history and republishes it with an exact-head lease. |
 | CI\* / Provenance / Docs | Validate code, history, human docs, agent docs, plugins, and interfaces. |
 | PR automation | Aggregates exact-head scans; reviews, repairs, resolves conflicts, and gates. |
