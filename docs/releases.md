@@ -15,3 +15,11 @@ trusted-publishing environments. `github-release.yml`, `release-surfaces.yml`, a
 `release-repair.yml` all trigger from a `workflow_run` named exactly `Release`; without a
 correctly named and behaving workflow, none of the tag, GitHub Release, GHCR, documentation,
 repository-profile, or release-repair steps below ever run.
+
+Not every push to the release branch carries a new version — a docs-only or tooling-only
+promotion, per `version.content_paths`/`code_paths`, is expected to publish nothing new. By
+default, `github-release.yml` treats a push whose version is already tagged at a different
+commit as that intentional no-op rather than a failure. Set `[github_release]
+require_new_version = true` on a repository whose release branch should carry a new version
+on every push, so a tag that would otherwise move is reported as the mistake it is. See
+`docs/configuration.md`.
