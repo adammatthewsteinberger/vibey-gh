@@ -369,7 +369,12 @@ repository-owned replacement PR.
 first pushed. It ignores the integration branch, release branch, and automation-owned fork
 repair branches. Later pushes reuse the existing PR. Once the configured scans for the
 exact draft head are complete and green, PR automation marks it ready and immediately
-continues through review, repair, gating, and the merge train. Pending, failing, stale,
+continues through review, repair, gating, and the merge train. A conflicted draft is the
+one case that does not wait: conflicts are classified before draft status, because a draft
+that conflicts can never become ready — promotion requires a clean merge — so leaving it to
+`ready_draft` would strand it forever. Same-repository conflicted drafts therefore enter
+conflict resolution directly; fork drafts still wait, since their conflict path closes the
+contributor's pull request. Pending, failing, stale,
 conflicting, closed, and fork draft heads are no-ops; they are never promoted prematurely.
 
 `pr-automation.yml` reacts to configured scan-workflow completions, re-reads the entire

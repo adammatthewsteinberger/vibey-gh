@@ -166,10 +166,6 @@ def evaluate(
         return result("blocked", f"stale event for {expected_sha}; current head is {head}")
     if pr.get("state", "OPEN") != "OPEN":
         return result("blocked", "pull request is not open")
-    if pr.get("isDraft"):
-        # Draft intake is intentionally nonterminal. `ready_draft` promotes the exact
-        # head once its scans are stable; until then no failing gate may be published.
-        return result("pending", "pull request is a draft awaiting a stable head")
     state = lineage_for(stored, head)
 
     labels = _labels(pr)
@@ -178,7 +174,19 @@ def evaluate(
     if EXHAUSTED_LABEL in labels:
         return result("blocked", "repair budget is exhausted")
 
-    if pr.get("mergeable") == "CONFLICTING":
+    draft = bool(pr.get("isDraft"))
+    # A conflict is a property of the branch against its base, not of review readiness, so
+    # it is classified before the draft short-circuit. Leaving it after strands a
+    # conflicted draft forever: `ready_draft` refuses to promote it *because* it
+    # conflicts, and conflict resolution never runs *because* it is a draft — and every
+    # branch-intake and issue-solution pull request starts as a draft. No gate is
+    # published for `conflict`, so this stays within the rule that a draft never
+    # publishes a failing gate.
+    #
+    # Fork drafts remain excluded. Their conflict path opens a repository-owned
+    # replacement and closes the original, which must never happen to a contributor's
+    # work in progress.
+    if pr.get("mergeable") == "CONFLICTING" and not (draft and pr.get("isCrossRepository")):
         if state.attempts >= cfg.pr_automation.max_repair_attempts:
             return result(
                 "blocked",
@@ -191,6 +199,10 @@ def evaluate(
             failed_checks=(f"Merge conflict with {base}",),
             repair_attempt=state.attempts + 1,
         )
+    if draft:
+        # Draft intake is otherwise nonterminal. `ready_draft` promotes the exact head
+        # once its scans are stable; until then no failing gate may be published.
+        return result("pending", "pull request is a draft awaiting a stable head")
     if pr.get("reviewDecision") == "CHANGES_REQUESTED":
         return result("blocked", "a human requested changes")
 

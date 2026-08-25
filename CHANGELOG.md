@@ -5,6 +5,13 @@ This file follows Keep a Changelog and semantic versioning conventions.
 
 ## Unreleased
 
+- Resolve conflicts on draft pull requests instead of stranding them. Conflict is now
+  classified before draft status: a conflicted draft could never be promoted, because
+  promotion requires a clean merge, and conflict resolution never ran because it was a
+  draft — so every conflicted branch-intake and issue-solution pull request deadlocked.
+  Fork drafts still wait, because their conflict path closes the contributor's pull
+  request.
+
 - Bound the review-to-repair cycle for every author. The budget check sat behind an
   outside-author condition, so a trusted author's exact-head review could request repair
   after repair without limit; it is now applied wherever another review would be

@@ -199,6 +199,37 @@ def test_evaluation_ignores_own_checks_and_accepts_context_shape(tmp_path):
     assert result.state == "review"
 
 
+def test_a_conflicted_draft_is_resolved_rather_than_stranded(tmp_path):
+    """The deadlock: `ready_draft` will not promote a conflicted draft *because* it
+    conflicts, and conflict resolution never ran *because* it was a draft. Every
+    branch-intake and issue-solution pull request starts as a draft, so this stranded all
+    of them.
+    """
+    config = cfg(tmp_path)
+    conflicted = pr(isDraft=True, mergeable="CONFLICTING")
+    decision = pa.evaluate(conflicted, config, expected_sha="abc")
+    assert decision.state == "conflict"
+    assert decision.repair_attempt == 1
+
+    # A fork draft still stays untouched: its conflict path closes the contributor's PR.
+    fork = pr(isDraft=True, mergeable="CONFLICTING", isCrossRepository=True)
+    assert pa.evaluate(fork, config, expected_sha="abc").state == "pending"
+    # Once that fork PR is ready for review, the ordinary replacement path applies again.
+    ready_fork = pr(mergeable="CONFLICTING", isCrossRepository=True)
+    assert pa.evaluate(ready_fork, config, expected_sha="abc").state == "conflict"
+
+    # An ordinary draft with no conflict is still nonterminal.
+    assert pa.evaluate(pr(isDraft=True), config, expected_sha="abc").state == "pending"
+
+    # Operator control still outranks conflict resolution for a draft.
+    blocked = pr(isDraft=True, mergeable="CONFLICTING", labels=[{"name": pa.BLOCKED_LABEL}])
+    assert pa.evaluate(blocked, config, expected_sha="abc").state == "blocked"
+    spent = pa.AutomationState("abc", "abc", attempts=3)
+    exhausted = pa.evaluate(conflicted, config, expected_sha="abc", stored=spent)
+    assert exhausted.state == "blocked"
+    assert "conflict resolution budget is exhausted" in exhausted.reason
+
+
 def test_the_review_loop_is_bounded_for_a_trusted_author_too(tmp_path):
     """The workflow reviews every author, so every author's review loop needs a budget.
 
