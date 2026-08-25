@@ -28,6 +28,7 @@ transport failure. Run `vibey-gh COMMAND --help` for argparse's generated refere
 | `realign` | none | Bring the integration branch forward after release without rewriting it. |
 | `pr-automation self-heal` | `--pr N` optional | Refill a spent repair budget, itself bounded by `branch_sync.max_self_heals`. Omit `--pr` to sweep every exhausted pull request. |
 | `reconcile-branches` | `--dry-run` | Rebase, close, or leave each open pull-request branch stranded by a realign rewrite. `--dry-run` decides without mutating anything. Realign calls this itself; the command exists for recovery and inspection. |
+| `rulesets` | `--dry-run` | Reconcile the integration and release branch rulesets declared by `[rulesets]`. `--dry-run` reports drift without creating or updating anything. `repository-profile.yml` calls this itself; the command exists for recovery and inspection. |
 | `api`, `mcp`, `sdk` | `CAPABILITY`, `--arguments JSON_ARRAY` | Invoke a canonical capability through that adapter. |
 | `webhook` | `CAPABILITY`, `--arguments JSON_ARRAY`, required `--delivery ID` | Sign and dispatch locally using `VIBEY_GH_WEBHOOK_SECRET`; claims persist by default. |
 

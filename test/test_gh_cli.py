@@ -20,6 +20,7 @@ from vibey_gh import (
     pr_automation,
     realign as realign_mod,
     reconcile,
+    rulesets,
 )
 from vibey_gh.cli import main
 from vibey_gh.config import load_config
@@ -579,6 +580,44 @@ def test_reconcile_branches_cli_reports_failures(repo, monkeypatch, capsys):
     monkeypatch.setattr(reconcile, "reconcile", boom)
     assert main(["reconcile-branches"]) == 1
     assert "refusing to delete" in capsys.readouterr().err
+
+
+def test_rulesets_cli_reports_each_outcome(repo, monkeypatch, capsys):
+    monkeypatch.setattr(
+        rulesets,
+        "reconcile",
+        lambda cfg, dry_run: [
+            {
+                "ruleset": "vibey-gh: develop",
+                "branch": "develop",
+                "changed": True,
+                "unexpected_rules": ["creation"],
+                "applied": not dry_run,
+            },
+            {
+                "ruleset": "vibey-gh: main",
+                "branch": "main",
+                "changed": False,
+                "unexpected_rules": [],
+                "applied": False,
+            },
+        ],
+    )
+    assert main(["rulesets", "--dry-run"]) == 0
+    out = capsys.readouterr().out
+    assert "vibey-gh: develop (develop): changed" in out
+    assert "unexpected rule(s) preserved: creation" in out
+    assert "vibey-gh: main (main): current" in out
+    assert "reconciled 2 ruleset(s)" in out
+
+
+def test_rulesets_cli_reports_failures(repo, monkeypatch, capsys):
+    def boom(*a, **k):
+        raise RuntimeError("422 required status check contexts must be unique")
+
+    monkeypatch.setattr(rulesets, "reconcile", boom)
+    assert main(["rulesets"]) == 1
+    assert "must be unique" in capsys.readouterr().err
 
 
 def test_api_and_mcp_surface_failures_return_nonzero(repo, monkeypatch, capsys):

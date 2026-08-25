@@ -22,6 +22,26 @@ jobs:
       github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
     steps:
+      - name: Check out trusted automation
+        if: __VIBEY_GH_RULESETS_ENABLED__
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 1
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        if: __VIBEY_GH_RULESETS_ENABLED__
+        with:
+          python-version: "3.12"
+      - name: Install vibey-gh
+        if: __VIBEY_GH_RULESETS_ENABLED__
+        run: |
+          set -euo pipefail
+          if grep -qE '^name = "vibey-gh"' pyproject.toml; then
+            python -m pip install --quiet -e .
+          else
+            python -m pip install --quiet vibey-gh
+          fi
+          command -v vibey-gh >/dev/null || { echo "::error::vibey-gh is not installed"; exit 1; }
       - name: Update identity, Pages homepage, and topics
         env:
           GH_TOKEN: ${{ secrets.AUTOMERGE_TOKEN || github.token }}
@@ -56,6 +76,15 @@ jobs:
           }
           security_method vulnerability_alerts vulnerability-alerts
           security_method automated_security_fixes automated-security-fixes
+
+      - name: Reconcile branch rulesets
+        if: __VIBEY_GH_RULESETS_ENABLED__
+        env:
+          GH_TOKEN: ${{ secrets.AUTOMERGE_TOKEN || github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          vibey-gh rulesets | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Verify public release surfaces
         env:
@@ -137,7 +166,7 @@ jobs:
             echo '- Releases: available'
             echo '- Deployments: available'
             echo '- Packages: available'
-            echo '- Protected branches: untouched'
+            echo '- Protected branches: reconciled from configured rulesets'
             echo '- Collaboration and merge settings: enforced'
             echo '- Vulnerability alerts and automated security fixes: enforced'
             echo '- Automatic branch deletion: disabled (develop is a promotion head)'

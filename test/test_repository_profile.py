@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from vibey_gh import install
-from vibey_gh.config import GhConfig, RepositoryProfileConfig, load_config
+from vibey_gh.config import GhConfig, RepositoryProfileConfig, RulesetsConfig, load_config
 
 
 def test_repository_profile_loads_from_toml(tmp_path: Path):
@@ -51,3 +51,17 @@ def test_repository_profile_workflow_renders_disabled_and_json_safe(tmp_path: Pa
     assert '\'\u007b"names":\u005b"python","github-actions"\u005d\u007d\'' in rendered
     assert '"delete_branch_on_merge":false' in rendered
     assert '"vulnerability_alerts":true' in rendered
+
+
+def test_repository_profile_workflow_renders_rulesets_disabled(tmp_path: Path):
+    cfg = GhConfig(root=tmp_path, rulesets=RulesetsConfig(enabled=False))
+    rendered = install.render_workflow(install.WORKFLOWS / "repository-profile.yml", cfg)
+    assert "if: false" in rendered
+    assert "if: true" not in rendered
+
+
+def test_repository_profile_workflow_renders_rulesets_enabled_by_default(tmp_path: Path):
+    cfg = GhConfig(root=tmp_path)
+    rendered = install.render_workflow(install.WORKFLOWS / "repository-profile.yml", cfg)
+    assert "if: true" in rendered
+    assert "vibey-gh rulesets" in rendered
