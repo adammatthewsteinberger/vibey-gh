@@ -725,6 +725,7 @@ The automation distinguishes failures by what can safely resolve them:
 | Three unsuccessful repair attempts in one contributor lineage | Mark `vibey-gh:repair-exhausted`; publish remaining failures and run links | Push a new human-authored commit or deliberately reset the lineage |
 | Issue too ambiguous, out of scope, or blocked on an operator decision | Return `needs_human`, change nothing, mark `vibey-gh:solve-blocked` | Answer the question in the issue, or refine and edit it to start a new lineage |
 | Configured unsuccessful solution attempts for one issue lineage | Mark `vibey-gh:solve-exhausted`; comment once with the reason | Edit the issue to restate the request, or take it manually |
+| Exact-head review returns no verdict (exhausted API credits, missing key, model unavailable) | Publish a failing `PR automation: review incomplete` gate naming the operator cause; never infer a verdict | Correct the operator condition, then rerun the review |
 | Stale workflow completion | Ignore it; it cannot create a successful current-head gate | None |
 | Failed trusted post-merge release workflow | Open a repair branch and ordinary PR; never patch a permanent branch directly | Correct operator-only infrastructure failures |
 

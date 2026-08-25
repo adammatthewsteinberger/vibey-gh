@@ -5,6 +5,11 @@ This file follows Keep a Changelog and semantic versioning conventions.
 
 ## Unreleased
 
+- Report the exact-head gate's outcome truthfully when the review, not the scans, decides
+  it: a review that returned actionable findings and a review that returned no verdict at
+  all are now distinct, named states instead of a failing check whose summary claims every
+  scan and review passed.
+
 - Add autonomous issue automation: an eligible published issue is evaluated by trusted
   policy code, implemented by a constrained agent that reads the issue only as bounded
   untrusted data, and published as one guarded solution branch and linked pull request

@@ -174,7 +174,12 @@ structured data, robots policy, sitemaps, and LLM discovery documents according 
 ## Failure recovery
 
 1. Open the failed check attached to the exact PR head, not an older cancelled run.
-2. Read the first failing trusted step and the `PR automation / gate` summary.
+2. Read the first failing trusted step and the `PR automation / gate` summary. The gate's
+   title names who decided the outcome: `PR automation: ready` reports the evaluation,
+   `PR automation: review findings` means the exact-head review returned actionable work,
+   and `PR automation: review incomplete` means the review returned no verdict at all —
+   an infrastructure or operator failure such as an exhausted API credit balance, not a
+   defect in the pull request.
 3. For source, test, docs, or review findings, allow bounded repair to push one commit and
    rerun ordinary scans.
 4. For missing secrets, permissions, billing, registry denial, unavailable services, or

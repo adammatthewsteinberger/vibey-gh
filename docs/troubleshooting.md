@@ -17,6 +17,11 @@
 - A redispatched `Issue automation` run that does nothing is working correctly. Attempts
   are keyed to a fingerprint of the issue's title and body, so unchanged text cannot spend
   a second attempt or open a second pull request.
+- A `PR automation / gate` failure titled `review incomplete` means every scan passed but
+  the exact-head review never returned a verdict. Read the review job log: the usual causes
+  are an exhausted Anthropic credit balance, a missing or expired `ANTHROPIC_API_KEY`, or
+  model unavailability. The gate deliberately fails closed rather than inferring a verdict,
+  so correct the operator condition and rerun the review — do not merge past it.
 - Package verification should query the GHCR manifest, not account package listing APIs.
 - Pages 404s require a successful deployment containing an `index.html` at each channel.
 - A `vibey-gh check` failure printed as `debug logging: <path>: cannot validate branch
