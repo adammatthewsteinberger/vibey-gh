@@ -36,6 +36,11 @@ sanitized_progress = true
 archive_execution_file = true
 allow_private_full_output = false
 
+[branch_sync]
+enabled = true
+update_contributor_branches = true
+max_self_heals = 2
+
 [realign]
 reconcile_branches = true
 automation_prefixes = ["vibey-gh/"]

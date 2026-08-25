@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 
 from vibey_gh import reconcile as rc
-from vibey_gh.config import GhConfig, RealignConfig
+from vibey_gh.config import BranchSyncConfig, GhConfig, RealignConfig
 
 
 def cfg(tmp_path: Path, **realign) -> GhConfig:
@@ -23,7 +23,7 @@ def cfg(tmp_path: Path, **realign) -> GhConfig:
 
 
 def facts(**changes) -> rc.BranchFacts:
-    value = dict(number=7, branch="vibey-gh/issue/1-abc", fork=False, unique_commits=1)
+    value = dict(number=7, branch="vibey-gh/issue/1-abc", fork=False, unique_commits=1, behind=True)
     value.update(changes)
     return rc.BranchFacts(**value)
 
@@ -50,6 +50,12 @@ def completed(code=0, out="", err=""):
 def test_invalid_realign_configuration_is_rejected(kwargs, match):
     with pytest.raises(ValueError, match=match):
         RealignConfig(**kwargs)
+
+
+@pytest.mark.parametrize("value", [-1, 11])
+def test_an_out_of_range_self_heal_budget_is_rejected(value):
+    with pytest.raises(ValueError, match="between 0 and 10"):
+        BranchSyncConfig(max_self_heals=value)
 
 
 def test_an_empty_prefix_list_is_allowed_when_reconciliation_is_off():
@@ -100,21 +106,32 @@ def test_an_automation_branch_with_real_work_is_rebased(tmp_path):
     assert "2 unique commit(s)" in decision.reason
 
 
-def test_a_contributor_branch_with_real_work_is_left_alone_and_told_why(tmp_path):
-    decision = rc.decide(facts(branch="feature/mine", unique_commits=1), cfg(tmp_path))
+def test_a_contributor_branch_is_never_rewritten_only_merged_or_left(tmp_path):
+    """Whatever else happens, a human's history is never rearranged underneath them."""
+    config = GhConfig(
+        root=tmp_path, branch_sync=BranchSyncConfig(update_contributor_branches=False)
+    )
+    decision = rc.decide(facts(branch="feature/mine", unique_commits=1), config)
     assert decision.action == rc.LEAVE and decision.notify
     assert "left for its author" in decision.reason
 
     quiet = rc.decide(
-        facts(branch="feature/mine"), cfg(tmp_path, notify_contributor_branches=False)
+        facts(branch="feature/mine"),
+        GhConfig(
+            root=tmp_path,
+            realign=RealignConfig(notify_contributor_branches=False),
+            branch_sync=BranchSyncConfig(update_contributor_branches=False),
+        ),
     )
     assert quiet.action == rc.LEAVE and not quiet.notify
+    # No contributor branch reaches a rewriting action under any configuration.
+    for policy in (cfg(tmp_path), config):
+        assert rc.decide(facts(branch="feature/mine"), policy).action != rc.REBASE
 
 
 @pytest.mark.parametrize(
     "changes,reason",
     [
-        ({"fork": True}, "fork branch is never mutated"),
         ({"branch": "develop"}, "permanent and unsafe"),
         ({"branch": "-hostile"}, "permanent and unsafe"),
     ],
@@ -122,6 +139,32 @@ def test_a_contributor_branch_with_real_work_is_left_alone_and_told_why(tmp_path
 def test_untouchable_branches_are_left_regardless_of_their_contents(tmp_path, changes, reason):
     decision = rc.decide(facts(unique_commits=0, **changes), cfg(tmp_path))
     assert decision.action == rc.LEAVE and reason in decision.reason
+
+
+def test_a_fork_may_be_moved_forward_but_never_rewritten(tmp_path):
+    """The whole fork invariant in one place: forward-merge yes, rewrite never.
+
+    `update-branch` is GitHub's own button and only succeeds where the contributor left
+    maintainer edits enabled, so it carries their consent. Rebasing, closing, and deleting
+    someone else's fork must stay unreachable under every configuration and every content.
+    """
+    behind = rc.decide(facts(fork=True, behind=True), cfg(tmp_path))
+    assert behind.action == rc.UPDATE and not behind.delete_branch
+
+    current = rc.decide(facts(fork=True, behind=False), cfg(tmp_path))
+    assert current.action == rc.LEAVE
+
+    for policy in (
+        cfg(tmp_path),
+        cfg(tmp_path, close_duplicates=True, delete_duplicate_branches=True),
+        GhConfig(root=tmp_path, branch_sync=BranchSyncConfig(update_contributor_branches=False)),
+    ):
+        for content in (0, 1, 5):
+            decision = rc.decide(facts(fork=True, unique_commits=content), policy)
+            assert decision.action in {rc.UPDATE, rc.LEAVE}
+            assert not decision.delete_branch
+    assert not rc.deletable("anything", cfg(tmp_path), fork=True)
+    assert not rc.rebasable("anything", cfg(tmp_path), fork=True)
 
 
 def test_reconciliation_can_be_switched_off_entirely(tmp_path):
@@ -134,6 +177,30 @@ def test_prefixes_decide_what_counts_as_automation_owned(tmp_path):
     assert rc.automation_owned("bots/x", config)
     assert rc.automation_owned("vibey-gh/issue/1", config)
     assert not rc.automation_owned("feature/x", config)
+
+
+def test_a_contributor_branch_that_is_behind_is_merged_forward_not_rewritten(tmp_path):
+    """GitHub's own "Update branch" semantics: a merge, never a rewrite of their history."""
+    decision = rc.decide(facts(branch="feature/mine", behind=True), cfg(tmp_path))
+    assert decision.action == rc.UPDATE
+    assert "merging the integration branch forward" in decision.reason
+
+    current = rc.decide(facts(branch="feature/mine", behind=False), cfg(tmp_path))
+    assert current.action == rc.LEAVE and not current.notify
+
+    off = rc.decide(
+        facts(branch="feature/mine", behind=True),
+        GhConfig(
+            root=tmp_path,
+            branch_sync=BranchSyncConfig(update_contributor_branches=False),
+        ),
+    )
+    assert off.action == rc.LEAVE and off.notify
+
+
+def test_an_automation_branch_already_current_is_left_alone(tmp_path):
+    assert rc.decide(facts(behind=False), cfg(tmp_path)).action == rc.LEAVE
+    assert rc.decide(facts(behind=True), cfg(tmp_path)).action == rc.REBASE
 
 
 # -------------------------------------------------------------------------- git
@@ -155,9 +222,15 @@ def test_patch_identity_decides_what_counts_as_unique(tmp_path, monkeypatch):
 def test_measure_only_runs_git_for_branches_that_could_be_acted_on(tmp_path, monkeypatch):
     config = cfg(tmp_path)
     monkeypatch.setattr(rc, "unique_commits", lambda c, b: 5)
+    monkeypatch.setattr(rc, "is_behind", lambda c, b: True)
     assert rc.measure(config, facts()).unique_commits == 5
-    for skipped in (facts(fork=True), facts(branch="develop"), facts(branch="-x")):
+    for skipped in (facts(branch="develop"), facts(branch="-x")):
         assert rc.measure(config, skipped) is skipped
+    # A fork's ref is not in this repository, so neither Git question can be asked of it.
+    monkeypatch.setattr(rc, "unique_commits", lambda c, b: pytest.fail("no git on a fork"))
+    monkeypatch.setattr(rc, "is_behind", lambda c, b: pytest.fail("no git on a fork"))
+    measured = rc.measure(config, facts(fork=True))
+    assert measured.fork and measured.behind and measured.unique_commits == 1
 
 
 def test_rebase_replays_a_branch_and_refuses_to_force_over_newer_work(tmp_path, monkeypatch):
@@ -228,6 +301,25 @@ def test_rebase_reports_every_way_it_can_decline(tmp_path, monkeypatch):
     assert "push refused" in rc.rebase_branch(config, "vibey-gh/a")[1]
 
 
+def test_behind_is_ancestry_of_the_integration_tip(tmp_path, monkeypatch):
+    config = cfg(tmp_path)
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: completed(0))
+    assert rc.is_behind(config, "topic") is False
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: completed(1))
+    assert rc.is_behind(config, "topic") is True
+
+
+def test_update_branch_uses_githubs_own_endpoint(tmp_path, monkeypatch):
+    monkeypatch.setenv("GH_REPO", "o/r")
+    calls = []
+    monkeypatch.setattr(subprocess, "run", lambda args, **k: calls.append(args) or completed())
+    assert rc.update_branch(cfg(tmp_path), 12) is True
+    assert "repos/o/r/pulls/12/update-branch" in calls[0]
+    assert "PUT" in calls[0]
+    monkeypatch.setattr(subprocess, "run", lambda args, **k: completed(1))
+    assert rc.update_branch(cfg(tmp_path), 12) is False
+
+
 # ------------------------------------------------------------------- gh adapters
 
 
@@ -289,10 +381,19 @@ def test_reconcile_applies_one_action_per_pull_request(monkeypatch, tmp_path):
             rc.BranchFacts(2, "vibey-gh/issue/work"),
             rc.BranchFacts(3, "feature/theirs"),
             rc.BranchFacts(4, "theirs", fork=True),
+            rc.BranchFacts(5, "vibey-gh/issue/current"),
         ],
     )
-    counts = {"vibey-gh/issue/dup": 0, "vibey-gh/issue/work": 2, "feature/theirs": 1}
+    counts = {
+        "vibey-gh/issue/dup": 0,
+        "vibey-gh/issue/work": 2,
+        "feature/theirs": 1,
+        "theirs": 1,
+        "vibey-gh/issue/current": 1,
+    }
     monkeypatch.setattr(rc, "unique_commits", lambda c, b: counts[b])
+    monkeypatch.setattr(rc, "is_behind", lambda c, b: b != "vibey-gh/issue/current")
+    monkeypatch.setattr(rc, "update_branch", lambda c, n: done.append(f"update #{n}") or True)
     done: list[str] = []
     monkeypatch.setattr(
         rc, "rebase_branch", lambda c, b: done.append(f"rebase {b}") or (True, "ok")
@@ -302,18 +403,28 @@ def test_reconcile_applies_one_action_per_pull_request(monkeypatch, tmp_path):
     monkeypatch.setattr(rc, "notify", lambda c, d: done.append(f"notify {d.branch}"))
 
     outcomes = rc.reconcile(config)
-    assert [o["action"] for o in outcomes] == [rc.CLOSE, rc.REBASE, rc.LEAVE, rc.LEAVE]
+    assert [o["action"] for o in outcomes] == [
+        rc.CLOSE,
+        rc.REBASE,
+        rc.UPDATE,
+        rc.UPDATE,
+        rc.LEAVE,
+    ]
     assert done == [
         "close vibey-gh/issue/dup",
         "delete vibey-gh/issue/dup",
         "rebase vibey-gh/issue/work",
-        "notify feature/theirs",
+        "update #3",
+        "update #4",
     ]
     assert outcomes[0]["deleted"] is True
     assert outcomes[1]["applied"] is True and outcomes[1]["detail"] == "ok"
-    assert outcomes[2]["notified"] is True
-    # The fork is reported but never acted on.
-    assert "applied" not in outcomes[3] and "notified" not in outcomes[3]
+    assert outcomes[2]["applied"] is True
+    # The fork was moved forward by merge, never rewritten.
+    assert outcomes[3]["applied"] is True and not outcomes[3]["delete_branch"]
+    # A branch already on the tip is reported and otherwise untouched.
+    assert "applied" not in outcomes[4] and "notified" not in outcomes[4]
+    assert "already current" in outcomes[4]["reason"]
 
 
 def test_a_closed_duplicate_keeps_its_branch_when_deletion_is_disabled(monkeypatch, tmp_path):
@@ -326,6 +437,20 @@ def test_a_closed_duplicate_keeps_its_branch_when_deletion_is_disabled(monkeypat
     outcome = rc.reconcile(cfg(tmp_path, delete_duplicate_branches=False))[0]
     assert outcome["action"] == rc.CLOSE and outcome["applied"] is True
     assert "deleted" not in outcome
+
+
+def test_a_contributor_is_notified_when_updating_their_branch_is_disabled(monkeypatch, tmp_path):
+    config = GhConfig(
+        root=tmp_path, branch_sync=BranchSyncConfig(update_contributor_branches=False)
+    )
+    monkeypatch.setattr(rc, "open_pull_requests", lambda c: [rc.BranchFacts(3, "feature/theirs")])
+    monkeypatch.setattr(rc, "unique_commits", lambda c, b: 1)
+    monkeypatch.setattr(rc, "is_behind", lambda c, b: True)
+    told: list = []
+    monkeypatch.setattr(rc, "notify", lambda c, d: told.append(d.branch))
+    outcome = rc.reconcile(config)[0]
+    assert outcome["action"] == rc.LEAVE and outcome["notified"] is True
+    assert told == ["feature/theirs"]
 
 
 def test_a_dry_run_decides_without_touching_anything(monkeypatch, tmp_path):

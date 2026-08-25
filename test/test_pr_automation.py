@@ -230,6 +230,43 @@ def test_a_conflicted_draft_is_resolved_rather_than_stranded(tmp_path):
     assert "conflict resolution budget is exhausted" in exhausted.reason
 
 
+def test_an_outside_author_can_never_steer_automation_at_a_permanent_branch(tmp_path):
+    """GitHub already refuses them write access; this is the defence behind that.
+
+    Both shapes are terminal, so no review, repair, conflict resolution, or gate runs —
+    automation simply never acts on a pull request from an outside author that points at
+    a permanent branch from either end.
+    """
+    config = cfg(tmp_path)
+    outsider = {"login": "stranger"}
+
+    for head in ("develop", "main", config.integration_branch, config.release_branch):
+        decision = pa.evaluate(
+            pr(author=outsider, headRefName=head, statusCheckRollup=[check()]),
+            config,
+            expected_sha="abc",
+        )
+        assert decision.state == "blocked"
+        assert "may not propose from" in decision.reason
+
+    for base in ("main", config.release_branch):
+        decision = pa.evaluate(
+            pr(author=outsider, baseRefName=base, statusCheckRollup=[check()]),
+            config,
+            expected_sha="abc",
+        )
+        assert decision.state == "blocked"
+        assert "may not target" in decision.reason
+
+    # A trusted author still promotes normally: the promotion PR's head IS the
+    # integration branch, and blocking that would stop every release.
+    promotion = pr(headRefName="develop", baseRefName="main", statusCheckRollup=[check()])
+    assert pa.evaluate(promotion, config, expected_sha="abc").state != "blocked"
+    # And an outside author's ordinary contribution is unaffected.
+    ordinary = pr(author=outsider, headRefName="feature/x", statusCheckRollup=[check()])
+    assert pa.evaluate(ordinary, config, expected_sha="abc").state != "blocked"
+
+
 def test_the_review_loop_is_bounded_for_a_trusted_author_too(tmp_path):
     """The workflow reviews every author, so every author's review loop needs a budget.
 
@@ -260,6 +297,67 @@ def test_an_outside_author_with_review_disabled_still_reaches_ready(tmp_path):
     config = cfg(tmp_path, review_untrusted_authors=False)
     green = pr(author={"login": "stranger"}, statusCheckRollup=[check()])
     assert pa.evaluate(green, config, expected_sha="abc", stored=None).state == "ready"
+
+
+def test_a_spent_repair_budget_can_be_refilled_a_bounded_number_of_times(monkeypatch, tmp_path):
+    """A budget that never refills turns a transient outage into a permanent stop; one
+    that refills forever is no budget. So the refill is itself budgeted."""
+    from vibey_gh.config import BranchSyncConfig
+
+    config = GhConfig(root=tmp_path, owner="owner", branch_sync=BranchSyncConfig(max_self_heals=2))
+    state = pa.AutomationState("abc", "abc", attempts=3)
+    current = pr(labels=[{"name": pa.EXHAUSTED_LABEL}], comments=[pa.state_body(state, "x")])
+    monkeypatch.setattr(pa, "fetch_pr", lambda number: current)
+    monkeypatch.setenv("GH_REPO", "o/r")
+    saved: list = []
+    monkeypatch.setattr(pa, "upsert_state", lambda *a: saved.append(a))
+    calls: list = []
+    monkeypatch.setattr(subprocess, "run", lambda args, **k: calls.append(args) or completed())
+
+    first = pa.self_heal(12, config)
+    assert first["healed"] and first["heal"] == 1
+    healed = saved[0][1]
+    assert healed.attempts == 0 and healed.heals == 1
+    assert healed.review_sha is None and healed.review_passed is None
+    assert [h["kind"] for h in healed.history][-1] == "self-heal"
+    assert any("--remove-label" in c for c in calls)
+
+    # The refill count rides in the same durable state, so it survives to bound the next.
+    spent = pa.AutomationState("abc", "abc", attempts=3, heals=2)
+    monkeypatch.setattr(
+        pa,
+        "fetch_pr",
+        lambda number: pr(
+            labels=[{"name": pa.EXHAUSTED_LABEL}], comments=[pa.state_body(spent, "x")]
+        ),
+    )
+    refused = pa.self_heal(12, config)
+    assert not refused["healed"] and "budget of 2 is spent" in refused["reason"]
+
+    monkeypatch.setattr(pa, "fetch_pr", lambda number: pr())
+    assert pa.self_heal(12, config) == {"pr": 12, "healed": False, "reason": "not exhausted"}
+
+
+def test_self_heal_starts_a_lineage_when_no_state_exists(monkeypatch, tmp_path):
+    monkeypatch.setenv("GH_REPO", "o/r")
+    monkeypatch.setattr(pa, "fetch_pr", lambda n: pr(labels=[{"name": pa.EXHAUSTED_LABEL}]))
+    saved: list = []
+    monkeypatch.setattr(pa, "upsert_state", lambda *a: saved.append(a))
+    monkeypatch.setattr(subprocess, "run", lambda args, **k: completed())
+    assert pa.self_heal(12, GhConfig(root=tmp_path))["healed"]
+    assert saved[0][1].lineage_sha == "abc"
+
+
+def test_exhausted_pull_requests_are_listed_by_label(monkeypatch, tmp_path):
+    monkeypatch.setenv("GH_REPO", "o/r")
+    captured: list = []
+    monkeypatch.setattr(
+        pa.github_state, "gh_json", lambda *a: captured.append(a) or [{"number": 4}, {"number": 9}]
+    )
+    assert pa.exhausted_pull_requests(GhConfig(root=tmp_path)) == [4, 9]
+    assert pa.EXHAUSTED_LABEL in captured[0]
+    monkeypatch.setattr(pa.github_state, "gh_json", lambda *a: None)
+    assert pa.exhausted_pull_requests(GhConfig(root=tmp_path)) == []
 
 
 def test_a_human_push_persists_a_fresh_attempt_budget():

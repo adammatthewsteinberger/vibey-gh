@@ -216,6 +216,10 @@ def _pr_automation(args) -> int:
             print(json.dumps(asdict(state), sort_keys=True))
         elif args.action == "mirror-fork":
             print(json.dumps(pr_automation.mirror_fork(args.pr, cfg), sort_keys=True))
+        elif args.action == "self-heal":
+            numbers = [args.pr] if args.pr else pr_automation.exhausted_pull_requests(cfg)
+            results = [pr_automation.self_heal(number, cfg) for number in numbers]
+            print(json.dumps(results, sort_keys=True))
         elif args.action == "ensure-labels":
             pr_automation.ensure_labels()
             print("vibey-gh: PR automation labels are ready")
@@ -473,6 +477,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     mirror.add_argument("--pr", type=int, required=True)
     mirror.set_defaults(func=_pr_automation)
+    heal = automation_sub.add_parser(
+        "self-heal", help="refill an exhausted repair budget, itself bounded"
+    )
+    heal.add_argument("--pr", type=int, help="one pull request; omit to sweep every exhausted one")
+    heal.set_defaults(func=_pr_automation)
     labels = automation_sub.add_parser("ensure-labels", help="create or update automation labels")
     labels.set_defaults(func=_pr_automation)
 

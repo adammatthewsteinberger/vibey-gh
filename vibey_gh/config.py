@@ -172,6 +172,25 @@ class IssueAutomationConfig:
 
 
 @dataclass(frozen=True)
+class BranchSyncConfig:
+    """Keeping open topic branches current with the integration branch.
+
+    A branch that sits behind eventually conflicts, and the longer it waits the worse the
+    conflict — so syncing on every merge stops that accumulating. A contributor's branch
+    is updated the way GitHub's own "Update branch" button does it, as a merge and never a
+    rewrite, so nobody's history is rearranged underneath them.
+    """
+
+    enabled: bool = True
+    update_contributor_branches: bool = True
+    max_self_heals: int = 2
+
+    def __post_init__(self) -> None:
+        if not 0 <= self.max_self_heals <= 10:
+            raise ValueError("branch_sync.max_self_heals must be between 0 and 10")
+
+
+@dataclass(frozen=True)
 class RealignConfig:
     """What happens to open topic branches when realign rewrites the integration branch.
 
@@ -296,6 +315,7 @@ class GhConfig:
     pr_automation: PrAutomationConfig = PrAutomationConfig()
     issue_automation: IssueAutomationConfig = IssueAutomationConfig()
     realign: RealignConfig = RealignConfig()
+    branch_sync: BranchSyncConfig = BranchSyncConfig()
     github_release: GithubReleaseConfig = GithubReleaseConfig()
     repository_profile: RepositoryProfileConfig = RepositoryProfileConfig()
     documentation: DocumentationConfig = DocumentationConfig()
@@ -354,6 +374,7 @@ def load_config(root: Path | None = None) -> GhConfig:
     observability = auto.get("observability", {})
     issues = data.get("issue_automation", {})
     realigning = data.get("realign", {})
+    syncing = data.get("branch_sync", {})
     release = data.get("github_release", {})
     profile = data.get("repository_profile", {})
     documentation = data.get("documentation", {})
@@ -400,6 +421,11 @@ def load_config(root: Path | None = None) -> GhConfig:
             open_pull_request=issues.get("open_pull_request", True),
             draft_pull_request=issues.get("draft_pull_request", True),
             retain_schedule_backstop=issues.get("retain_schedule_backstop", True),
+        ),
+        branch_sync=BranchSyncConfig(
+            enabled=syncing.get("enabled", True),
+            update_contributor_branches=syncing.get("update_contributor_branches", True),
+            max_self_heals=syncing.get("max_self_heals", 2),
         ),
         realign=RealignConfig(
             reconcile_branches=realigning.get("reconcile_branches", True),

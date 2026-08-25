@@ -47,6 +47,7 @@ class AutomationState:
     review_sha: str | None = None
     review_passed: bool | None = None
     replacement_pr: int | None = None
+    heals: int = 0
     history: list[dict[str, Any]] = field(default_factory=list)
 
 
@@ -93,6 +94,7 @@ def parse_state(comments: Sequence[dict[str, Any] | str]) -> AutomationState | N
             review_sha=data.get("review_sha"),
             review_passed=data.get("review_passed"),
             replacement_pr=data.get("replacement_pr"),
+            heals=int(data.get("heals", 0)),
             history=list(data.get("history", [])),
         )
     except (KeyError, TypeError, ValueError):
@@ -167,6 +169,24 @@ def evaluate(
     if pr.get("state", "OPEN") != "OPEN":
         return result("blocked", "pull request is not open")
     state = lineage_for(stored, head)
+
+    # An outside contributor must not be able to steer automation at a permanent branch,
+    # by any route. GitHub already refuses them write access, so this is defence in depth
+    # against the shapes that would slip past it: a pull request whose HEAD is a permanent
+    # branch (whose repair push would land there), and one aimed straight at the release
+    # branch (which must only ever receive a promotion). Both are terminal, so no review,
+    # repair, conflict resolution, or gate ever runs for them.
+    permanent = {cfg.integration_branch, cfg.release_branch, "develop", "main"}
+    if not trusted:
+        head_ref = str(pr.get("headRefName") or "")
+        if head_ref in permanent:
+            return result("blocked", f"an outside author may not propose from {head_ref}")
+        if base in {cfg.release_branch, "main"}:
+            return result(
+                "blocked",
+                f"an outside author may not target {base}; open it against "
+                f"{cfg.integration_branch} instead",
+            )
 
     labels = _labels(pr)
     if BLOCKED_LABEL in labels:
@@ -372,6 +392,74 @@ def record(number: int, payload: dict[str, Any], kind: str) -> AutomationState:
     summary = str(payload.get("summary") or f"Recorded {kind} for `{state.current_sha}`.")
     upsert_state(number, state, summary, list(pr.get("comments") or []))
     return state
+
+
+def exhausted_pull_requests(cfg: GhConfig) -> list[int]:
+    """Every open pull request whose repair budget is spent."""
+    listed = github_state.gh_json(
+        "pr",
+        "list",
+        "--repo",
+        github_state.repository(),
+        "--state",
+        "open",
+        "--label",
+        EXHAUSTED_LABEL,
+        "--json",
+        "number",
+    )
+    return [int(item["number"]) for item in listed or []]
+
+
+def self_heal(number: int, cfg: GhConfig) -> dict[str, Any]:
+    """Give an exhausted pull request one more bounded round of repair.
+
+    A budget that can never be refilled turns a transient failure — an outage, an
+    exhausted credit balance, a formatter the agent could not run — into a permanent stop
+    that a human must notice. A budget that refills forever is no budget at all. So the
+    refill is itself budgeted: `branch_sync.max_self_heals` bounds how many times one
+    lineage may be revived, the count rides in the same durable state as the attempts, and
+    once it is spent the pull request stays exhausted until a human intervenes.
+    """
+    pr = fetch_pr(number)
+    if EXHAUSTED_LABEL not in _labels(pr):
+        return {"pr": number, "healed": False, "reason": "not exhausted"}
+    head = str(pr.get("headRefOid") or "")
+    state = parse_state(pr.get("comments") or []) or AutomationState(
+        lineage_sha=head, current_sha=head
+    )
+    if state.heals >= cfg.branch_sync.max_self_heals:
+        return {
+            "pr": number,
+            "healed": False,
+            "reason": f"self-heal budget of {cfg.branch_sync.max_self_heals} is spent",
+        }
+    state.heals += 1
+    state.attempts = 0
+    state.review_sha = None
+    state.review_passed = None
+    state.history.append({"kind": "self-heal", "head_sha": head, "heal": state.heals})
+    summary = (
+        f"Repair budget refilled automatically (self-heal {state.heals} of "
+        f"{cfg.branch_sync.max_self_heals}). The previous attempts are retained above; "
+        "if this round exhausts the budget again the pull request stays blocked for a human."
+    )
+    upsert_state(number, state, summary, list(pr.get("comments") or []))
+    subprocess.run(
+        [
+            "gh",
+            "pr",
+            "edit",
+            str(number),
+            "--repo",
+            github_state.repository(),
+            "--remove-label",
+            EXHAUSTED_LABEL,
+        ],
+        capture_output=True,
+        check=False,
+    )
+    return {"pr": number, "healed": True, "heal": state.heals, "head_sha": head}
 
 
 def ensure_labels() -> None:

@@ -264,6 +264,7 @@ request bytes for HMAC verification; see [the CLI and adapter reference](docs/cl
 | `vibey-gh promote [--no-wait]` | Open or reuse the asynchronous `develop → main` promotion PR. |
 | `vibey-gh github-release --target SHA [--version VERSION]` | Create or reuse an immutable tag and GitHub Release for an exact production SHA. |
 | `vibey-gh realign` | Align identical `develop` and `main` trees after a rebase merge without discarding work. |
+| `vibey-gh pr-automation self-heal [--pr N]` | Refill a spent repair budget, itself bounded so a permanent failure still stops. |
 | `vibey-gh reconcile-branches [--dry-run]` | Rebase, close, or leave each open branch stranded by a realign rewrite. |
 | `vibey-gh sdk|api|mcp|webhook CAPABILITY` | Invoke the same canonical capability through each supported public surface. |
 
@@ -735,6 +736,7 @@ trusted_authors = ["your-login", "dependabot[bot]"]
 |---|---|
 | Branch intake | Turns a new topic branch into one reusable draft PR. |
 | Issue automation | Turns an eligible published issue into one guarded solution branch and linked PR. |
+| Branch sync | Brings open branches forward on every merge; daily, refills a bounded number of spent repair budgets. |
 | Conventional Commits | Normalizes guarded same-repository topic history and republishes it with an exact-head lease. |
 | CI\* / Provenance / Docs | Validate code, history, human docs, agent docs, plugins, and interfaces. |
 | PR automation | Aggregates exact-head scans; reviews, repairs, resolves conflicts, and gates. |

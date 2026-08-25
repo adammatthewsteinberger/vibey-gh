@@ -5,6 +5,18 @@ This file follows Keep a Changelog and semantic versioning conventions.
 
 ## Unreleased
 
+- Bring open branches forward automatically whenever the integration branch moves, so a
+  conflict never accumulates. Automation-owned branches are rebased; every other branch,
+  fork included, is merged forward through GitHub's own update-branch endpoint, which
+  never rewrites a contributor's history and succeeds only where they enabled maintainer
+  edits.
+- Refill a spent repair budget on a daily schedule, itself bounded by
+  `branch_sync.max_self_heals`, so a transient outage stops being a permanent halt that
+  only a human notices — while a genuinely stuck pull request still stops for good.
+- Terminally block any outside author's pull request whose head is a permanent branch or
+  whose base is the release branch, so no untrusted work can steer automation at `develop`
+  or `main` from either end.
+
 - Reconcile open topic branches after realign rewrites the integration branch. A branch
   cut from a replaced commit previously reported a conflict covering work that had already
   landed, through nobody's fault. Realign now closes and deletes a branch whose commits are

@@ -34,6 +34,7 @@ from vibey_gh import github_state
 from vibey_gh.config import GhConfig
 
 REBASE = "rebase"
+UPDATE = "update"
 CLOSE = "close"
 LEAVE = "leave"
 
@@ -46,6 +47,7 @@ class BranchFacts:
     branch: str
     fork: bool = False
     unique_commits: int = 0
+    behind: bool = False
 
 
 @dataclass(frozen=True)
@@ -97,7 +99,13 @@ def decide(facts: BranchFacts, cfg: GhConfig) -> Decision:
     if not policy.reconcile_branches:
         return result(LEAVE, "branch reconciliation is disabled")
     if facts.fork:
-        return result(LEAVE, "a fork branch is never mutated by this repository")
+        # A fork may be brought FORWARD but never rewritten. `update-branch` is the same
+        # merge a maintainer performs by hand with GitHub's button, and it only succeeds
+        # when the contributor left "allow maintainer edits" on — their consent, not ours.
+        # Rebasing, closing, and deleting stay unreachable for a fork under every setting.
+        if facts.behind and cfg.branch_sync.enabled and cfg.branch_sync.update_contributor_branches:
+            return result(UPDATE, "merging the integration branch forward into the fork")
+        return result(LEAVE, "a fork branch is never rewritten by this repository")
     if facts.branch in permanent_branches(cfg) or _unsafe(facts.branch):
         return result(LEAVE, "permanent and unsafe refs are never reconciled")
     if facts.unique_commits == 0:
@@ -110,11 +118,18 @@ def decide(facts: BranchFacts, cfg: GhConfig) -> Decision:
             and deletable(facts.branch, cfg, fork=facts.fork),
         )
     if not automation_owned(facts.branch, cfg):
+        # Someone else's history is not this automation's to rearrange, so a contributor
+        # branch is brought forward by merge — the same operation as GitHub's own "Update
+        # branch" button — and only when it is actually behind.
+        if facts.behind and cfg.branch_sync.enabled and cfg.branch_sync.update_contributor_branches:
+            return result(UPDATE, "merging the integration branch forward into the branch")
         return result(
             LEAVE,
             "a contributor's branch with unique work is left for its author",
-            notify=policy.notify_contributor_branches,
+            notify=policy.notify_contributor_branches and facts.behind,
         )
+    if not facts.behind:
+        return result(LEAVE, "already current with the integration branch")
     return result(REBASE, f"{facts.unique_commits} unique commit(s) replayed onto the new tip")
 
 
@@ -133,6 +148,40 @@ def unique_commits(cfg: GhConfig, branch: str) -> int:
         # An unreadable ref is not a licence to guess; report work so it is left alone.
         return 1
     return sum(1 for line in run.stdout.splitlines() if line.startswith("+"))
+
+
+def is_behind(cfg: GhConfig, branch: str) -> bool:
+    """Whether the integration tip is missing from this branch."""
+    run = _git(
+        cfg,
+        "merge-base",
+        "--is-ancestor",
+        f"origin/{cfg.integration_branch}",
+        f"origin/{branch}",
+    )
+    return run.returncode != 0
+
+
+def update_branch(cfg: GhConfig, number: int) -> bool:
+    """Merge the base forward using GitHub's own update-branch endpoint.
+
+    This is the "Update branch" button. It merges rather than rewrites and needs no local
+    checkout, which is what makes it safe for a branch this automation does not own.
+    Forks stay excluded anyway: `decide` refuses them before reaching here.
+    """
+    run = subprocess.run(
+        [
+            "gh",
+            "api",
+            f"repos/{github_state.repository()}/pulls/{number}/update-branch",
+            "--method",
+            "PUT",
+        ],
+        cwd=cfg.root,
+        capture_output=True,
+        check=False,
+    )
+    return run.returncode == 0
 
 
 def open_pull_requests(cfg: GhConfig) -> list[BranchFacts]:
@@ -164,14 +213,22 @@ def open_pull_requests(cfg: GhConfig) -> list[BranchFacts]:
 
 
 def measure(cfg: GhConfig, facts: BranchFacts) -> BranchFacts:
-    """Fill in the patch-identity count for a branch worth measuring."""
-    if facts.fork or _unsafe(facts.branch) or facts.branch in permanent_branches(cfg):
+    """Fill in the patch-identity count for a branch worth measuring.
+
+    A fork's ref is not in this repository, so neither Git question can be asked of it.
+    GitHub answers the only one that matters for a fork — whether it is behind — through
+    the update-branch endpoint itself, which is a no-op when it is already current.
+    """
+    if facts.fork:
+        return BranchFacts(facts.number, facts.branch, fork=True, unique_commits=1, behind=True)
+    if _unsafe(facts.branch) or facts.branch in permanent_branches(cfg):
         return facts
     return BranchFacts(
         number=facts.number,
         branch=facts.branch,
         fork=facts.fork,
         unique_commits=unique_commits(cfg, facts.branch),
+        behind=is_behind(cfg, facts.branch),
     )
 
 
@@ -296,6 +353,8 @@ def reconcile(cfg: GhConfig, *, dry_run: bool = False) -> list[dict[str, Any]]:
                 outcome["applied"] = True
                 if decision.delete_branch:
                     outcome["deleted"] = delete_branch(cfg, decision.branch)
+            elif decision.action == UPDATE:
+                outcome["applied"] = update_branch(cfg, decision.number)
             elif decision.notify:
                 notify(cfg, decision)
                 outcome["notified"] = True

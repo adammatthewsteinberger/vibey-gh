@@ -55,6 +55,21 @@ Raw output additionally requires a manual `workflow_dispatch` with
 `full_claude_output = true`. Event-triggered runs can never enable it, and the workflow
 fails closed when repository visibility is not private.
 
+## `[branch_sync]`
+
+Keeps open branches current so conflicts never accumulate, and refills a spent repair
+budget a bounded number of times so a transient outage does not become a permanent stop.
+
+| Field | Type / default | Meaning |
+|---|---|---|
+| `enabled` | boolean / `true` | Run the sync and self-heal jobs at all. |
+| `update_contributor_branches` | boolean / `true` | Merge the integration branch forward into branches this automation does not own, using GitHub's own update-branch endpoint. Never a rewrite. |
+| `max_self_heals` | integer / `2` (0–10) | How many times one lineage's repair budget may be refilled before it stays exhausted for a human. `0` disables self-healing. |
+
+A fork is only ever moved *forward*, never rewritten: `update-branch` succeeds only where
+the contributor left "allow maintainer edits" enabled, so it carries their consent.
+Rebasing, closing, and deleting are unreachable for a fork under every setting.
+
 ## `[realign]`
 
 Realign converges the integration branch onto the release branch with a lease-protected

@@ -498,6 +498,18 @@ def test_issue_automation_cli_reports_failures(repo, monkeypatch, capsys):
     assert "must be an object" in capsys.readouterr().err
 
 
+def test_self_heal_cli_sweeps_or_targets_one_pull_request(repo, monkeypatch, capsys):
+    monkeypatch.setattr(pr_automation, "exhausted_pull_requests", lambda cfg: [4, 9])
+    monkeypatch.setattr(
+        pr_automation, "self_heal", lambda number, cfg: {"pr": number, "healed": True}
+    )
+    assert main(["pr-automation", "self-heal"]) == 0
+    assert [item["pr"] for item in json.loads(capsys.readouterr().out)] == [4, 9]
+
+    assert main(["pr-automation", "self-heal", "--pr", "7"]) == 0
+    assert [item["pr"] for item in json.loads(capsys.readouterr().out)] == [7]
+
+
 def test_reconcile_branches_cli_reports_each_decision(repo, monkeypatch, capsys):
     from vibey_gh import reconcile
 
