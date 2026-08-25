@@ -213,7 +213,13 @@ and builds the wheel and sdist. `testpypi` (needs `build`, `develop` only) and `
 trusted-publishing environments pinned to their respective branch. `realign` (needs
 `build` and `pypi`, `main` only, `contents: write`) runs `vibey-gh realign` to converge
 `develop` back onto `main` when their trees are content-identical; it never force-pushes
-over unmerged `develop` work and skips gracefully when `AUTOMERGE_TOKEN` is absent.
+over unmerged `develop` work and skips gracefully when `AUTOMERGE_TOKEN` is absent. A
+successful realign then reconciles every open pull request against the rewritten
+`develop`, the same as [Branch sync](#branch-sync); because this job only holds
+`contents: write`, that follow-up can fail for lack of `pull-requests: write` or because
+GitHub is unreachable, and such a failure is logged rather than failing the job — the
+realign already succeeded and must stand regardless of whether the follow-up reconciled
+every branch.
 
 ## GitHub Release
 
