@@ -5,6 +5,12 @@ This file follows Keep a Changelog and semantic versioning conventions.
 
 ## Unreleased
 
+- Report whether a branch reconciliation actually took effect, not merely what it decided.
+  A rebase that conflicted and aborted printed exactly like one that succeeded and left the
+  job green, so two stranded pull requests looked reconciled across four runs while neither
+  branch had moved. The decision and its outcome are now printed separately, and a run that
+  could not apply an action says how many.
+
 - Keep a successful realign successful when its branch reconciliation cannot reach GitHub.
   Reconciliation is a follow-up that needs credentials some contexts do not have, and a
   branch left unreconciled is a nuisance rather than a reason to report the realign as
