@@ -115,8 +115,14 @@ starts a fresh lineage. Managed labels are `vibey-gh:solve`, `vibey-gh:solving`,
 | `production_indexing` | boolean / `true` | Permit production indexing. |
 | `preview_indexing` | boolean / `false` | Permit preview indexing. |
 | `generate_robots`, `generate_sitemap_index`, `generate_llms_txt`, `generate_llms_full_txt`, `generate_json_ld` | boolean / `true` | Generate robot, search, LLM, and structured metadata. |
-| `author_name` | string / `Adam Matthew Steinberger` | Provenance author label. |
-| `author_url` | URL / configured author site | Provenance author destination. |
+| `author_name` | string / `Adam Matthew Steinberger` | Reserved documentation-provenance author label. Parsed and validated (non-empty), but not yet emitted into any generated asset. |
+| `author_url` | URL / `https://hire.adam.matthewsteinberger.com` | Reserved documentation-provenance author destination. Same current scope as `author_name`. |
+
+`author_name` and `author_url` exist for a planned author credit in the generated
+Pages sites and are exercised by config parsing, validation, and tests today. The
+`release-surfaces.yml` JSON-LD record currently emits only `@context`, `@type`,
+`name`, `codeRepository`, `url`, and `version` — no author field — so setting these
+two keys has no visible effect on a generated site yet.
 
 Run `vibey-gh install`, review and commit generated assets, then run
 `vibey-gh check --ci`. Identity and Pages URLs are derived at runtime.
