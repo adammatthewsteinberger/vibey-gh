@@ -53,6 +53,10 @@ DEFAULT_SCAN_WORKFLOWS = (
     "Docs",
     "API drift (Cloud Agents OpenAPI)",
 )
+# Files every branch appends to, so two branches almost always touch the same lines.
+# Git's built-in `union` driver keeps both sides instead of reporting a conflict, which is
+# exactly right for an append-only log and wrong for anything with structure.
+DEFAULT_UNION_MERGE_PATHS = ("CHANGELOG.md",)
 DEFAULT_IGNORED_CHECKS = ("PR automation / gate", "gate", "Merge train / merge")
 # Managed issue-automation labels. They live here rather than beside the policy because
 # `IssueAutomationConfig` defaults name one of them, and configuration must not import
@@ -338,6 +342,9 @@ class GhConfig:
     # keeps only the hooks and the CLI — otherwise `check` reports a permanent failure
     # for workflows it deliberately does not want.
     managed_workflows: tuple[str, ...] | None = None
+    # Paths marked `merge=union` in `.gitattributes`. Appended to whatever the
+    # repository already has there; an existing `.gitattributes` is never rewritten.
+    union_merge_paths: tuple[str, ...] = DEFAULT_UNION_MERGE_PATHS
 
     def __post_init__(self) -> None:
         """Cross-field rules neither dataclass can check on its own.
@@ -345,6 +352,12 @@ class GhConfig:
         A branch namespace only reads as safe next to the branches it must never
         collide with, and those live here rather than in `IssueAutomationConfig`.
         """
+        _unique_nonempty("install.union_merge_paths", self.union_merge_paths)
+        if any(
+            Path(value).is_absolute() or ".." in Path(value).parts
+            for value in self.union_merge_paths
+        ):
+            raise ValueError("install.union_merge_paths must be repository-relative paths")
         prefix = self.issue_automation.branch_prefix
         permanent = {self.integration_branch, self.release_branch, "develop", "main"}
         if prefix in permanent or any(prefix.startswith(f"{name}/") for name in permanent):
@@ -416,6 +429,7 @@ def load_config(root: Path | None = None) -> GhConfig:
         content_paths=tuple(ver.get("content_paths", ())),
         code_paths=tuple(ver.get("code_paths", ("src/",))),
         managed_workflows=(tuple(inst["workflows"]) if "workflows" in inst else None),
+        union_merge_paths=tuple(inst.get("union_merge_paths", DEFAULT_UNION_MERGE_PATHS)),
         integration_branch=br.get("integration", "develop"),
         release_branch=br.get("release", "main"),
         owner=tr.get("owner", ""),

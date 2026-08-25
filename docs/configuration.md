@@ -28,6 +28,7 @@ defaults below. Paths are repository-relative unless stated otherwise.
 | `merge_train.owner` | string / empty | Normalized repository-owner login. |
 | `merge_train.trusted_authors` | string list / empty | Authors exempt from outside-author review. |
 | `install.workflows` | string list / all managed workflows | Exact managed subset; `[]` installs hooks and CLI assets only. |
+| `install.union_merge_paths` | string list / `["CHANGELOG.md"]` | Files declared `merge=union` in `.gitattributes`, so two branches appending to the same section merge instead of conflicting. Appended to an existing `.gitattributes`, never rewriting it. `[]` declares none. |
 
 ## `[pr_automation]`
 
