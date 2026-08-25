@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from vibey_gh.config import load_config
+from vibey_gh.config import DocumentationConfig, GhConfig, load_config
 from vibey_gh.install import TEMPLATES, WORKFLOWS, installed, render_workflow
 
 WORKFLOW_TEMPLATES = sorted(WORKFLOWS.glob("*.yml"))
@@ -108,6 +108,24 @@ def test_release_surfaces_preserve_both_docs_channels_and_publish_oci_packages()
     assert 'rel="canonical"' in text
     assert "application/ld+json" in text
     assert "noindex,nofollow" in text
+
+
+def test_release_surfaces_google_analytics_is_generic_and_off_by_default(tmp_path: Path):
+    text = (WORKFLOWS / "release-surfaces.yml").read_text(encoding="utf-8")
+    assert "__VIBEY_GH_DOC_GOOGLE_ANALYTICS_ID__" in text
+    assert "googletagmanager.com/gtag/js" in text
+    assert "__GA_SNIPPET__" in text
+    disabled = render_workflow(WORKFLOWS / "release-surfaces.yml", load_config())
+    assert "__VIBEY_GH_DOC_GOOGLE_ANALYTICS_ID__" not in disabled
+    assert 'GA_ID=""' in disabled
+    enabled = render_workflow(
+        WORKFLOWS / "release-surfaces.yml",
+        GhConfig(
+            root=tmp_path,
+            documentation=DocumentationConfig(google_analytics_id="G-ABC1234567"),
+        ),
+    )
+    assert 'GA_ID="G-ABC1234567"' in enabled
 
 
 def test_documentation_workflow_authors_guarded_refresh_prs():
