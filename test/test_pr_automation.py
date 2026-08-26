@@ -619,3 +619,83 @@ def test_mirror_fork_success_and_failures(monkeypatch, tmp_path):
         monkeypatch.setattr(subprocess, "run", fail)
         with pytest.raises(RuntimeError, match=message):
             pa.mirror_fork(12, cfg(tmp_path))
+
+
+def _workflow(tmp_path: Path, filename: str, name: str, body: str) -> None:
+    directory = tmp_path / ".github" / "workflows"
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / filename).write_text(f"name: {name}\n\non:\n{body}\n")
+
+
+def test_scan_workflows_check_is_a_noop_when_disabled_or_absent(tmp_path):
+    assert pa.check_scan_workflows(cfg(tmp_path, enabled=False)).ok
+    assert pa.check_scan_workflows(cfg(tmp_path, scan_workflows=("Docs",))).ok
+
+
+def test_scan_workflows_check_ignores_a_name_absent_from_the_repository(tmp_path):
+    _workflow(tmp_path, "ci.yml", "CI", "  push:\n")
+    report = pa.check_scan_workflows(cfg(tmp_path, scan_workflows=("Docs",)))
+    assert report.ok
+
+
+@pytest.mark.parametrize("trigger", ["pull_request", "pull_request_target"])
+def test_scan_workflows_check_accepts_either_pull_request_spelling(tmp_path, trigger):
+    _workflow(tmp_path, "docs.yml", "Docs", f"  {trigger}:\n  push:\n")
+    report = pa.check_scan_workflows(cfg(tmp_path, scan_workflows=("Docs",)))
+    assert report.ok
+
+
+def test_scan_workflows_check_fails_a_push_only_workflow_with_a_clear_message(tmp_path):
+    _workflow(tmp_path, "docs.yml", "Docs", '  push:\n    branches: ["main"]\n')
+    report = pa.check_scan_workflows(cfg(tmp_path, scan_workflows=("Docs",)))
+    assert not report.ok
+    assert len(report.problems) == 1
+    problem = report.problems[0]
+    assert "'Docs'" in problem
+    assert "docs.yml" in problem
+    assert "pull_request" in problem and "pull_request_target" in problem
+
+
+def test_scan_workflows_check_reads_inline_and_bare_on_triggers(tmp_path):
+    directory = tmp_path / ".github" / "workflows"
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / "push-only.yml").write_text("name: Push only\non: push\n")
+    (directory / "bracketed.yml").write_text("name: Bracketed\non: [push, pull_request]\n")
+    report = pa.check_scan_workflows(cfg(tmp_path, scan_workflows=("Push only", "Bracketed")))
+    assert len(report.problems) == 1
+    assert "'Push only'" in report.problems[0]
+
+
+def test_scan_workflows_check_ignores_a_workflow_file_with_no_name_field(tmp_path):
+    directory = tmp_path / ".github" / "workflows"
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / "nameless.yml").write_text("on:\n  push:\n")
+    report = pa.check_scan_workflows(cfg(tmp_path, scan_workflows=("Docs",)))
+    assert report.ok
+
+
+def test_scan_workflows_check_ignores_a_non_key_line_at_trigger_indentation(tmp_path):
+    _workflow(tmp_path, "weird.yml", "Weird", "  push:\n  - not-a-trigger\n")
+    report = pa.check_scan_workflows(cfg(tmp_path, scan_workflows=("Weird",)))
+    assert not report.ok
+    assert "'Weird'" in report.problems[0]
+
+
+def test_scan_workflows_check_stops_reading_triggers_at_the_next_top_level_key(tmp_path):
+    body = "  pull_request:\npermissions:\n  contents: read\n"
+    _workflow(tmp_path, "trailing.yml", "Trailing", body)
+    report = pa.check_scan_workflows(cfg(tmp_path, scan_workflows=("Trailing",)))
+    assert report.ok
+
+
+def test_a_workflow_with_no_trigger_block_reports_no_triggers():
+    """A malformed or trigger-less workflow must report nothing rather than guess.
+
+    Reporting a trigger it does not have would let a workflow that can never fire for a
+    pull request pass the check — which is the exact silent merge lockout this validation
+    exists to prevent.
+    """
+    assert pa._workflow_triggers("name: CI\njobs:\n  build:\n    runs-on: ubuntu-latest\n") == set()
+    assert pa._workflow_triggers("") == set()
+    # And one that does declare them is still read correctly.
+    assert pa._workflow_triggers("on:\n  pull_request:\n  push:\n") == {"pull_request", "push"}

@@ -13,6 +13,7 @@ import re
 import subprocess
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass, field
+from pathlib import Path
 from typing import Any, cast
 
 from vibey_gh import github_state
@@ -28,7 +29,11 @@ AUTOMATION_LABELS = (EXTERNAL_REPAIR_LABEL, REPAIRING_LABEL, EXHAUSTED_LABEL, BL
 PASSING = {"SUCCESS", "NEUTRAL", "SKIPPED"}
 FAILING = {"FAILURE", "TIMED_OUT", "STARTUP_FAILURE", "ACTION_REQUIRED"}
 OPERATIONAL = {"CANCELLED", "STALE"}
+PULL_REQUEST_TRIGGERS = ("pull_request", "pull_request_target")
 _STATE_RE = github_state.marker_pattern(STATE_MARKER)
+_NAME_RE = re.compile(r"""^(?:name|"name"|'name'):\s*(.*?)\s*(?:#.*)?$""")
+_ON_RE = re.compile(r"""^(?:on|"on"|'on'):\s*(.*?)\s*(?:#.*)?$""")
+_KEY_RE = re.compile(r"^([A-Za-z_]+):")
 
 
 @dataclass(frozen=True)
@@ -70,6 +75,94 @@ class Evaluation:
         payload["pending_checks"] = list(self.pending_checks)
         payload["failed_checks"] = list(self.failed_checks)
         return json.dumps(payload, sort_keys=True)
+
+
+@dataclass(frozen=True)
+class ScanWorkflowReport:
+    problems: tuple[str, ...]
+
+    @property
+    def ok(self) -> bool:
+        return not self.problems
+
+
+def _workflow_name(text: str) -> str | None:
+    """The workflow's display `name:`, matched the way GitHub matches `workflow_run`."""
+    for line in text.splitlines():
+        match = _NAME_RE.match(line)
+        if match:
+            return match.group(1).strip("'\"") or None
+    return None
+
+
+def _workflow_triggers(text: str) -> set[str]:
+    """Best-effort top-level `on:` trigger keys.
+
+    Not a general YAML parser — every shipped and generated workflow indents its `on:`
+    block consistently, and that convention, not full YAML semantics, is all this reads.
+    """
+    lines = text.splitlines()
+    for index, line in enumerate(lines):
+        match = _ON_RE.match(line)
+        if not match:
+            continue
+        inline = match.group(1).strip()
+        if inline:
+            return {
+                part.strip().strip("'\"") for part in inline.strip("[]").split(",") if part.strip()
+            }
+        triggers: set[str] = set()
+        base_indent: int | None = None
+        for follower in lines[index + 1 :]:
+            if not follower.strip() or follower.lstrip().startswith("#"):
+                continue
+            indent = len(follower) - len(follower.lstrip())
+            if base_indent is None:
+                base_indent = indent
+            if indent < base_indent:
+                break
+            if indent == base_indent:
+                key = _KEY_RE.match(follower.strip())
+                if key:
+                    triggers.add(key.group(1))
+        return triggers
+    return set()
+
+
+def check_scan_workflows(cfg: GhConfig) -> ScanWorkflowReport:
+    """Every `pr_automation.scan_workflows` entry must be able to fire for a pull request.
+
+    `evaluate` waits for a `workflow_run` completion from each name. A workflow that
+    exists but triggers only on `push` can structurally never complete for a pull
+    request: `state` never leaves `pending`, the gate never publishes, and — if it is a
+    required check — no pull request can ever merge, silently and permanently. A name
+    absent from `.github/workflows/` is not this failure; it may live elsewhere or under
+    another name, so it is left alone.
+    """
+    if not cfg.pr_automation.enabled:
+        return ScanWorkflowReport(())
+    directory = cfg.root / ".github" / "workflows"
+    if not directory.is_dir():
+        return ScanWorkflowReport(())
+    by_name: dict[str, tuple[Path, set[str]]] = {}
+    for path in sorted(directory.glob("*.yml")) + sorted(directory.glob("*.yaml")):
+        text = path.read_text(encoding="utf-8")
+        name = _workflow_name(text)
+        if name and name not in by_name:
+            by_name[name] = (path, _workflow_triggers(text))
+    problems: list[str] = []
+    for wanted in cfg.pr_automation.scan_workflows:
+        found = by_name.get(wanted)
+        if found is None:
+            continue
+        path, triggers = found
+        if not triggers.intersection(PULL_REQUEST_TRIGGERS):
+            problems.append(
+                f"pr_automation.scan_workflows names {wanted!r} ({path.relative_to(cfg.root)}), "
+                "which has no `pull_request` or `pull_request_target` trigger and can never "
+                "complete for a pull request — this permanently blocks the gate"
+            )
+    return ScanWorkflowReport(tuple(problems))
 
 
 def _check(raw: dict[str, Any]) -> Check:

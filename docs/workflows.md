@@ -204,6 +204,16 @@ paths, and publishes one resolution commit. `escalate` labels and comments once 
 repair-attempt budget is exhausted. `gate` publishes the final `PR automation / gate`
 check run for the exact head and, on success, dispatches `merge-train.yml`.
 
+Every `[pr_automation].scan_workflows` entry names a `workflow_run` this aggregation
+waits on, so each one must be a workflow that runs on `pull_request` or
+`pull_request_target`. A workflow that only triggers on `push` can never complete for a
+pull request: `state` never leaves `pending`, `gate` — which requires `state !=
+'pending'` — never runs, and the `PR automation / gate` check-run is never published. Made
+a required check on the branch ruleset, that is a silent, total, and permanent lockout.
+`vibey-gh check` fails on any named workflow that exists but cannot fire for a pull
+request; a name absent from `.github/workflows/` is not an error, since it may live
+elsewhere or under another name.
+
 ## Merge train
 
 `Merge train` runs on completion of `PR automation`, a weekly Monday recovery schedule,

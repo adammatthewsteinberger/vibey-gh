@@ -85,6 +85,19 @@ def test_check_reports_missing_documentation(repo, capsys):
         assert imposed not in err, imposed
 
 
+def test_check_reports_a_scan_workflow_that_cannot_fire_for_a_pull_request(repo, capsys):
+    main(["install"])
+    assert main(["check", "--ci", "--apply"]) == 0
+    config = repo / ".vibey-gh.toml"
+    config.write_text(config.read_text() + '\n[pr_automation]\nscan_workflows = ["Custom"]\n')
+    workflows = repo / ".github" / "workflows"
+    (workflows / "custom.yml").write_text("name: Custom\non:\n  push:\n")
+    assert main(["check", "--ci"]) == 1
+    err = capsys.readouterr().err
+    assert "'Custom'" in err
+    assert "pull_request" in err
+
+
 def test_check_reports_a_duplicate_header(repo, capsys):
     cfg = load_config(repo)
     target = repo / "src" / "__init__.py"
