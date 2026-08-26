@@ -184,7 +184,7 @@ names are not configured here — `[rulesets.integration]` always targets
 
 | Field | Type / default | Meaning |
 |---|---|---|
-| `required_checks` | string list / integration: `pr_automation.scan_workflows` plus `PR automation / gate`; release: `["CI", "Provenance", "CodeQL", "Docs"]` | Required status-check contexts. Empty omits the check requirement entirely. |
+| `required_checks` | string list / integration: `["Provenance", "Analyze Python", "Documentation contract", "PR automation / gate"]`; release: the same without the gate | Required status-check contexts — **check-run names, not workflow names** (see below). Empty omits the check requirement entirely. |
 | `strict_required_checks` | boolean / `true` | Require the branch to be up to date with its base before merging. |
 | `required_approvals` | integer / integration: `0`, release: `1` (0–6) | Required approving reviews. Integration defaults to `0` because PR automation gates it instead. |
 | `dismiss_stale_reviews` | boolean / `true` | Dismiss stale reviews when new commits are pushed. |
@@ -193,7 +193,28 @@ names are not configured here — `[rulesets.integration]` always targets
 | `require_signed_commits` | boolean / `false` | Require every commit to be signed. |
 | `allow_force_pushes` | boolean / `false` | **Rejected at load time if `true`.** A permanent branch can never be configured to allow force pushes. |
 | `allow_deletions` | boolean / `false` | **Rejected at load time if `true`.** A permanent branch can never be configured to allow deletion. |
-| `bypass_actors` | string list / empty | `"<ActorType>:<id>"` entries such as `"RepositoryRole:5"`, granted to bypass the ruleset. Empty means nobody. |
+| `bypass_actors` | string list / `["RepositoryRole:5"]` | `"<ActorType>:<id>"` entries granted to bypass the ruleset. The default is the repository admin role. `[]` means nobody — including the owner. |
+
+### `required_checks` names check runs, not workflows
+
+This is the one field here that can lock a branch with no way out, so it is worth stating
+plainly. A required status check matches a **check run**, and for GitHub Actions a check
+run is named for its **job**, not its workflow. The `CI` workflow in this repository
+reports as `Lint`, `Build`, and `Test (3.12)`; nothing ever reports as `CI`.
+
+Requiring a name nothing produces does not fail — it *waits*. The branch reports
+`N of M required status checks are expected` forever, and because a ruleset has no
+"include administrators" toggle the way classic branch protection did, an empty
+`bypass_actors` means no one can merge past it. The only exit is editing the ruleset.
+
+Two habits avoid it: name the job, and keep a bypass actor. `[pr_automation].scan_workflows`
+names *workflows* and looks like a tempting list to reuse here — it is not one. To find the
+real names, open a recent pull request's checks tab, or:
+
+```bash
+gh api "repos/OWNER/REPO/commits/$(git rev-parse HEAD)/check-runs" \
+  --jq '.check_runs[].name' | sort -u
+```
 
 Reconciliation is idempotent read-compare-write, the same shape `repository-profile.yml`
 already uses for settings and topics: an existing rule type the configuration does not

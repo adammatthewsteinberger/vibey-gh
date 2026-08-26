@@ -5,6 +5,16 @@ This file follows Keep a Changelog and semantic versioning conventions.
 
 ## Unreleased
 
+- Require checks that can actually report, and keep a way out when they cannot. The
+  default `required_checks` were built from `scan_workflows`, which names *workflows*; a
+  required status check names a *check run*, which for Actions is the job's name. So a
+  fresh install demanded "CI", "Docs", and "API drift (Cloud Agents OpenAPI)" — three
+  contexts nothing produces. That does not fail, it waits: the branch reports "N of M
+  required status checks are expected" forever. And because a ruleset has no "include
+  administrators" toggle the way the branch protection it replaced did, an empty
+  `bypass_actors` meant nobody could merge past it, owner included. The defaults now name
+  jobs the bundled templates actually render, `bypass_actors` defaults to the repository
+  admin role, and a test asserts every default check is a job some template renders.
 - Actually send the ruleset request body. `gh api` ignores stdin unless told to read it, so
   every reconciliation failed with HTTP 422 "data cannot be null" while the payload it had
   built was perfectly good — it simply never left the process.

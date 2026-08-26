@@ -12,7 +12,13 @@ exception is a lease-protected force-update of a same-repository topic branch to
 commit subjects; exact-head, linear-history, repository-ownership, and permanent-branch
 guards all precede it. A fork, merge commit, stale event, or concurrent push fails closed.
 Operators must protect repository secrets and review changes to `.vibey-gh.toml`'s
-`[rulesets]` block, especially `bypass_actors`.
+`[rulesets]` block, especially `bypass_actors`. That field defaults to the repository
+admin role rather than to nobody, which is a deliberate availability trade: a ruleset has
+no "include administrators" toggle, so an empty bypass list turns any check that stops
+reporting — an outage, an exhausted budget, a renamed job — into a branch nobody can merge
+to. The default grants no authority it does not already imply, since anyone able to bypass
+a ruleset can equally rewrite it; a repository wanting the stricter posture sets
+`bypass_actors = []` and accepts that recovery then means editing the ruleset by hand.
 
 The integration and release branch rulesets are themselves reconciled, not merely assumed:
 `vibey_gh.rulesets` builds each desired ruleset from configuration and compares it against
