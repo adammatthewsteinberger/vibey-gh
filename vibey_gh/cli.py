@@ -22,6 +22,7 @@ from vibey_gh import (
     promote,
     realign,
     reconcile,
+    rulesets,
     surfaces,
     versioning,
 )
@@ -351,6 +352,23 @@ def _reconcile(args) -> int:
     return 0
 
 
+def _rulesets(args) -> int:
+    cfg = load_config()
+    try:
+        outcomes = rulesets.reconcile(cfg, dry_run=args.dry_run)
+    except (RuntimeError, ValueError, json.JSONDecodeError) as exc:
+        print(f"vibey-gh: {exc}", file=sys.stderr)
+        return 1
+    for outcome in outcomes:
+        state = "changed" if outcome["changed"] else "current"
+        note = ""
+        if outcome["unexpected_rules"]:
+            note = f" — unexpected rule(s) preserved: {', '.join(outcome['unexpected_rules'])}"
+        print(f"  {outcome['ruleset']} ({outcome['branch']}): {state}{note}")
+    print(f"vibey-gh: reconciled {len(outcomes)} ruleset(s)")
+    return 0
+
+
 def _surface(args) -> int:
     try:
         arguments = json.loads(args.arguments)
@@ -567,6 +585,10 @@ def main(argv: list[str] | None = None) -> int:
     )
     rec.add_argument("--dry-run", action="store_true", help="decide without mutating anything")
     rec.set_defaults(func=_reconcile)
+
+    rs = sub.add_parser("rulesets", help="reconcile the integration and release branch rulesets")
+    rs.add_argument("--dry-run", action="store_true", help="decide without applying anything")
+    rs.set_defaults(func=_rulesets)
 
     for surface in ("api", "mcp", "sdk", "webhook"):
         adapter = sub.add_parser(surface, help=f"invoke a capability through the {surface} adapter")

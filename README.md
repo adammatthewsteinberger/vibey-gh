@@ -266,6 +266,7 @@ request bytes for HMAC verification; see [the CLI and adapter reference](docs/cl
 | `vibey-gh realign` | Align identical `develop` and `main` trees after a rebase merge without discarding work. |
 | `vibey-gh pr-automation self-heal [--pr N]` | Refill a spent repair budget, itself bounded so a permanent failure still stops. |
 | `vibey-gh reconcile-branches [--dry-run]` | Rebase, close, or leave each open branch stranded by a realign rewrite. |
+| `vibey-gh rulesets [--dry-run]` | Reconcile the integration and release branch rulesets from `[rulesets]`. |
 | `vibey-gh sdk|api|mcp|webhook CAPABILITY` | Invoke the same canonical capability through each supported public surface. |
 
 Run `vibey-gh --help` and read [docs/cli.md](docs/cli.md) for the full reference.
@@ -569,6 +570,33 @@ tag_prefix = "v"
 generate_notes = true
 require_new_version = false          # a versionless release-branch push is a no-op, not an error
 
+[rulesets]
+enabled = true
+
+[rulesets.integration]
+required_checks = [
+  "CI", "Provenance", "CodeQL", "Docs",
+  "API drift (Cloud Agents OpenAPI)", "PR automation / gate",
+]
+strict_required_checks = true          # branch must be up to date before merging
+required_approvals = 0                 # PR automation gates instead
+dismiss_stale_reviews = true
+require_conversation_resolution = true
+require_linear_history = true
+require_signed_commits = false
+allow_force_pushes = false             # rejected at load time if true
+allow_deletions = false                # rejected at load time if true
+bypass_actors = []                     # e.g. ["RepositoryRole:5"]; empty means nobody
+
+[rulesets.release]
+required_checks = ["CI", "Provenance", "CodeQL", "Docs"]
+strict_required_checks = true
+required_approvals = 1
+require_linear_history = true
+allow_force_pushes = false
+allow_deletions = false
+bypass_actors = []
+
 [repository_profile]
 enabled = true
 description = "A configurable repository description"
@@ -608,6 +636,19 @@ google_analytics_id = ""                    # empty disables it; set a GA4 ID li
 official action. `API drift (Cloud Agents OpenAPI)` executes the capability registry and
 requires identical coverage through MCP, API, CLI, SDK, and webhook adapters. The scan
 names above therefore map to concrete required checks rather than advisory placeholders.
+
+`[rulesets]` is what actually sets the branch protection the rest of this document
+describes, rather than leaving it for an adopter to configure by hand from prose.
+`repository-profile.yml` reconciles a ruleset per permanent branch from this block —
+required status checks, review and conversation-resolution requirements, linear history,
+and signed commits — using the same idempotent read-compare-write shape it already uses
+for settings and topics. `allow_force_pushes` and `allow_deletions` are rejected at
+configuration load time if set to `true`, not merely defaulted to `false`, so the
+non-deletion, non-rewrite guarantee cannot become one keystroke away from disabled. An
+existing rule type the configuration does not mention is never removed, only reported, and
+a ruleset the API refuses fails the job with the API's own reason. Omitting `[rulesets]`
+entirely, or setting `enabled = false`, leaves the repository exactly as untouched as
+before this feature existed. Run `vibey-gh rulesets --dry-run` to inspect the diff first.
 
 Issue automation is closed by default for people you have not vouched for.
 `solve_untrusted_authors = false` means an outside author's issue waits for a maintainer
@@ -654,14 +695,17 @@ executes repository code in the privileged job, commits application changes, or 
 permanent branch directly. It must return `complete=true` with no remaining gaps before a
 documentation PR may be published; PR-creation errors fail loudly.
 
-The required suite includes `README`, changelog, license, conduct, contribution, security,
-support, architecture, operations, testing, release, governance, accessibility, dependency,
-threat-model, troubleshooting, ADR, GitHub, hooks, Claude, Cursor, Gemini, Codex/Agents, and
-generic-agent documentation. The repository also contains a Claude-standard plugin
-marketplace at `.claude-plugin/marketplace.json` with development, documentation,
-release-security, and PR-automation plugins. Each plugin ships manifests, skills, commands,
-specialist agents, and supporting references; `.claude/settings.json` registers and enables
-the marketplace for project sessions.
+The deterministic file-presence suite (`documentation.required_files`) includes `README`,
+changelog, license, conduct, contribution, security, support, the project diagram, GitHub,
+hooks, Claude, Cursor, Gemini, Codex/Agents, and generic-agent documentation. Deeper guides
+such as architecture, operations, testing, release, governance, accessibility, dependency,
+threat-model, troubleshooting, and ADR documentation are not covered by that file-presence
+check; they are kept accurate by the exact-head semantic audit described above, which reads
+every doc against source, tests, configuration, and workflows. The repository also contains
+a Claude-standard plugin marketplace at `.claude-plugin/marketplace.json` with development,
+documentation, release-security, and PR-automation plugins. Each plugin ships manifests,
+skills, commands, specialist agents, and supporting references; `.claude/settings.json`
+registers and enables the marketplace for project sessions.
 
 The Pages build emits production and preview sitemaps, a root sitemap index, `robots.txt`,
 `llms.txt`, `llms-full.txt`, canonical links, indexing policy, Open Graph/Twitter metadata,
@@ -711,12 +755,15 @@ unchanged.
 
 After release surfaces succeed, `repository-profile.yml` reconciles the repository's
 description, topics, homepage, collaboration features, merge methods, automatic merge,
-commit signoff, branch retention, vulnerability alerts, and automated security fixes.
+commit signoff, branch retention, vulnerability alerts, automated security fixes, and —
+from `[rulesets]` — the integration and release branch rulesets themselves.
 An empty description derives
 a repository-specific description from the consuming repository name. It verifies that
 Pages, a GitHub Release, a deployment, and the OCI package really exist—the public API
-does not expose fictional “show Releases/Deployments/Packages” switches. Profile updates
-use `AUTOMERGE_TOKEN` when available and never create, update, push, or delete a branch.
+does not expose fictional “show Releases/Deployments/Packages” switches—and, now that
+ruleset reconciliation runs first in the same job, that `develop` and `main` really are
+protected. Profile updates use `AUTOMERGE_TOKEN` when available and never create, update,
+push, or delete a branch.
 
 If a trusted post-merge workflow fails on `develop` or `main`, `release-repair.yml`
 reviews its logs with the same constrained agent used for PR repair. A fixable problem is

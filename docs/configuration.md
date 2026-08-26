@@ -125,6 +125,39 @@ starts a fresh lineage. Managed labels are `vibey-gh:solve`, `vibey-gh:solving`,
 | `generate_notes` | boolean / `true` | Ask GitHub to generate release notes. |
 | `require_new_version` | boolean / `false` | Fail instead of silently doing nothing when a release-branch push does not carry a new version (the tag it would need already exists at a different commit). Leave off for a repository where a docs-only or tooling-only promotion is a normal, frequent, versionless push. |
 
+## `[rulesets]`
+
+Reconciles GitHub repository rulesets for the integration and release branches, so the
+protection `repository-profile.yml` has always only *verified* is actually *set*. Branch
+names are not configured here — `[rulesets.integration]` always targets
+`branches.integration` and `[rulesets.release]` always targets `branches.release`.
+
+| Field | Type / default | Meaning |
+|---|---|---|
+| `enabled` | boolean / `true` | Reconcile both rulesets at all. `false` leaves the repository untouched, exactly as before this feature existed. |
+
+### `[rulesets.integration]` and `[rulesets.release]`
+
+| Field | Type / default | Meaning |
+|---|---|---|
+| `required_checks` | string list / integration: `pr_automation.scan_workflows` plus `PR automation / gate`; release: `["CI", "Provenance", "CodeQL", "Docs"]` | Required status-check contexts. Empty omits the check requirement entirely. |
+| `strict_required_checks` | boolean / `true` | Require the branch to be up to date with its base before merging. |
+| `required_approvals` | integer / integration: `0`, release: `1` (0–6) | Required approving reviews. Integration defaults to `0` because PR automation gates it instead. |
+| `dismiss_stale_reviews` | boolean / `true` | Dismiss stale reviews when new commits are pushed. |
+| `require_conversation_resolution` | boolean / `true` | Require every review thread to be resolved before merging. |
+| `require_linear_history` | boolean / `true` | Forbid merge commits onto the branch. |
+| `require_signed_commits` | boolean / `false` | Require every commit to be signed. |
+| `allow_force_pushes` | boolean / `false` | **Rejected at load time if `true`.** A permanent branch can never be configured to allow force pushes. |
+| `allow_deletions` | boolean / `false` | **Rejected at load time if `true`.** A permanent branch can never be configured to allow deletion. |
+| `bypass_actors` | string list / empty | `"<ActorType>:<id>"` entries such as `"RepositoryRole:5"`, granted to bypass the ruleset. Empty means nobody. |
+
+Reconciliation is idempotent read-compare-write, the same shape `repository-profile.yml`
+already uses for settings and topics: an existing rule type the configuration does not
+mention is never removed, only reported. A ruleset the API refuses fails the job with the
+API's own reason rather than being silently skipped — a skipped reconciliation would look
+identical to a satisfied one. Run `vibey-gh rulesets --dry-run` to inspect the diff before
+a workflow run applies it.
+
 ## `[repository_profile]`
 
 | Field | Type / default | Meaning |

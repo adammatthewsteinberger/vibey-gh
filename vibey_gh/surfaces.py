@@ -27,6 +27,7 @@ CAPABILITIES = (
     "promote",
     "realign",
     "reconcile-branches",
+    "rulesets",
 )
 SURFACES = ("mcp", "api", "cli", "sdk", "webhook")
 

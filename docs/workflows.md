@@ -246,9 +246,14 @@ left empty (the default), no analytics script is emitted anywhere.
 `Repository profile` runs on completion of `Release surfaces` or manual dispatch, with
 read-only `actions: read`, `contents: read`, `deployments: read`, and `packages: read`. It
 reconciles the repository's description, homepage, topics, and collaboration/security
-settings to the configured values, then verifies the public release surfaces are actually
-live: the Pages homepage responds, at least one release and one deployment exist, the
-GHCR package is reachable, and `develop`/`main` remain protected.
+settings to the configured values, then — when `[rulesets].enabled` — checks out the
+default branch, installs `vibey-gh`, and reconciles the integration and release branch
+rulesets from `[rulesets]` before verifying the public release surfaces are actually live:
+the Pages homepage responds, at least one release and one deployment exist, the GHCR
+package is reachable, and `develop`/`main` remain protected. Ruleset reconciliation runs
+before that verification step in the same job, so the branches it protects are already
+current by the time the check runs. A ruleset the API refuses fails the job with the API's
+own reason instead of being silently skipped.
 
 ## Release repair
 

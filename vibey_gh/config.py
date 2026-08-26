@@ -58,6 +58,8 @@ DEFAULT_SCAN_WORKFLOWS = (
 # exactly right for an append-only log and wrong for anything with structure.
 DEFAULT_UNION_MERGE_PATHS = ("CHANGELOG.md",)
 DEFAULT_IGNORED_CHECKS = ("PR automation / gate", "gate", "Merge train / merge")
+DEFAULT_INTEGRATION_RULESET_CHECKS = DEFAULT_SCAN_WORKFLOWS + ("PR automation / gate",)
+DEFAULT_RELEASE_RULESET_CHECKS = ("CI", "Provenance", "CodeQL", "Docs")
 # Managed issue-automation labels. They live here rather than beside the policy because
 # `IssueAutomationConfig` defaults name one of them, and configuration must not import
 # the module that imports configuration.
@@ -134,6 +136,23 @@ def _unique_nonempty(name: str, values: tuple[str, ...]) -> None:
         raise ValueError(f"{name} entries must be non-empty")
     if len(set(values)) != len(values):
         raise ValueError(f"{name} entries must be unique")
+
+
+def _ruleset(
+    section: dict, default_checks: tuple[str, ...], default_approvals: int
+) -> RulesetConfig:
+    return RulesetConfig(
+        required_checks=tuple(section.get("required_checks", default_checks)),
+        strict_required_checks=section.get("strict_required_checks", True),
+        required_approvals=section.get("required_approvals", default_approvals),
+        dismiss_stale_reviews=section.get("dismiss_stale_reviews", True),
+        require_conversation_resolution=section.get("require_conversation_resolution", True),
+        require_linear_history=section.get("require_linear_history", True),
+        require_signed_commits=section.get("require_signed_commits", False),
+        allow_force_pushes=section.get("allow_force_pushes", False),
+        allow_deletions=section.get("allow_deletions", False),
+        bypass_actors=tuple(section.get("bypass_actors", ())),
+    )
 
 
 @dataclass(frozen=True)
@@ -252,6 +271,60 @@ class GithubReleaseConfig:
 
 
 @dataclass(frozen=True)
+class RulesetConfig:
+    """Declared branch-protection policy for one permanent branch.
+
+    `allow_force_pushes` and `allow_deletions` are rejected outright rather than merely
+    defaulted, because this config shape only ever targets a permanent branch: the
+    non-deletion, non-rewrite guarantee this project claims cannot become one keystroke
+    away from silently disabled.
+    """
+
+    required_checks: tuple[str, ...] = ()
+    strict_required_checks: bool = True
+    required_approvals: int = 0
+    dismiss_stale_reviews: bool = True
+    require_conversation_resolution: bool = True
+    require_linear_history: bool = True
+    require_signed_commits: bool = False
+    allow_force_pushes: bool = False
+    allow_deletions: bool = False
+    bypass_actors: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        if self.allow_force_pushes:
+            raise ValueError("rulesets: allow_force_pushes must not be true for a permanent branch")
+        if self.allow_deletions:
+            raise ValueError("rulesets: allow_deletions must not be true for a permanent branch")
+        _unique_nonempty("rulesets.required_checks", self.required_checks)
+        _unique_nonempty("rulesets.bypass_actors", self.bypass_actors)
+        if not 0 <= self.required_approvals <= 6:
+            raise ValueError("rulesets.required_approvals must be between 0 and 6")
+        for actor in self.bypass_actors:
+            actor_type, sep, actor_id = actor.partition(":")
+            if not sep or not actor_type.strip() or not actor_id.strip().isdigit():
+                raise ValueError(f"rulesets.bypass_actors entry is malformed: {actor!r}")
+
+
+@dataclass(frozen=True)
+class RulesetsConfig:
+    """Whether and how declared repository rulesets are reconciled.
+
+    Branch names are not configured here — `[rulesets.integration]` always targets
+    `branches.integration` and `[rulesets.release]` always targets `branches.release`, so a
+    repository that renamed either branch does not have to repeat the name.
+    """
+
+    enabled: bool = True
+    integration: RulesetConfig = RulesetConfig(
+        required_checks=DEFAULT_INTEGRATION_RULESET_CHECKS, required_approvals=0
+    )
+    release: RulesetConfig = RulesetConfig(
+        required_checks=DEFAULT_RELEASE_RULESET_CHECKS, required_approvals=1
+    )
+
+
+@dataclass(frozen=True)
 class RepositoryProfileConfig:
     enabled: bool = True
     description: str = ""
@@ -346,6 +419,7 @@ class GhConfig:
     realign: RealignConfig = RealignConfig()
     branch_sync: BranchSyncConfig = BranchSyncConfig()
     github_release: GithubReleaseConfig = GithubReleaseConfig()
+    rulesets: RulesetsConfig = RulesetsConfig()
     repository_profile: RepositoryProfileConfig = RepositoryProfileConfig()
     documentation: DocumentationConfig = DocumentationConfig()
     # Which bundled workflow templates this repository wants installed and kept current.
@@ -414,6 +488,7 @@ def load_config(root: Path | None = None) -> GhConfig:
     realigning = data.get("realign", {})
     syncing = data.get("branch_sync", {})
     release = data.get("github_release", {})
+    rulesets_data = data.get("rulesets", {})
     profile = data.get("repository_profile", {})
     documentation = data.get("documentation", {})
     automation = PrAutomationConfig(
@@ -481,6 +556,13 @@ def load_config(root: Path | None = None) -> GhConfig:
             tag_prefix=release.get("tag_prefix", "v"),
             generate_notes=release.get("generate_notes", True),
             require_new_version=release.get("require_new_version", False),
+        ),
+        rulesets=RulesetsConfig(
+            enabled=rulesets_data.get("enabled", True),
+            integration=_ruleset(
+                rulesets_data.get("integration", {}), DEFAULT_INTEGRATION_RULESET_CHECKS, 0
+            ),
+            release=_ruleset(rulesets_data.get("release", {}), DEFAULT_RELEASE_RULESET_CHECKS, 1),
         ),
         repository_profile=RepositoryProfileConfig(
             enabled=profile.get("enabled", True),
