@@ -695,14 +695,17 @@ executes repository code in the privileged job, commits application changes, or 
 permanent branch directly. It must return `complete=true` with no remaining gaps before a
 documentation PR may be published; PR-creation errors fail loudly.
 
-The required suite includes `README`, changelog, license, conduct, contribution, security,
-support, architecture, operations, testing, release, governance, accessibility, dependency,
-threat-model, troubleshooting, ADR, GitHub, hooks, Claude, Cursor, Gemini, Codex/Agents, and
-generic-agent documentation. The repository also contains a Claude-standard plugin
-marketplace at `.claude-plugin/marketplace.json` with development, documentation,
-release-security, and PR-automation plugins. Each plugin ships manifests, skills, commands,
-specialist agents, and supporting references; `.claude/settings.json` registers and enables
-the marketplace for project sessions.
+The deterministic file-presence suite (`documentation.required_files`) includes `README`,
+changelog, license, conduct, contribution, security, support, the project diagram, GitHub,
+hooks, Claude, Cursor, Gemini, Codex/Agents, and generic-agent documentation. Deeper guides
+such as architecture, operations, testing, release, governance, accessibility, dependency,
+threat-model, troubleshooting, and ADR documentation are not covered by that file-presence
+check; they are kept accurate by the exact-head semantic audit described above, which reads
+every doc against source, tests, configuration, and workflows. The repository also contains
+a Claude-standard plugin marketplace at `.claude-plugin/marketplace.json` with development,
+documentation, release-security, and PR-automation plugins. Each plugin ships manifests,
+skills, commands, specialist agents, and supporting references; `.claude/settings.json`
+registers and enables the marketplace for project sessions.
 
 The Pages build emits production and preview sitemaps, a root sitemap index, `robots.txt`,
 `llms.txt`, `llms-full.txt`, canonical links, indexing policy, Open Graph/Twitter metadata,
