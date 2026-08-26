@@ -686,3 +686,16 @@ def test_scan_workflows_check_stops_reading_triggers_at_the_next_top_level_key(t
     _workflow(tmp_path, "trailing.yml", "Trailing", body)
     report = pa.check_scan_workflows(cfg(tmp_path, scan_workflows=("Trailing",)))
     assert report.ok
+
+
+def test_a_workflow_with_no_trigger_block_reports_no_triggers():
+    """A malformed or trigger-less workflow must report nothing rather than guess.
+
+    Reporting a trigger it does not have would let a workflow that can never fire for a
+    pull request pass the check — which is the exact silent merge lockout this validation
+    exists to prevent.
+    """
+    assert pa._workflow_triggers("name: CI\njobs:\n  build:\n    runs-on: ubuntu-latest\n") == set()
+    assert pa._workflow_triggers("") == set()
+    # And one that does declare them is still read correctly.
+    assert pa._workflow_triggers("on:\n  pull_request:\n  push:\n") == {"pull_request", "push"}

@@ -109,9 +109,7 @@ def _workflow_triggers(text: str) -> set[str]:
         inline = match.group(1).strip()
         if inline:
             return {
-                part.strip().strip("'\"")
-                for part in inline.strip("[]").split(",")
-                if part.strip()
+                part.strip().strip("'\"") for part in inline.strip("[]").split(",") if part.strip()
             }
         triggers: set[str] = set()
         base_indent: int | None = None
