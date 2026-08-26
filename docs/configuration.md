@@ -29,6 +29,7 @@ defaults below. Paths are repository-relative unless stated otherwise.
 | `merge_train.trusted_authors` | string list / empty | Authors exempt from outside-author review. |
 | `install.workflows` | string list / all managed workflows | Exact managed subset; `[]` installs hooks and CLI assets only. |
 | `install.union_merge_paths` | string list / `["CHANGELOG.md"]` | Files declared `merge=union` in `.gitattributes`, so two branches appending to the same section merge instead of conflicting. Appended to an existing `.gitattributes`, never rewriting it. `[]` declares none. |
+| `install.pin_version` | boolean / `false` | Pin every managed workflow's `pip install vibey-gh` to the exact version that rendered it (`vibey-gh==X.Y.Z`), instead of the latest release on every run. `false` keeps the historical floating install. The self-hosting path (this repository, and anything else installing from its own `pyproject.toml`) is never pinned — it installs from source regardless. Running `vibey-gh install` from a newer release moves the pin forward as one visible diff. |
 
 ## `[pr_automation]`
 
