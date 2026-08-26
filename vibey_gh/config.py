@@ -293,9 +293,7 @@ class RulesetConfig:
 
     def __post_init__(self) -> None:
         if self.allow_force_pushes:
-            raise ValueError(
-                "rulesets: allow_force_pushes must not be true for a permanent branch"
-            )
+            raise ValueError("rulesets: allow_force_pushes must not be true for a permanent branch")
         if self.allow_deletions:
             raise ValueError("rulesets: allow_deletions must not be true for a permanent branch")
         _unique_nonempty("rulesets.required_checks", self.required_checks)
@@ -564,9 +562,7 @@ def load_config(root: Path | None = None) -> GhConfig:
             integration=_ruleset(
                 rulesets_data.get("integration", {}), DEFAULT_INTEGRATION_RULESET_CHECKS, 0
             ),
-            release=_ruleset(
-                rulesets_data.get("release", {}), DEFAULT_RELEASE_RULESET_CHECKS, 1
-            ),
+            release=_ruleset(rulesets_data.get("release", {}), DEFAULT_RELEASE_RULESET_CHECKS, 1),
         ),
         repository_profile=RepositoryProfileConfig(
             enabled=profile.get("enabled", True),
