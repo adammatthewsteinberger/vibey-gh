@@ -605,7 +605,7 @@ def test_pinning_the_tooling_version_is_a_visible_one_line_diff(repo):
     from vibey_gh.install import WORKFLOWS, render_workflow
 
     floating = render_workflow(WORKFLOWS / "merge-train.yml", GhConfig(root=repo))
-    assert 'python -m pip install --quiet vibey-gh\n' in floating
+    assert "python -m pip install --quiet vibey-gh\n" in floating
     assert "vibey-gh==" not in floating
 
     pinned = render_workflow(WORKFLOWS / "merge-train.yml", GhConfig(root=repo, pin_version=True))
