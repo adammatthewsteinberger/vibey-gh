@@ -524,6 +524,37 @@ def test_a_contributor_is_notified_when_updating_their_branch_is_disabled(monkey
     assert told == ["feature/theirs"]
 
 
+def test_a_branch_github_refuses_falls_back_to_a_local_merge(monkeypatch, tmp_path):
+    """The refusal is the normal case for the branches that most need updating."""
+    monkeypatch.setattr(rc, "open_pull_requests", lambda c: [rc.BranchFacts(3, "feature/theirs")])
+    monkeypatch.setattr(rc, "unique_commits", lambda c, b: 1)
+    monkeypatch.setattr(rc, "is_behind", lambda c, b: True)
+    monkeypatch.setattr(rc, "update_branch", lambda c, n: (False, "merge conflict (HTTP 422)"))
+    done: list = []
+    monkeypatch.setattr(
+        rc,
+        "merge_forward",
+        lambda c, b: (done.append(b) or True, "merged develop forward as abc1234"),
+    )
+    outcome = rc.reconcile(cfg(tmp_path))[0]
+    assert done == ["feature/theirs"], "the local merge must be attempted"
+    assert outcome["applied"] is True
+    assert "merged develop forward" in outcome["detail"]
+
+
+def test_a_fork_github_refuses_is_never_merged_locally(monkeypatch, tmp_path):
+    """A fork's branch is not this repository's to write to, whatever GitHub answered."""
+    monkeypatch.setattr(
+        rc, "open_pull_requests", lambda c: [rc.BranchFacts(4, "theirs", fork=True)]
+    )
+    monkeypatch.setattr(rc, "update_branch", lambda c, n: (False, "refused"))
+    monkeypatch.setattr(
+        rc, "merge_forward", lambda c, b: pytest.fail("a fork is never written to locally")
+    )
+    outcome = rc.reconcile(cfg(tmp_path))[0]
+    assert outcome["applied"] is False and outcome["detail"] == "refused"
+
+
 def test_a_dry_run_decides_without_touching_anything(monkeypatch, tmp_path):
     monkeypatch.setattr(rc, "open_pull_requests", lambda c: [rc.BranchFacts(1, "vibey-gh/a")])
     monkeypatch.setattr(rc, "unique_commits", lambda c, b: 0)
