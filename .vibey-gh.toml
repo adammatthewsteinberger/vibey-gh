@@ -38,7 +38,7 @@ allow_private_full_output = false
 
 [conversation]
 enabled = true
-trigger = "@vibey"
+trigger = "@vibey-gh"
 model = "claude-sonnet-5"
 max_interactions = 10
 respond_to_untrusted = false

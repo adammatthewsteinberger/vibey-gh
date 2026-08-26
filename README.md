@@ -806,7 +806,7 @@ trusted_authors = ["your-login", "dependabot[bot]"]
 | Branch intake | Turns a new topic branch into one reusable draft PR. |
 | Issue automation | Turns an eligible published issue into one guarded solution branch and linked PR. |
 | Branch sync | Brings open branches forward on every merge; daily, refills a bounded number of spent repair budgets. |
-| Conversation | Answers `@vibey` in a comment, and may make the change when a trusted author asks on a PR. |
+| Conversation | Answers `@vibey-gh` in a comment, and may make the change when a trusted author asks on a PR. |
 | Conventional Commits | Normalizes guarded same-repository topic history and republishes it with an exact-head lease. |
 | CI\* / Provenance / Docs | Validate code, history, human docs, agent docs, plugins, and interfaces. |
 | PR automation | Aggregates exact-head scans; reviews, repairs, resolves conflicts, and gates. |

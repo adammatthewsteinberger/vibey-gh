@@ -533,7 +533,7 @@ def test_conversation_cli_surfaces(repo, monkeypatch, tmp_path, capsys):
 
     assert main(["conversation", "evaluate", "--subject", "7"]) == 0
     decision = json.loads(capsys.readouterr().out)
-    assert decision["comment_id"] == 42, "the newest comment is used by default"
+    assert decision["comment_id"] == "42", "the newest comment is used by default"
 
     assert main(["conversation", "evaluate", "--subject", "7", "--comment-id", "41"]) == 0
     assert json.loads(capsys.readouterr().out)["state"] == "skip"
