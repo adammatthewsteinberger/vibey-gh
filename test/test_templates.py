@@ -550,6 +550,30 @@ def test_promotion_checks_provenance_without_rewriting_or_reauditing_history():
     assert 'vibey-gh check --ci --commits "${BASE_SHA}..HEAD"' in text
 
 
+def test_pin_version_pins_every_managed_templates_tooling_install(tmp_path: Path):
+    """`install.pin_version` must reach every managed workflow, not just the ones the
+    issue happened to confirm — a config key that only fixes some templates leaves the
+    same outage waiting in whichever one it missed.
+    """
+    from vibey_gh import __version__
+
+    cfg = GhConfig(root=tmp_path, pin_version=True)
+    unpinned = re.compile(r"pip install --quiet vibey-gh(?!==)")
+    for path in WORKFLOW_TEMPLATES:
+        text = render_workflow(path, cfg)
+        if "pip install --quiet vibey-gh" not in path.read_text(encoding="utf-8"):
+            continue  # this template never installed the floating tooling to begin with
+        assert not unpinned.search(text), f"{path.name}: an unpinned install survived pinning"
+        assert f'"vibey-gh=={__version__}"' in text
+
+
+def test_pin_version_unset_leaves_every_managed_template_floating(tmp_path: Path):
+    cfg = GhConfig(root=tmp_path)
+    for path in WORKFLOW_TEMPLATES:
+        text = render_workflow(path, cfg)
+        assert "vibey-gh==" not in text
+
+
 def test_every_managed_third_party_action_is_immutably_pinned():
     for path in [*WORKFLOW_TEMPLATES, *REPO_WORKFLOWS]:
         for action, revision in re.findall(r"uses:\s+([^@\s]+)@([^\s#]+)", path.read_text()):

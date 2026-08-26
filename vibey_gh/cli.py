@@ -35,9 +35,10 @@ def _check(args) -> int:
     ok, problems = install.installed(cfg, local=not args.ci)
     report = fingerprints.check(cfg, rev_range=args.commits, apply=args.apply)
     docs = documentation.check(cfg)
+    scan = pr_automation.check_scan_workflows(cfg)
 
     if args.quiet:
-        return 0 if (ok and report.ok and docs.ok) else 1
+        return 0 if (ok and report.ok and docs.ok and scan.ok) else 1
 
     for problem in problems:
         print(f"  hooks: {problem}", file=sys.stderr)
@@ -56,8 +57,10 @@ def _check(args) -> int:
         print(f"  debug logging: {problem}", file=sys.stderr)
     for problem in docs.problems:
         print(f"  documentation: {problem}", file=sys.stderr)
+    for problem in scan.problems:
+        print(f"  {problem}", file=sys.stderr)
 
-    if ok and report.ok and docs.ok:
+    if ok and report.ok and docs.ok and scan.ok:
         scope = f"{report.checked_files} source file(s)"
         if args.commits:
             scope += f" and every commit in {args.commits}"

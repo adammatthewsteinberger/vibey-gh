@@ -375,3 +375,29 @@ def test_reconcile_is_a_noop_when_disabled(monkeypatch, tmp_path):
         rs, "reconcile_one", lambda *a, **k: pytest.fail("disabled must reconcile nothing")
     )
     assert rs.reconcile(cfg) == []
+
+
+def test_a_request_body_is_actually_sent(monkeypatch):
+    """`gh api` ignores stdin unless told to read it.
+
+    Every ruleset reconciliation failed in production with HTTP 422 "data cannot be null"
+    while the payload it had built was perfectly good — it simply never left the process.
+    """
+    import subprocess
+
+    captured: list = []
+
+    def run(command, **kwargs):
+        captured.append((command, kwargs.get("input")))
+        return subprocess.CompletedProcess(command, 0, "{}", "")
+
+    monkeypatch.setattr(subprocess, "run", run)
+    rs._api("repos/o/r/rulesets", "--method", "POST", input_json={"name": "x"})
+    command, sent = captured[0]
+    assert "--input" in command and command[command.index("--input") + 1] == "-"
+    assert sent and '"name": "x"' in sent
+
+    # A read needs no body and must not claim to have one.
+    captured.clear()
+    rs._api("repos/o/r/rulesets")
+    assert "--input" not in captured[0][0]

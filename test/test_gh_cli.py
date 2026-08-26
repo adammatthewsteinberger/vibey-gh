@@ -72,10 +72,30 @@ def test_check_quiet_succeeds_after_install(repo, capsys):
 
 
 def test_check_reports_missing_documentation(repo, capsys):
+    """The agent-docs layout is owed by every managed repository; this project's own
+    narrative is not owed by anyone else."""
     config = repo / ".vibey-gh.toml"
     config.write_text(config.read_text().replace("enabled = false", "enabled = true"))
     assert main(["check", "--ci"]) == 1
-    assert "documentation:" in capsys.readouterr().err
+    err = capsys.readouterr().err
+    assert "documentation:" in err
+    assert "AGENTS.md is missing" in err
+    # Nothing is demanded of their README beyond existing — its subject is their product.
+    for imposed in ("Why vibey-gh", "provenance sentence", "project surface"):
+        assert imposed not in err, imposed
+
+
+def test_check_reports_a_scan_workflow_that_cannot_fire_for_a_pull_request(repo, capsys):
+    main(["install"])
+    assert main(["check", "--ci", "--apply"]) == 0
+    config = repo / ".vibey-gh.toml"
+    config.write_text(config.read_text() + '\n[pr_automation]\nscan_workflows = ["Custom"]\n')
+    workflows = repo / ".github" / "workflows"
+    (workflows / "custom.yml").write_text("name: Custom\non:\n  push:\n")
+    assert main(["check", "--ci"]) == 1
+    err = capsys.readouterr().err
+    assert "'Custom'" in err
+    assert "pull_request" in err
 
 
 def test_check_reports_a_duplicate_header(repo, capsys):

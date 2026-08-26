@@ -106,4 +106,69 @@ generate_llms_full_txt = true
 generate_json_ld = true
 author_name = "Adam Matthew Steinberger"
 author_url = "https://hire.adam.matthewsteinberger.com"
+# This repository's documentation IS about vibey-gh, so it declares that contract for
+# itself. An adopter inherits none of it: they document their own product.
+require_provenance = true
+readme_sections = [
+  "## Why vibey-gh", "## Requirements", "## Quick start", "## Architecture",
+  "## Security model", "## Commands", "## Configuration", "## Workflows",
+  "## Troubleshooting", "## Contributing", "## Licence",
+]
+github_readme_sections = [
+  "## Delivery model", "## Workflow inventory", "## Exact-head PR automation",
+  "## AI trust boundary", "## Credentials and settings", "## Permanent-branch safety",
+  "## Failure recovery", "## Changing workflows",
+]
+github_readme_min_words = 500
+mermaid_terms = [
+  "flowchart", "CLI", "SDK", "API", "MCP", "Webhook", "PR Automation", "develop",
+  "main", "TestPyPI", "PyPI", "GitHub Pages", "Provenance", "Realign", "Security Boundary",
+]
+mermaid_min_edges = 20
 google_analytics_id = ""
+
+# Reconciled branch rulesets. Two things here are load-bearing and were learned the hard
+# way, so they are spelled out rather than left to the defaults.
+#
+# `required_checks` names *check runs*, not workflows. `[pr_automation].scan_workflows`
+# above names workflows, and the defaults reuse that list here — which locked every merge
+# out of the integration branch. A context like "CI", "Docs", or "API drift (Cloud Agents
+# OpenAPI)" can never report, because the checks those workflows produce are named for
+# their jobs: "Lint", "Build", "Documentation contract". The ruleset sat there requiring
+# three checks that structurally could not arrive, and nothing could merge.
+#
+# `bypass_actors` has to be declared here rather than added in the UI. Reconciliation
+# writes the whole ruleset every run, so a bypass actor added by hand is erased the next
+# time it fires — which is not hypothetical, it happened between one merge and the next.
+# "RepositoryRole:5" is the repository admin role, and it is what makes
+# `gh pr merge --admin` a real escape hatch when a required check cannot report.
+[rulesets]
+enabled = true
+
+[rulesets.integration]
+required_checks = [
+  "Lint",
+  "Build",
+  "Test (3.11)",
+  "Test (3.12)",
+  "Test (3.13)",
+  "Provenance",
+  "CodeQL",
+  "Documentation contract",
+  "MCP, API, CLI, SDK, and webhook parity",
+  "PR automation / gate",
+]
+bypass_actors = ["RepositoryRole:5"]
+
+[rulesets.release]
+required_checks = [
+  "Lint",
+  "Build",
+  "Test (3.11)",
+  "Test (3.12)",
+  "Test (3.13)",
+  "Provenance",
+  "CodeQL",
+  "Documentation contract",
+]
+bypass_actors = ["RepositoryRole:5"]

@@ -5,6 +5,17 @@ This file follows Keep a Changelog and semantic versioning conventions.
 
 ## Unreleased
 
+- Actually send the ruleset request body. `gh api` ignores stdin unless told to read it, so
+  every reconciliation failed with HTTP 422 "data cannot be null" while the payload it had
+  built was perfectly good — it simply never left the process.
+- Merge the integration branch forward locally when GitHub refuses to. Its update-branch
+  endpoint declines a branch it considers conflicting, which is exactly when a branch needs
+  moving forward, and it computes that without this repository's merge drivers — so a
+  changelog every branch appends to conflicts there while merging cleanly here. The
+  fallback is an ordinary merge commit pushed without force: the branch moves forward and
+  is never rewritten, and forks stay untouched.
+- Report why an update was refused instead of "no detail reported".
+
 - Identify a comment the same way whichever GitHub API produced it. A webhook numbers a
   comment; `gh issue view` returns a GraphQL node instead. They name the same comment and
   never match each other, and `int("IC_kwDO...")` raises — so the first real mention ever
@@ -12,6 +23,36 @@ This file follows Keep a Changelog and semantic versioning conventions.
   recovered from the comment's own URL when only the node is given, is now the single
   identity stored and compared.
 - Rename the mention trigger to `@vibey-gh`, matching the tool's own name.
+- Stop imposing this project's documentation contract on the repositories that install it.
+  A project using vibey-gh as a dependency was required to carry a `## Why vibey-gh`
+  heading in its own product README, this tool's branded provenance sentence verbatim, an
+  and an architecture diagram naming this tool's modules — none of which describe the
+  adopter's product. Those narrative requirements are now configuration with no default, so
+  an adopter declares what *their* documentation must contain. The agent-docs layout still
+  applies to every managed repository, because those files describe the adopter's own
+  project and make it navigable to an agent; only their vibey-gh-specific contents are no
+  longer demanded. This repository's own contract is unchanged: it declares the narrative
+  requirements explicitly in its `.vibey-gh.toml`, so its internals stay fully documented
+  and enforced.
+- Make the generated release commit a Conventional Commit. `Release 1.23.0` does not stay
+  on the release branch: any topic branch that later merges the integration branch in pulls
+  it into its own commit range, where the provenance gate reads it like any other commit
+  and rejects the subject. That blocked a pull request outright, and bounded repair could
+  not fix it because the problem was history rather than file content. Now
+  `chore(release): 1.23.0`.
+- Add `[install].pin_version` to pin every managed workflow's `pip install vibey-gh` to the
+  exact version that rendered it (`vibey-gh==X.Y.Z`) instead of floating on the latest
+  release. An adopter could not previously pin this by hand: `vibey-gh install` regenerates
+  every managed file from its template, so an edited install line was reported as out of
+  date and silently reverted on the next install. `vibey-gh install` now owns bumping the
+  pin, so upgrading is an explicit, reviewable diff. Unset, behavior is unchanged. The
+  self-hosting `pip install -e .` branch is never pinned.
+- Fail `vibey-gh check` when a `[pr_automation].scan_workflows` entry names a workflow
+  that exists but has no `pull_request` or `pull_request_target` trigger. Such a workflow
+  can never complete for a pull request, so `state` never leaves `pending`, `gate` never
+  runs, and — made a required check — no pull request could ever merge, silently and
+  permanently. A name absent from `.github/workflows/` is left alone, since it may live
+  elsewhere or under another name.
 
 - Declare `CHANGELOG.md merge=union` in `.gitattributes` so branches appending to the same
   section merge instead of conflicting. Every open branch adds an Unreleased entry, so each

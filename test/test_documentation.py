@@ -6,7 +6,12 @@ from pathlib import Path
 
 import pytest
 
-from vibey_gh.config import DocumentationConfig, GhConfig, load_config
+from vibey_gh.config import (
+    DEFAULT_DOCUMENTATION_FILES,
+    DocumentationConfig,
+    GhConfig,
+    load_config,
+)
 from vibey_gh.documentation import (
     GITHUB_README_SECTIONS,
     MERMAID_REQUIRED_TERMS,
@@ -28,9 +33,8 @@ def test_documentation_reports_missing_empty_invalid_and_provenance(tmp_path: Pa
     (tmp_path / "docs/index.md").write_text("plain")
     (tmp_path / ".claude/settings.json").write_text("[]")
     (tmp_path / "EMPTY.md").write_text("")
-    report = check(
-        GhConfig(root=tmp_path, documentation=DocumentationConfig(required_files=required))
-    )
+    policy = DocumentationConfig(required_files=required, require_provenance=True)
+    report = check(GhConfig(root=tmp_path, documentation=policy))
     assert "MISSING.md is missing" in report.problems
     assert "EMPTY.md is empty" in report.problems
     assert ".claude/settings.json must contain a JSON object" in report.problems
@@ -39,10 +43,63 @@ def test_documentation_reports_missing_empty_invalid_and_provenance(tmp_path: Pa
     (tmp_path / ".claude/settings.json").write_text("{")
     assert (
         ".claude/settings.json is invalid JSON"
-        in check(
-            GhConfig(root=tmp_path, documentation=DocumentationConfig(required_files=required))
-        ).problems
+        in check(GhConfig(root=tmp_path, documentation=policy)).problems
     )
+
+
+def test_an_adopter_documents_its_own_product_not_this_tool(tmp_path: Path):
+    """The line between what every managed repository owes and what only this one does.
+
+    The agent-docs layout is owed by everyone: those files describe the ADOPTER's project
+    and make it navigable to an agent. What is *inside* them is the adopter's own subject —
+    no `## Why vibey-gh` heading, no branded provenance sentence, no architecture surfaces
+    named after this tool's modules.
+    """
+    for relative in DEFAULT_DOCUMENTATION_FILES:
+        path = tmp_path / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("about my own product\n", encoding="utf-8")
+    (tmp_path / ".claude/settings.json").write_text("{}", encoding="utf-8")
+    (tmp_path / ".claude-plugin/marketplace.json").write_text('{"plugins": []}', encoding="utf-8")
+    report = check(GhConfig(root=tmp_path))
+
+    # The layout is satisfied, so nothing is reported missing...
+    assert not any(problem.endswith("is missing") for problem in report.problems)
+    # ...and none of this project's own narrative is demanded of theirs.
+    for imposed in ("Why vibey-gh", "provenance sentence", "project surface", "at least"):
+        assert not any(imposed in problem for problem in report.problems), imposed
+
+
+def test_every_required_file_is_required_individually(tmp_path: Path):
+    """A list of required files is an AND: having one never excuses another."""
+    (tmp_path / ".agents/skills").mkdir(parents=True)
+    (tmp_path / ".agents/skills/README.md").write_text("skills")
+    problems = check(GhConfig(root=tmp_path)).problems
+    assert not any(".agents/skills/README.md is missing" in p for p in problems)
+    assert any(".claude-plugin/marketplace.json is missing" in p for p in problems)
+    assert sum(p.endswith("is missing") for p in problems) == len(DEFAULT_DOCUMENTATION_FILES) - 1
+
+
+def test_a_repository_can_require_its_own_readme_sections(tmp_path: Path):
+    """The requirement is the repository's own words, not this project's headings."""
+    (tmp_path / "README.md").write_text("# My product\n\n## Install\n\nRun it.\n")
+    report = check(
+        GhConfig(
+            root=tmp_path,
+            documentation=DocumentationConfig(
+                readme_sections=("## Install", "## Support", "## Licence")
+            ),
+        )
+    )
+    assert "README.md is missing human documentation section: ## Support" in report.problems
+    assert "README.md is missing human documentation section: ## Licence" in report.problems
+    assert not any("## Install" in problem for problem in report.problems)
+
+
+@pytest.mark.parametrize("field", ["github_readme_min_words", "mermaid_min_edges"])
+def test_a_negative_documentation_threshold_is_rejected(field):
+    with pytest.raises(ValueError, match="must not be negative"):
+        DocumentationConfig(**{field: -1})
 
 
 def test_documentation_rejects_incomplete_mermaid_project_map(tmp_path: Path):
@@ -52,7 +109,11 @@ def test_documentation_rejects_incomplete_mermaid_project_map(tmp_path: Path):
     report = check(
         GhConfig(
             root=tmp_path,
-            documentation=DocumentationConfig(required_files=("docs/project.mmd",)),
+            documentation=DocumentationConfig(
+                required_files=("docs/project.mmd",),
+                mermaid_terms=MERMAID_REQUIRED_TERMS,
+                mermaid_min_edges=20,
+            ),
         )
     )
     assert any("missing required project surface" in problem for problem in report.problems)
@@ -66,7 +127,12 @@ def test_documentation_rejects_placeholder_github_automation_guide(tmp_path: Pat
     report = check(
         GhConfig(
             root=tmp_path,
-            documentation=DocumentationConfig(required_files=(".github/README.md",)),
+            documentation=DocumentationConfig(
+                required_files=(".github/README.md",),
+                github_readme_sections=GITHUB_README_SECTIONS,
+                github_readme_min_words=500,
+                require_provenance=True,
+            ),
         )
     )
     for heading in GITHUB_README_SECTIONS:

@@ -29,13 +29,14 @@ defaults below. Paths are repository-relative unless stated otherwise.
 | `merge_train.trusted_authors` | string list / empty | Authors exempt from outside-author review. |
 | `install.workflows` | string list / all managed workflows | Exact managed subset; `[]` installs hooks and CLI assets only. |
 | `install.union_merge_paths` | string list / `["CHANGELOG.md"]` | Files declared `merge=union` in `.gitattributes`, so two branches appending to the same section merge instead of conflicting. Appended to an existing `.gitattributes`, never rewriting it. `[]` declares none. |
+| `install.pin_version` | boolean / `false` | Pin every managed workflow's `pip install vibey-gh` to the exact version that rendered it (`vibey-gh==X.Y.Z`), instead of the latest release on every run. `false` keeps the historical floating install. The self-hosting path (this repository, and anything else installing from its own `pyproject.toml`) is never pinned — it installs from source regardless. Running `vibey-gh install` from a newer release moves the pin forward as one visible diff. |
 
 ## `[pr_automation]`
 
 | Field | Type / default | Meaning |
 |---|---|---|
 | `enabled` | boolean / `true` | Enable event-driven evaluation, review, repair, and gating. |
-| `scan_workflows` | string list / CI, Provenance, CodeQL, Docs, API drift | Workflow names that trigger evaluation. |
+| `scan_workflows` | string list / CI, Provenance, CodeQL, Docs, API drift | Workflow names that trigger evaluation. Every name must be a workflow with a `pull_request` or `pull_request_target` trigger — one that only runs on `push` can never complete for a pull request, so `state` never leaves `pending`, the gate never publishes, and — made a required check — no pull request can ever merge. `vibey-gh check` fails on any named workflow that exists but cannot fire for a pull request; a name absent from `.github/workflows/` is not an error. |
 | `ignored_checks` | string list / orchestration checks | Checks excluded from the ordinary rollup. Own checks are always ignored. |
 | `max_repair_attempts` | integer / `3` (1–10) | Repair budget per contributor lineage. |
 | `model` | string / `claude-sonnet-5` | Review and repair model. |
@@ -133,6 +134,31 @@ An issue's attempt budget is keyed to a SHA-256 fingerprint of its title and bod
 re-running automation on unchanged text cannot spend the budget twice and editing the issue
 starts a fresh lineage. Managed labels are `vibey-gh:solve`, `vibey-gh:solving`,
 `vibey-gh:solution-proposed`, `vibey-gh:solve-exhausted`, and `vibey-gh:solve-blocked`.
+
+### Documenting your project, not this one
+
+A repository that installs vibey-gh documents **its own product**. It is still held to the
+agent-docs *layout* — those files describe the adopter's project and make it navigable to an
+agent — but nothing about their contents describes vibey-gh: no `## Why vibey-gh` heading in
+their product README, no branded provenance sentence, no architecture surfaces named after
+this tool's modules.
+
+Every entry in `required_files` is required: having one never excuses another.
+
+| Field | Type / default | Meaning |
+|---|---|---|
+| `required_files` | string list / the agent-docs layout | Files that must exist and be non-empty, each one individually. |
+| `readme_sections` | string list / empty | Headings required in `README.md`, in your own words. |
+| `github_readme_sections` | string list / empty | Headings required in `.github/README.md`. |
+| `github_readme_min_words` | integer / `0` | Minimum length for `.github/README.md`; `0` disables. |
+| `mermaid_terms` | string list / empty | Surfaces that must appear in `docs/project.mmd`. |
+| `mermaid_min_edges` | integer / `0` | Minimum `-->` edges in that diagram; `0` disables. |
+| `require_provenance` | boolean / `false` | Require the Vibey provenance sentence in `provenance_files`. |
+| `provenance_files` | string list / `README.md`, `docs/index.md` | Where that sentence is required, when it is. |
+
+This repository declares the full contract for itself in its own `.vibey-gh.toml`, which is
+both the dogfooding rule the rest of the tool follows and the reason its own requirements
+are visible rather than compiled in.
 
 ## `[github_release]`
 
