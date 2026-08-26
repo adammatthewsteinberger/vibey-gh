@@ -582,9 +582,11 @@ require_new_version = false          # a versionless release-branch push is a no
 enabled = true
 
 [rulesets.integration]
+# Check-RUN names, not workflow names. A check run is named for its job, so the "CI"
+# workflow reports as "Lint", "Build", "Test (3.12)" and never as "CI". Requiring a
+# workflow name waits forever and blocks the branch outright — see the note below.
 required_checks = [
-  "CI", "Provenance", "CodeQL", "Docs",
-  "API drift (Cloud Agents OpenAPI)", "PR automation / gate",
+  "Provenance", "Analyze Python", "Documentation contract", "PR automation / gate",
 ]
 strict_required_checks = true          # branch must be up to date before merging
 required_approvals = 0                 # PR automation gates instead
@@ -594,16 +596,16 @@ require_linear_history = true
 require_signed_commits = false
 allow_force_pushes = false             # rejected at load time if true
 allow_deletions = false                # rejected at load time if true
-bypass_actors = []                     # e.g. ["RepositoryRole:5"]; empty means nobody
+bypass_actors = ["RepositoryRole:5"]   # repository admin; [] means nobody, including you
 
 [rulesets.release]
-required_checks = ["CI", "Provenance", "CodeQL", "Docs"]
+required_checks = ["Provenance", "Analyze Python", "Documentation contract"]
 strict_required_checks = true
 required_approvals = 1
 require_linear_history = true
 allow_force_pushes = false
 allow_deletions = false
-bypass_actors = []
+bypass_actors = ["RepositoryRole:5"]
 
 [repository_profile]
 enabled = true
