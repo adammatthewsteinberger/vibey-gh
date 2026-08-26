@@ -23,6 +23,17 @@ This file follows Keep a Changelog and semantic versioning conventions.
   recovered from the comment's own URL when only the node is given, is now the single
   identity stored and compared.
 - Rename the mention trigger to `@vibey-gh`, matching the tool's own name.
+- Stop imposing this project's documentation contract on the repositories that install it.
+  A project using vibey-gh as a dependency was required to carry a `## Why vibey-gh`
+  heading in its own product README, this tool's branded provenance sentence verbatim, an
+  and an architecture diagram naming this tool's modules — none of which describe the
+  adopter's product. Those narrative requirements are now configuration with no default, so
+  an adopter declares what *their* documentation must contain. The agent-docs layout still
+  applies to every managed repository, because those files describe the adopter's own
+  project and make it navigable to an agent; only their vibey-gh-specific contents are no
+  longer demanded. This repository's own contract is unchanged: it declares the narrative
+  requirements explicitly in its `.vibey-gh.toml`, so its internals stay fully documented
+  and enforced.
 - Make the generated release commit a Conventional Commit. `Release 1.23.0` does not stay
   on the release branch: any topic branch that later merges the integration branch in pulls
   it into its own commit range, where the provenance gate reads it like any other commit

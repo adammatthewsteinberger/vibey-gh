@@ -14,6 +14,8 @@ README_PROVENANCE = (
     "(https://hire.adam.matthewsteinberger.com/) "
     "([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/))."
 )
+# Retained for the repositories that import them directly; the contract itself now comes
+# from configuration. `vibey_gh.config` holds this repository's own declaration.
 README_SECTIONS = (
     "## Why vibey-gh",
     "## Requirements",
@@ -103,40 +105,57 @@ def check(cfg: GhConfig) -> DocumentationReport:
                     problems.append(f"{source} has no skills")
         except json.JSONDecodeError:
             problems.append(".claude-plugin/marketplace.json is invalid JSON")
-    for relative in ("README.md", "docs/index.md"):
-        path = cfg.root / relative
-        if path.is_file() and "Made with" not in path.read_text(encoding="utf-8"):
-            problems.append(f"{relative} has no Vibey provenance")
+    # Everything below is what THIS repository asks of its own documentation. A project
+    # that installs vibey-gh documents its own product, not this tool's internals, so each
+    # requirement is empty until the repository declares it in `.vibey-gh.toml`.
+    if cfg.documentation.require_provenance:
+        for relative in cfg.documentation.provenance_files:
+            path = cfg.root / relative
+            if path.is_file() and "Made with" not in path.read_text(encoding="utf-8"):
+                problems.append(f"{relative} has no Vibey provenance")
+
     readme = cfg.root / "README.md"
-    if readme.is_file():
+    if readme.is_file() and (
+        cfg.documentation.readme_sections or cfg.documentation.require_provenance
+    ):
         text = readme.read_text(encoding="utf-8")
-        for heading in README_SECTIONS:
+        for heading in cfg.documentation.readme_sections:
             if heading not in text:
                 problems.append(f"README.md is missing human documentation section: {heading}")
-        if not text.rstrip().endswith(README_PROVENANCE):
+        if cfg.documentation.require_provenance and not text.rstrip().endswith(README_PROVENANCE):
             problems.append("README.md must end with the exact Vibey provenance sentence")
+
     github_readme = cfg.root / ".github/README.md"
-    if github_readme.is_file():
+    if github_readme.is_file() and (
+        cfg.documentation.github_readme_sections
+        or cfg.documentation.github_readme_min_words
+        or cfg.documentation.require_provenance
+    ):
         text = github_readme.read_text(encoding="utf-8")
-        for heading in GITHUB_README_SECTIONS:
+        for heading in cfg.documentation.github_readme_sections:
             if heading not in text:
                 problems.append(
                     f".github/README.md is missing automation documentation section: {heading}"
                 )
-        if len(text.split()) < 500:
+        minimum = cfg.documentation.github_readme_min_words
+        if minimum and len(text.split()) < minimum:
             problems.append(
-                ".github/README.md is not comprehensive enough: expected at least 500 words"
+                f".github/README.md is not comprehensive enough: expected at least {minimum} words"
             )
-        if not text.rstrip().endswith(README_PROVENANCE):
+        if cfg.documentation.require_provenance and not text.rstrip().endswith(README_PROVENANCE):
             problems.append(".github/README.md must end with the exact Vibey provenance sentence")
+
     diagram = cfg.root / "docs/project.mmd"
-    if diagram.is_file():
+    if diagram.is_file() and (
+        cfg.documentation.mermaid_terms or cfg.documentation.mermaid_min_edges
+    ):
         text = diagram.read_text(encoding="utf-8")
-        for term in MERMAID_REQUIRED_TERMS:
+        for term in cfg.documentation.mermaid_terms:
             if term not in text:
                 problems.append(f"docs/project.mmd is missing required project surface: {term}")
-        if text.count("-->") < 20:
+        edges = cfg.documentation.mermaid_min_edges
+        if edges and text.count("-->") < edges:
             problems.append(
-                "docs/project.mmd is not comprehensive enough: expected at least 20 edges"
+                f"docs/project.mmd is not comprehensive enough: expected at least {edges} edges"
             )
     return DocumentationReport(tuple(problems))

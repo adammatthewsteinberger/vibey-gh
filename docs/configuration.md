@@ -134,6 +134,31 @@ re-running automation on unchanged text cannot spend the budget twice and editin
 starts a fresh lineage. Managed labels are `vibey-gh:solve`, `vibey-gh:solving`,
 `vibey-gh:solution-proposed`, `vibey-gh:solve-exhausted`, and `vibey-gh:solve-blocked`.
 
+### Documenting your project, not this one
+
+A repository that installs vibey-gh documents **its own product**. It is still held to the
+agent-docs *layout* — those files describe the adopter's project and make it navigable to an
+agent — but nothing about their contents describes vibey-gh: no `## Why vibey-gh` heading in
+their product README, no branded provenance sentence, no architecture surfaces named after
+this tool's modules.
+
+Every entry in `required_files` is required: having one never excuses another.
+
+| Field | Type / default | Meaning |
+|---|---|---|
+| `required_files` | string list / the agent-docs layout | Files that must exist and be non-empty, each one individually. |
+| `readme_sections` | string list / empty | Headings required in `README.md`, in your own words. |
+| `github_readme_sections` | string list / empty | Headings required in `.github/README.md`. |
+| `github_readme_min_words` | integer / `0` | Minimum length for `.github/README.md`; `0` disables. |
+| `mermaid_terms` | string list / empty | Surfaces that must appear in `docs/project.mmd`. |
+| `mermaid_min_edges` | integer / `0` | Minimum `-->` edges in that diagram; `0` disables. |
+| `require_provenance` | boolean / `false` | Require the Vibey provenance sentence in `provenance_files`. |
+| `provenance_files` | string list / `README.md`, `docs/index.md` | Where that sentence is required, when it is. |
+
+This repository declares the full contract for itself in its own `.vibey-gh.toml`, which is
+both the dogfooding rule the rest of the tool follows and the reason its own requirements
+are visible rather than compiled in.
+
 ## `[github_release]`
 
 | Field | Type / default | Meaning |
