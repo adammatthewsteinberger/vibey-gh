@@ -36,6 +36,7 @@ flowchart TB
     ReleaseSurfaces[Release surfaces publishing]
     Realign[Realign released branches]
     Reconcile["Stranded-branch reconciliation (vibey_gh.reconcile)"]
+    Rulesets["Branch ruleset reconciliation (vibey_gh.rulesets)"]
   end
 
   subgraph Security["Security Boundary"]
@@ -183,6 +184,10 @@ flowchart TB
   TestPyPI --> ReleaseSurfaces
   PyPI --> ReleaseSurfaces
   ReleaseSurfaces --> RepositoryProfile
+  RepositoryProfile --> Rulesets
+  Rulesets --> Develop
+  Rulesets --> Main
+  Rulesets -->|allow_force_pushes/allow_deletions rejected at load time| Guard
   CI --> ReleaseRepair
   PublishRelease --> ReleaseRepair
   Release --> ReleaseRepair

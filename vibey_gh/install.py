@@ -120,6 +120,10 @@ def render_workflow(source: Path, cfg: GhConfig) -> str:
         "true" if cfg.repository_profile.enabled else "false",
     )
     wanted = wanted.replace(
+        "__VIBEY_GH_RULESETS_ENABLED__",
+        "true" if cfg.rulesets.enabled else "false",
+    )
+    wanted = wanted.replace(
         "__VIBEY_GH_PROFILE_DESCRIPTION__",
         json.dumps(cfg.repository_profile.description),
     )

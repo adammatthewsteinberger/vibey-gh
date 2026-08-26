@@ -11,7 +11,21 @@ concurrent human or bot update into a stale no-op instead of overwriting it. The
 exception is a lease-protected force-update of a same-repository topic branch to repair
 commit subjects; exact-head, linear-history, repository-ownership, and permanent-branch
 guards all precede it. A fork, merge commit, stale event, or concurrent push fails closed.
-Operators must protect repository secrets and review ruleset changes.
+Operators must protect repository secrets and review changes to `.vibey-gh.toml`'s
+`[rulesets]` block, especially `bypass_actors`.
+
+The integration and release branch rulesets are themselves reconciled, not merely assumed:
+`vibey_gh.rulesets` builds each desired ruleset from configuration and compares it against
+what GitHub actually has before `repository-profile.yml` applies the difference.
+`RulesetConfig` refuses to construct at all when `allow_force_pushes` or `allow_deletions`
+is `true`, so the non-deletion, non-rewrite guarantee this document claims cannot be
+disabled by a single configuration key — that path fails at load time, before any workflow
+runs. A rule type an existing ruleset carries that configuration does not mention is never
+removed; it is merged back into the payload untouched and reported as unexpected, so a
+reconciliation can never look like a deletion. A ruleset the API refuses raises rather than
+being swallowed, because a skipped reconciliation is indistinguishable from a satisfied
+one from the outside — the same failure mode the exact-head gate and branch reconciliation
+below already refuse to risk.
 
 An outside author cannot steer automation at a permanent branch from either end. GitHub
 already refuses them write access; behind that, `evaluate` terminally blocks any untrusted

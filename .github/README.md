@@ -53,7 +53,7 @@ events. A skipped stale run is expected. A current-head failure is never bypasse
 | `release.yml` | Release | Publishes development builds from `develop` to TestPyPI and production builds from `main` to PyPI. |
 | `github-release.yml` | GitHub Release | Creates or reuses the immutable production tag and generated-notes GitHub Release for the exact released SHA. |
 | `release-surfaces.yml` | Release surfaces | Publishes OCI package artifacts and the persistent Production and Preview ProperDocs sites. |
-| `repository-profile.yml` | Repository profile | Reconciles description, homepage, topics, collaboration settings, merge policy, security settings, and observable release surfaces. |
+| `repository-profile.yml` | Repository profile | Reconciles description, homepage, topics, collaboration settings, merge policy, security settings, branch rulesets, and observable release surfaces. |
 | `release-repair.yml` | Release repair | Reviews trusted post-merge failures and returns fixable changes through a guarded PR instead of patching a permanent branch directly. |
 
 Workflow `name:` values are event contracts. Renaming `CI`, `Release`, `Docs`, `CodeQL`,
@@ -140,13 +140,16 @@ private-repository diagnostic.
 - `ANTHROPIC_API_KEY` must be a repository secret for AI review, repair, conflict
   resolution, autonomous issue solutions, documentation upkeep, and release repair.
 - `AUTOMERGE_TOKEN` is needed when the default `GITHUB_TOKEN` cannot merge through the
-  ruleset, manage settings, create PRs, or reconcile the repository profile.
+  ruleset, manage settings, create PRs, or reconcile the repository profile and rulesets.
 - PyPI and TestPyPI use trusted publishing through the `pypi` and `testpypi` environments;
   registry passwords are not embedded in workflows.
 
 In **Settings -> Actions -> General**, grant workflow read/write permissions and permit
-Actions to create and approve pull requests. Configure Pages for GitHub Actions and protect
-`develop` and `main` with the repository's required current-head checks.
+Actions to create and approve pull requests, then configure Pages for GitHub Actions.
+Protecting `develop` and `main` with the repository's required current-head checks is no
+longer a manual step: `repository-profile.yml` reconciles both branches' rulesets from
+`[rulesets]` in `.vibey-gh.toml` on every run, so a fresh repository reaches the documented
+protection state from `vibey-gh install` plus one workflow run.
 
 ## Permanent-branch safety
 
