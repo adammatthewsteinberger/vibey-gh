@@ -136,14 +136,17 @@ starts a fresh lineage. Managed labels are `vibey-gh:solve`, `vibey-gh:solving`,
 
 ### Documenting your project, not this one
 
-A repository that installs vibey-gh documents **its own product**. None of the keys below
-has a default, so an adopter inherits no requirement describing vibey-gh's internals — no
-`## Why vibey-gh` heading in their product README, no branded provenance sentence, no
-architecture surfaces named after this tool's modules.
+A repository that installs vibey-gh documents **its own product**. It is still held to the
+agent-docs *layout* — those files describe the adopter's project and make it navigable to an
+agent — but nothing about their contents describes vibey-gh: no `## Why vibey-gh` heading in
+their product README, no branded provenance sentence, no architecture surfaces named after
+this tool's modules.
+
+Every entry in `required_files` is required: having one never excuses another.
 
 | Field | Type / default | Meaning |
 |---|---|---|
-| `required_files` | string list / empty | Files that must exist and be non-empty. |
+| `required_files` | string list / the agent-docs layout | Files that must exist and be non-empty, each one individually. |
 | `readme_sections` | string list / empty | Headings required in `README.md`, in your own words. |
 | `github_readme_sections` | string list / empty | Headings required in `.github/README.md`. |
 | `github_readme_min_words` | integer / `0` | Minimum length for `.github/README.md`; `0` disables. |

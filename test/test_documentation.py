@@ -6,7 +6,12 @@ from pathlib import Path
 
 import pytest
 
-from vibey_gh.config import DocumentationConfig, GhConfig, load_config
+from vibey_gh.config import (
+    DEFAULT_DOCUMENTATION_FILES,
+    DocumentationConfig,
+    GhConfig,
+    load_config,
+)
 from vibey_gh.documentation import (
     GITHUB_README_SECTIONS,
     MERMAID_REQUIRED_TERMS,
@@ -42,21 +47,37 @@ def test_documentation_reports_missing_empty_invalid_and_provenance(tmp_path: Pa
     )
 
 
-def test_an_adopter_inherits_none_of_this_projects_documentation_contract(tmp_path: Path):
-    """A repository that installs vibey-gh documents its own product, not this tool.
+def test_an_adopter_documents_its_own_product_not_this_tool(tmp_path: Path):
+    """The line between what every managed repository owes and what only this one does.
 
-    None of the section names, the provenance sentence, the architecture surfaces, or the
-    agent-docs layout describe an adopter's product, so none of them are required until
-    that repository asks for them.
+    The agent-docs layout is owed by everyone: those files describe the ADOPTER's project
+    and make it navigable to an agent. What is *inside* them is the adopter's own subject —
+    no `## Why vibey-gh` heading, no branded provenance sentence, no architecture surfaces
+    named after this tool's modules.
     """
-    (tmp_path / "README.md").write_text("# My product\n\nIt does a thing.\n")
-    (tmp_path / ".github").mkdir()
-    (tmp_path / ".github/README.md").write_text("# CI notes\n")
-    (tmp_path / "docs").mkdir()
-    (tmp_path / "docs/project.mmd").write_text("flowchart TB\n  A --> B\n")
+    for relative in DEFAULT_DOCUMENTATION_FILES:
+        path = tmp_path / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("about my own product\n", encoding="utf-8")
+    (tmp_path / ".claude/settings.json").write_text("{}", encoding="utf-8")
+    (tmp_path / ".claude-plugin/marketplace.json").write_text('{"plugins": []}', encoding="utf-8")
     report = check(GhConfig(root=tmp_path))
-    assert report.problems == (), report.problems
-    assert report.ok
+
+    # The layout is satisfied, so nothing is reported missing...
+    assert not any(problem.endswith("is missing") for problem in report.problems)
+    # ...and none of this project's own narrative is demanded of theirs.
+    for imposed in ("Why vibey-gh", "provenance sentence", "project surface", "at least"):
+        assert not any(imposed in problem for problem in report.problems), imposed
+
+
+def test_every_required_file_is_required_individually(tmp_path: Path):
+    """A list of required files is an AND: having one never excuses another."""
+    (tmp_path / ".agents/skills").mkdir(parents=True)
+    (tmp_path / ".agents/skills/README.md").write_text("skills")
+    problems = check(GhConfig(root=tmp_path)).problems
+    assert not any(".agents/skills/README.md is missing" in p for p in problems)
+    assert any(".claude-plugin/marketplace.json is missing" in p for p in problems)
+    assert sum(p.endswith("is missing") for p in problems) == len(DEFAULT_DOCUMENTATION_FILES) - 1
 
 
 def test_a_repository_can_require_its_own_readme_sections(tmp_path: Path):

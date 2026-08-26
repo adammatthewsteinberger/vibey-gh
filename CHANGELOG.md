@@ -15,11 +15,14 @@ This file follows Keep a Changelog and semantic versioning conventions.
 - Stop imposing this project's documentation contract on the repositories that install it.
   A project using vibey-gh as a dependency was required to carry a `## Why vibey-gh`
   heading in its own product README, this tool's branded provenance sentence verbatim, an
-  architecture diagram naming this tool's modules, and a twenty-file agent-docs layout —
-  none of which describe the adopter's product. All of it is now configuration with no
-  default, so an adopter declares what *their* documentation must contain and inherits
-  nothing. This repository's own contract is unchanged: it declares the same requirements
-  explicitly in its `.vibey-gh.toml`, so its internals stay fully documented and enforced.
+  and an architecture diagram naming this tool's modules — none of which describe the
+  adopter's product. Those narrative requirements are now configuration with no default, so
+  an adopter declares what *their* documentation must contain. The agent-docs layout still
+  applies to every managed repository, because those files describe the adopter's own
+  project and make it navigable to an agent; only their vibey-gh-specific contents are no
+  longer demanded. This repository's own contract is unchanged: it declares the narrative
+  requirements explicitly in its `.vibey-gh.toml`, so its internals stay fully documented
+  and enforced.
 
 - Declare `CHANGELOG.md merge=union` in `.gitattributes` so branches appending to the same
   section merge instead of conflicting. Every open branch adds an Unreleased entry, so each

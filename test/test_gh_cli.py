@@ -72,26 +72,17 @@ def test_check_quiet_succeeds_after_install(repo, capsys):
 
 
 def test_check_reports_missing_documentation(repo, capsys):
-    """Enabling the contract alone requires nothing — a repository declares what it wants.
-
-    Requirements are the repository's own; installing vibey-gh does not import this
-    project's documentation shape into somebody else's product.
-    """
+    """The agent-docs layout is owed by every managed repository; this project's own
+    narrative is not owed by anyone else."""
     config = repo / ".vibey-gh.toml"
     config.write_text(config.read_text().replace("enabled = false", "enabled = true"))
-    main(["check", "--ci"])
-    assert (
-        "documentation:" not in capsys.readouterr().err
-    ), "an adopter inherits no documentation requirements"
-
-    config.write_text(
-        config.read_text().replace(
-            "[documentation]\nenabled = true",
-            '[documentation]\nenabled = true\nrequired_files = ["HANDBOOK.md"]',
-        )
-    )
     assert main(["check", "--ci"]) == 1
-    assert "documentation:" in capsys.readouterr().err
+    err = capsys.readouterr().err
+    assert "documentation:" in err
+    assert "AGENTS.md is missing" in err
+    # Nothing is demanded of their README beyond existing — its subject is their product.
+    for imposed in ("Why vibey-gh", "provenance sentence", "project surface"):
+        assert imposed not in err, imposed
 
 
 def test_check_reports_a_duplicate_header(repo, capsys):
