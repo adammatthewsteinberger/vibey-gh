@@ -309,15 +309,84 @@ def test_behind_is_ancestry_of_the_integration_tip(tmp_path, monkeypatch):
     assert rc.is_behind(config, "topic") is True
 
 
-def test_update_branch_uses_githubs_own_endpoint(tmp_path, monkeypatch):
+def test_update_branch_uses_githubs_own_endpoint_and_reports_refusals(tmp_path, monkeypatch):
     monkeypatch.setenv("GH_REPO", "o/r")
     calls = []
     monkeypatch.setattr(subprocess, "run", lambda args, **k: calls.append(args) or completed())
-    assert rc.update_branch(cfg(tmp_path), 12) is True
+    applied, detail = rc.update_branch(cfg(tmp_path), 12)
+    assert applied and "merged the base forward" in detail
     assert "repos/o/r/pulls/12/update-branch" in calls[0]
     assert "PUT" in calls[0]
-    monkeypatch.setattr(subprocess, "run", lambda args, **k: completed(1))
-    assert rc.update_branch(cfg(tmp_path), 12) is False
+
+    # A refusal must say why: "not applied, no detail" is how two branches sat stuck.
+    monkeypatch.setattr(
+        subprocess, "run", lambda args, **k: completed(1, err="gh: merge conflict (HTTP 422)")
+    )
+    applied, detail = rc.update_branch(cfg(tmp_path), 12)
+    assert not applied and "422" in detail
+
+
+def test_a_branch_github_refuses_is_merged_forward_locally(tmp_path, monkeypatch):
+    """GitHub computes mergeability without this repository's merge drivers, so it calls a
+    branch conflicting that merges cleanly here. The fallback is a merge, never a rewrite."""
+    config = cfg(tmp_path)
+    calls: list = []
+
+    def run(args, **kwargs):
+        calls.append(args)
+        if args[:2] == ["git", "rev-parse"]:
+            remote = any(str(a).startswith("origin/") for a in args)
+            return completed(out=("old\n" if remote else "new\n"))
+        return completed()
+
+    monkeypatch.setattr(subprocess, "run", run)
+    applied, detail = rc.merge_forward(config, "feature/theirs")
+    assert applied and "merged develop forward" in detail
+    pushed = next(c for c in calls if c[:2] == ["git", "push"])
+    assert "HEAD:refs/heads/feature/theirs" in pushed
+    assert not any("force" in " ".join(c) for c in calls), "a merge never rewrites history"
+
+
+def test_merging_forward_reports_every_way_it_can_decline(tmp_path, monkeypatch):
+    config = cfg(tmp_path)
+
+    def responder(**outcomes):
+        def run(args, **kwargs):
+            if args[:2] == ["git", "rev-parse"]:
+                return completed(out=outcomes.get("rev", "old") + "\n")
+            for key in ("checkout", "merge", "push"):
+                if args[1] == key and outcomes.get(key):
+                    return completed(1, err="boom")
+            return completed()
+
+        return run
+
+    monkeypatch.setattr(subprocess, "run", responder(rev=""))
+    assert rc.merge_forward(config, "feature/x") == (False, "branch no longer exists")
+
+    monkeypatch.setattr(subprocess, "run", responder(checkout=True))
+    assert rc.merge_forward(config, "feature/x")[1] == "could not check the branch out"
+
+    monkeypatch.setattr(subprocess, "run", responder(merge=True))
+    assert "conflicted" in rc.merge_forward(config, "feature/x")[1]
+
+    # Identical before and after means the base was already in the branch.
+    monkeypatch.setattr(subprocess, "run", responder())
+    assert rc.merge_forward(config, "feature/x") == (False, "already current")
+
+    def diverged(args, **kwargs):
+        if args[:2] == ["git", "rev-parse"]:
+            return completed(out=("old\n" if "origin/" in " ".join(args) else "new\n"))
+        return completed(1, err="stale") if args[1] == "push" else completed()
+
+    monkeypatch.setattr(subprocess, "run", diverged)
+    assert "push refused" in rc.merge_forward(config, "feature/x")[1]
+
+
+@pytest.mark.parametrize("branch", ["develop", "main", "-x", "a:b"])
+def test_merging_forward_refuses_a_protected_or_unsafe_branch(tmp_path, branch):
+    with pytest.raises(ValueError, match="refusing to merge into"):
+        rc.merge_forward(cfg(tmp_path), branch)
 
 
 # ------------------------------------------------------------------- gh adapters
@@ -393,7 +462,9 @@ def test_reconcile_applies_one_action_per_pull_request(monkeypatch, tmp_path):
     }
     monkeypatch.setattr(rc, "unique_commits", lambda c, b: counts[b])
     monkeypatch.setattr(rc, "is_behind", lambda c, b: b != "vibey-gh/issue/current")
-    monkeypatch.setattr(rc, "update_branch", lambda c, n: done.append(f"update #{n}") or True)
+    monkeypatch.setattr(
+        rc, "update_branch", lambda c, n: (done.append(f"update #{n}") or True, "ok")
+    )
     done: list[str] = []
     monkeypatch.setattr(
         rc, "rebase_branch", lambda c, b: done.append(f"rebase {b}") or (True, "ok")
