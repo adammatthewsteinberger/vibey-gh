@@ -76,7 +76,50 @@ DEFAULT_IGNORED_ISSUE_LABELS = (
     SOLVE_BLOCKED_LABEL,
 )
 GOOGLE_ANALYTICS_ID_PATTERN = re.compile(r"^G-[A-Z0-9]+$")
-DEFAULT_DOCUMENTATION_FILES = (
+# What this repository requires of its OWN documentation. None of it is imposed on an
+# adopter: a project that installs vibey-gh documents its own product, not this tool's
+# internals, so every one of these defaults to empty and is declared per repository.
+VIBEY_README_SECTIONS = (
+    "## Why vibey-gh",
+    "## Requirements",
+    "## Quick start",
+    "## Architecture",
+    "## Security model",
+    "## Commands",
+    "## Configuration",
+    "## Workflows",
+    "## Troubleshooting",
+    "## Contributing",
+    "## Licence",
+)
+VIBEY_GITHUB_README_SECTIONS = (
+    "## Delivery model",
+    "## Workflow inventory",
+    "## Exact-head PR automation",
+    "## AI trust boundary",
+    "## Credentials and settings",
+    "## Permanent-branch safety",
+    "## Failure recovery",
+    "## Changing workflows",
+)
+VIBEY_MERMAID_TERMS = (
+    "flowchart",
+    "CLI",
+    "SDK",
+    "API",
+    "MCP",
+    "Webhook",
+    "PR Automation",
+    "develop",
+    "main",
+    "TestPyPI",
+    "PyPI",
+    "GitHub Pages",
+    "Provenance",
+    "Realign",
+    "Security Boundary",
+)
+VIBEY_DOCUMENTATION_FILES = (
     ".claude-plugin/marketplace.json",
     ".claude/settings.json",
     ".claude/skills/README.md",
@@ -396,7 +439,7 @@ class DocumentationConfig:
     enabled: bool = True
     ai_maintenance: bool = True
     model: str = "claude-sonnet-5"
-    required_files: tuple[str, ...] = DEFAULT_DOCUMENTATION_FILES
+    required_files: tuple[str, ...] = ()
     production_label: str = "Production"
     preview_label: str = "Preview"
     production_indexing: bool = True
@@ -408,10 +451,33 @@ class DocumentationConfig:
     generate_json_ld: bool = True
     author_name: str = "Adam Matthew Steinberger"
     author_url: str = "https://hire.adam.matthewsteinberger.com"
+    # Everything below describes what a repository requires of ITS OWN documentation.
+    # A project that installs vibey-gh documents its product, not this tool, so each of
+    # these is empty until the repository declares it.
+    readme_sections: tuple[str, ...] = ()
+    github_readme_sections: tuple[str, ...] = ()
+    github_readme_min_words: int = 0
+    mermaid_terms: tuple[str, ...] = ()
+    mermaid_min_edges: int = 0
+    require_provenance: bool = False
+    provenance_files: tuple[str, ...] = ("README.md", "docs/index.md")
     google_analytics_id: str = ""
 
     def __post_init__(self) -> None:
         _unique_nonempty("documentation.required_files", self.required_files)
+        for name, values in (
+            ("readme_sections", self.readme_sections),
+            ("github_readme_sections", self.github_readme_sections),
+            ("mermaid_terms", self.mermaid_terms),
+            ("provenance_files", self.provenance_files),
+        ):
+            _unique_nonempty(f"documentation.{name}", values)
+        for name, threshold in (
+            ("github_readme_min_words", self.github_readme_min_words),
+            ("mermaid_min_edges", self.mermaid_min_edges),
+        ):
+            if threshold < 0:
+                raise ValueError(f"documentation.{name} must not be negative")
         if any(
             Path(value).is_absolute() or ".." in Path(value).parts for value in self.required_files
         ):
@@ -629,7 +695,7 @@ def load_config(root: Path | None = None) -> GhConfig:
             enabled=documentation.get("enabled", True),
             ai_maintenance=documentation.get("ai_maintenance", True),
             model=documentation.get("model", "claude-sonnet-5"),
-            required_files=tuple(documentation.get("required_files", DEFAULT_DOCUMENTATION_FILES)),
+            required_files=tuple(documentation.get("required_files", ())),
             production_label=documentation.get("production_label", "Production"),
             preview_label=documentation.get("preview_label", "Preview"),
             production_indexing=documentation.get("production_indexing", True),
@@ -641,6 +707,15 @@ def load_config(root: Path | None = None) -> GhConfig:
             generate_json_ld=documentation.get("generate_json_ld", True),
             author_name=documentation.get("author_name", "Adam Matthew Steinberger"),
             author_url=documentation.get("author_url", "https://hire.adam.matthewsteinberger.com"),
+            readme_sections=tuple(documentation.get("readme_sections", ())),
+            github_readme_sections=tuple(documentation.get("github_readme_sections", ())),
+            github_readme_min_words=documentation.get("github_readme_min_words", 0),
+            mermaid_terms=tuple(documentation.get("mermaid_terms", ())),
+            mermaid_min_edges=documentation.get("mermaid_min_edges", 0),
+            require_provenance=documentation.get("require_provenance", False),
+            provenance_files=tuple(
+                documentation.get("provenance_files", ("README.md", "docs/index.md"))
+            ),
             google_analytics_id=documentation.get("google_analytics_id", ""),
         ),
     )

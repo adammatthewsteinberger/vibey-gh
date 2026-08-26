@@ -106,4 +106,30 @@ generate_llms_full_txt = true
 generate_json_ld = true
 author_name = "Adam Matthew Steinberger"
 author_url = "https://hire.adam.matthewsteinberger.com"
+# This repository's documentation IS about vibey-gh, so it declares that contract for
+# itself. An adopter inherits none of it: they document their own product.
+require_provenance = true
+required_files = [
+  ".claude-plugin/marketplace.json", ".claude/settings.json", ".claude/skills/README.md",
+  ".cursor/rules/project.mdc", ".agents/skills/README.md", ".agent/rules/project.md",
+  ".githooks/README.md", ".github/README.md", "docs/index.md", "docs/project.mmd",
+  "AGENTS.md", "CHANGELOG.md", "CLAUDE.md", "CODE_OF_CONDUCT.md", "CONTRIBUTING.md",
+  "GEMINI.md", "LICENSE", "README.md", "SECURITY.md", "SUPPORT.md",
+]
+readme_sections = [
+  "## Why vibey-gh", "## Requirements", "## Quick start", "## Architecture",
+  "## Security model", "## Commands", "## Configuration", "## Workflows",
+  "## Troubleshooting", "## Contributing", "## Licence",
+]
+github_readme_sections = [
+  "## Delivery model", "## Workflow inventory", "## Exact-head PR automation",
+  "## AI trust boundary", "## Credentials and settings", "## Permanent-branch safety",
+  "## Failure recovery", "## Changing workflows",
+]
+github_readme_min_words = 500
+mermaid_terms = [
+  "flowchart", "CLI", "SDK", "API", "MCP", "Webhook", "PR Automation", "develop",
+  "main", "TestPyPI", "PyPI", "GitHub Pages", "Provenance", "Realign", "Security Boundary",
+]
+mermaid_min_edges = 20
 google_analytics_id = ""

@@ -28,9 +28,8 @@ def test_documentation_reports_missing_empty_invalid_and_provenance(tmp_path: Pa
     (tmp_path / "docs/index.md").write_text("plain")
     (tmp_path / ".claude/settings.json").write_text("[]")
     (tmp_path / "EMPTY.md").write_text("")
-    report = check(
-        GhConfig(root=tmp_path, documentation=DocumentationConfig(required_files=required))
-    )
+    policy = DocumentationConfig(required_files=required, require_provenance=True)
+    report = check(GhConfig(root=tmp_path, documentation=policy))
     assert "MISSING.md is missing" in report.problems
     assert "EMPTY.md is empty" in report.problems
     assert ".claude/settings.json must contain a JSON object" in report.problems
@@ -39,10 +38,47 @@ def test_documentation_reports_missing_empty_invalid_and_provenance(tmp_path: Pa
     (tmp_path / ".claude/settings.json").write_text("{")
     assert (
         ".claude/settings.json is invalid JSON"
-        in check(
-            GhConfig(root=tmp_path, documentation=DocumentationConfig(required_files=required))
-        ).problems
+        in check(GhConfig(root=tmp_path, documentation=policy)).problems
     )
+
+
+def test_an_adopter_inherits_none_of_this_projects_documentation_contract(tmp_path: Path):
+    """A repository that installs vibey-gh documents its own product, not this tool.
+
+    None of the section names, the provenance sentence, the architecture surfaces, or the
+    agent-docs layout describe an adopter's product, so none of them are required until
+    that repository asks for them.
+    """
+    (tmp_path / "README.md").write_text("# My product\n\nIt does a thing.\n")
+    (tmp_path / ".github").mkdir()
+    (tmp_path / ".github/README.md").write_text("# CI notes\n")
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs/project.mmd").write_text("flowchart TB\n  A --> B\n")
+    report = check(GhConfig(root=tmp_path))
+    assert report.problems == (), report.problems
+    assert report.ok
+
+
+def test_a_repository_can_require_its_own_readme_sections(tmp_path: Path):
+    """The requirement is the repository's own words, not this project's headings."""
+    (tmp_path / "README.md").write_text("# My product\n\n## Install\n\nRun it.\n")
+    report = check(
+        GhConfig(
+            root=tmp_path,
+            documentation=DocumentationConfig(
+                readme_sections=("## Install", "## Support", "## Licence")
+            ),
+        )
+    )
+    assert "README.md is missing human documentation section: ## Support" in report.problems
+    assert "README.md is missing human documentation section: ## Licence" in report.problems
+    assert not any("## Install" in problem for problem in report.problems)
+
+
+@pytest.mark.parametrize("field", ["github_readme_min_words", "mermaid_min_edges"])
+def test_a_negative_documentation_threshold_is_rejected(field):
+    with pytest.raises(ValueError, match="must not be negative"):
+        DocumentationConfig(**{field: -1})
 
 
 def test_documentation_rejects_incomplete_mermaid_project_map(tmp_path: Path):
@@ -52,7 +88,11 @@ def test_documentation_rejects_incomplete_mermaid_project_map(tmp_path: Path):
     report = check(
         GhConfig(
             root=tmp_path,
-            documentation=DocumentationConfig(required_files=("docs/project.mmd",)),
+            documentation=DocumentationConfig(
+                required_files=("docs/project.mmd",),
+                mermaid_terms=MERMAID_REQUIRED_TERMS,
+                mermaid_min_edges=20,
+            ),
         )
     )
     assert any("missing required project surface" in problem for problem in report.problems)
@@ -66,7 +106,12 @@ def test_documentation_rejects_placeholder_github_automation_guide(tmp_path: Pat
     report = check(
         GhConfig(
             root=tmp_path,
-            documentation=DocumentationConfig(required_files=(".github/README.md",)),
+            documentation=DocumentationConfig(
+                required_files=(".github/README.md",),
+                github_readme_sections=GITHUB_README_SECTIONS,
+                github_readme_min_words=500,
+                require_provenance=True,
+            ),
         )
     )
     for heading in GITHUB_README_SECTIONS:
