@@ -36,7 +36,7 @@ defaults below. Paths are repository-relative unless stated otherwise.
 | Field | Type / default | Meaning |
 |---|---|---|
 | `enabled` | boolean / `true` | Enable event-driven evaluation, review, repair, and gating. |
-| `scan_workflows` | string list / CI, Provenance, CodeQL, Docs, API drift | Workflow names that trigger evaluation. |
+| `scan_workflows` | string list / CI, Provenance, CodeQL, Docs, API drift | Workflow names that trigger evaluation. Every name must be a workflow with a `pull_request` or `pull_request_target` trigger — one that only runs on `push` can never complete for a pull request, so `state` never leaves `pending`, the gate never publishes, and — made a required check — no pull request can ever merge. `vibey-gh check` fails on any named workflow that exists but cannot fire for a pull request; a name absent from `.github/workflows/` is not an error. |
 | `ignored_checks` | string list / orchestration checks | Checks excluded from the ordinary rollup. Own checks are always ignored. |
 | `max_repair_attempts` | integer / `3` (1–10) | Repair budget per contributor lineage. |
 | `model` | string / `claude-sonnet-5` | Review and repair model. |

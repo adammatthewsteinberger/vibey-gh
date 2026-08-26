@@ -47,6 +47,12 @@ This file follows Keep a Changelog and semantic versioning conventions.
   date and silently reverted on the next install. `vibey-gh install` now owns bumping the
   pin, so upgrading is an explicit, reviewable diff. Unset, behavior is unchanged. The
   self-hosting `pip install -e .` branch is never pinned.
+- Fail `vibey-gh check` when a `[pr_automation].scan_workflows` entry names a workflow
+  that exists but has no `pull_request` or `pull_request_target` trigger. Such a workflow
+  can never complete for a pull request, so `state` never leaves `pending`, `gate` never
+  runs, and — made a required check — no pull request could ever merge, silently and
+  permanently. A name absent from `.github/workflows/` is left alone, since it may live
+  elsewhere or under another name.
 
 - Declare `CHANGELOG.md merge=union` in `.gitattributes` so branches appending to the same
   section merge instead of conflicting. Every open branch adds an Unreleased entry, so each
