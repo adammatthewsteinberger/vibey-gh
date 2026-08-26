@@ -10,12 +10,21 @@ recorder, never a real network call.
 from __future__ import annotations
 
 import json
+import re
 import subprocess
+from pathlib import Path
 
 import pytest
 
 from vibey_gh import rulesets as rs
-from vibey_gh.config import GhConfig, RulesetConfig, RulesetsConfig, load_config
+from vibey_gh.config import (
+    DEFAULT_INTEGRATION_RULESET_CHECKS,
+    DEFAULT_RELEASE_RULESET_CHECKS,
+    GhConfig,
+    RulesetConfig,
+    RulesetsConfig,
+    load_config,
+)
 
 
 def completed(code=0, out="", err=""):
@@ -72,7 +81,65 @@ def test_rulesets_are_enabled_and_defaulted_without_any_configuration(tmp_path):
     assert cfg.rulesets.integration.required_approvals == 0
     assert cfg.rulesets.release.required_approvals == 1
     assert "PR automation / gate" in cfg.rulesets.integration.required_checks
-    assert cfg.rulesets.release.required_checks == ("CI", "Provenance", "CodeQL", "Docs")
+    assert cfg.rulesets.release.required_checks == (
+        "Provenance",
+        "Analyze Python",
+        "Documentation contract",
+    )
+
+
+def template_check_names() -> set[str]:
+    """Every check-run name the bundled workflow templates can produce.
+
+    A check run is named for its job, except when the workflow is triggered by
+    `workflow_run`, where GitHub prefixes it with the workflow's name — so both spellings
+    count. Parsed with `re` rather than a YAML library because the templates carry
+    unrendered `__VIBEY_GH_*__` placeholders and the test suite takes no new dependency.
+    """
+    names: set[str] = set()
+    for path in sorted((Path(rs.__file__).parent / "templates" / "workflows").glob("*.yml")):
+        text = path.read_text(encoding="utf-8")
+        workflow = re.search(r"(?m)^name: *(.+)$", text)
+        workflow_name = workflow.group(1).strip().strip("\"'") if workflow else ""
+        for job in re.findall(r"(?m)^    name: *(.+)$", text):
+            job_name = job.strip().strip("\"'")
+            names.add(job_name)
+            names.add(f"{workflow_name} / {job_name}")
+    return names
+
+
+@pytest.mark.parametrize(
+    "checks",
+    [DEFAULT_INTEGRATION_RULESET_CHECKS, DEFAULT_RELEASE_RULESET_CHECKS],
+    ids=["integration", "release"],
+)
+def test_every_default_required_check_is_a_job_a_bundled_template_renders(checks):
+    """The invariant the original defaults broke, pinned so it cannot break again.
+
+    A required status check names a *check run*, not a workflow. The defaults were once
+    built from `DEFAULT_SCAN_WORKFLOWS`, so they required "CI", "Docs", and "API drift
+    (Cloud Agents OpenAPI)" — workflow names with no job behind them. Nothing reported
+    them, and every merge to the protected branch was refused with no way through, since a
+    ruleset never exempts administrators on its own. Overlap with a workflow name is fine
+    where a job genuinely shares it, which is why this checks membership rather than
+    disjointness: "Provenance" is both, and legitimately so.
+    """
+    renderable = template_check_names()
+    assert renderable, "no job names parsed out of the bundled templates"
+    assert set(checks) <= renderable, f"cannot ever report: {sorted(set(checks) - renderable)}"
+
+
+def test_the_default_bypass_keeps_a_stuck_branch_recoverable(tmp_path):
+    """Without this, a check that stops reporting is unrecoverable except by hand.
+
+    Classic branch protection had an "include administrators" toggle that defaulted to
+    off; a ruleset has no equivalent, so an empty bypass list means nobody — owner
+    included — can merge past a check that will never arrive.
+    """
+    assert RulesetConfig().bypass_actors == ("RepositoryRole:5",)
+    cfg = load_config(tmp_path)
+    assert cfg.rulesets.integration.bypass_actors == ("RepositoryRole:5",)
+    assert cfg.rulesets.release.bypass_actors == ("RepositoryRole:5",)
 
 
 def test_a_toml_rulesets_block_overrides_the_defaults(tmp_path):

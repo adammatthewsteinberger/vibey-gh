@@ -60,8 +60,31 @@ DEFAULT_SCAN_WORKFLOWS = (
 # exactly right for an append-only log and wrong for anything with structure.
 DEFAULT_UNION_MERGE_PATHS = ("CHANGELOG.md",)
 DEFAULT_IGNORED_CHECKS = ("PR automation / gate", "gate", "Merge train / merge")
-DEFAULT_INTEGRATION_RULESET_CHECKS = DEFAULT_SCAN_WORKFLOWS + ("PR automation / gate",)
-DEFAULT_RELEASE_RULESET_CHECKS = ("CI", "Provenance", "CodeQL", "Docs")
+# A required status check names a *check run* — for Actions, a job's `name:` — not the
+# workflow that contains it. `DEFAULT_SCAN_WORKFLOWS` above names workflows and must never
+# be reused here, however tempting the overlap looks: "CI" and "Docs" are workflows whose
+# jobs are called "Lint"/"Build"/"Test (…)" and "Documentation contract", so a ruleset
+# requiring "CI" waits for a check that cannot arrive and blocks every merge to the branch
+# it protects. Rulesets have no implicit admin override, so that state is not recoverable
+# by merging past it — only by editing the ruleset.
+#
+# These are the jobs the bundled templates render, which is the whole of what a fresh
+# install can promise. An adopter's test suite is deliberately absent: vibey-gh ships no
+# `ci.yml`, so naming one here would reintroduce exactly the failure above.
+DEFAULT_RULESET_CHECKS = (
+    "Provenance",
+    "Analyze Python",
+    "Documentation contract",
+)
+DEFAULT_INTEGRATION_RULESET_CHECKS = DEFAULT_RULESET_CHECKS + ("PR automation / gate",)
+DEFAULT_RELEASE_RULESET_CHECKS = DEFAULT_RULESET_CHECKS
+# The repository admin role. A required check can always stop reporting — an outage, an
+# exhausted budget, a renamed job, a workflow the repository chose not to install — and
+# with no bypass actor that locks the branch outright, because a ruleset (unlike the
+# classic branch protection it replaced) never exempts administrators on its own. This
+# grants an admin no authority they lack: anyone who can bypass a ruleset can already
+# rewrite it. It only removes the detour.
+DEFAULT_RULESET_BYPASS_ACTORS = ("RepositoryRole:5",)
 # Managed issue-automation labels. They live here rather than beside the policy because
 # `IssueAutomationConfig` defaults name one of them, and configuration must not import
 # the module that imports configuration.
@@ -199,7 +222,7 @@ def _ruleset(
         require_signed_commits=section.get("require_signed_commits", False),
         allow_force_pushes=section.get("allow_force_pushes", False),
         allow_deletions=section.get("allow_deletions", False),
-        bypass_actors=tuple(section.get("bypass_actors", ())),
+        bypass_actors=tuple(section.get("bypass_actors", DEFAULT_RULESET_BYPASS_ACTORS)),
     )
 
 
@@ -370,7 +393,7 @@ class RulesetConfig:
     require_signed_commits: bool = False
     allow_force_pushes: bool = False
     allow_deletions: bool = False
-    bypass_actors: tuple[str, ...] = ()
+    bypass_actors: tuple[str, ...] = DEFAULT_RULESET_BYPASS_ACTORS
 
     def __post_init__(self) -> None:
         if self.allow_force_pushes:
