@@ -95,6 +95,12 @@ def render_workflow(source: Path, cfg: GhConfig) -> str:
     wanted = wanted.replace(
         "__VIBEY_GH_SYNC_ENABLED__", "true" if cfg.branch_sync.enabled else "false"
     )
+    talk = cfg.conversation
+    wanted = wanted.replace(
+        "__VIBEY_GH_CONVERSATION_ENABLED__", "true" if talk.enabled else "false"
+    )
+    wanted = wanted.replace("__VIBEY_GH_CONVERSATION_TRIGGER__", talk.trigger)
+    wanted = wanted.replace("__VIBEY_GH_CONVERSATION_MODEL__", talk.model)
     issues = cfg.issue_automation
     wanted = wanted.replace("__VIBEY_GH_ISSUE_ENABLED__", "true" if issues.enabled else "false")
     wanted = wanted.replace("__VIBEY_GH_ISSUE_MODEL__", issues.model)

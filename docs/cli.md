@@ -27,6 +27,10 @@ transport failure. Run `vibey-gh COMMAND --help` for argparse's generated refere
 | `promote` | `--method rebase\|squash\|merge`, `--dry-run`, `--wait` or `--no-wait`, `--summary FILE` | Open/reuse the integration-to-release PR. Event-driven `--no-wait` is the default. |
 | `realign` | none | Bring the integration branch forward after release without rewriting it. |
 | `pr-automation self-heal` | `--pr N` optional | Refill a spent repair budget, itself bounded by `branch_sync.max_self_heals`. Omit `--pr` to sweep every exhausted pull request. |
+| `conversation evaluate` | required `--subject N`; optional `--comment-id ID` | Decide whether one comment gets a response, and how far it may reach. |
+| `conversation context` | required `--subject N`; optional `--comment-id ID`, `--output FILE`, `--max-bytes N` | Render the thread as a bounded, explicitly untrusted briefing. |
+| `conversation reply` | required `--subject N --body TEXT\|FILE\|-` | Post an answer. A trusted step calls this; the model never gets the tool. |
+| `conversation record-response` | required `--subject N --input JSON\|FILE\|-` | Persist one interaction against the thread's budget. |
 | `reconcile-branches` | `--dry-run` | Rebase, close, or leave each open pull-request branch stranded by a realign rewrite. `--dry-run` decides without mutating anything. Realign calls this itself; the command exists for recovery and inspection. |
 | `rulesets` | `--dry-run` | Reconcile the integration and release branch rulesets declared by `[rulesets]`. `--dry-run` reports drift without creating or updating anything. `repository-profile.yml` calls this itself; the command exists for recovery and inspection. |
 | `api`, `mcp`, `sdk` | `CAPABILITY`, `--arguments JSON_ARRAY` | Invoke a canonical capability through that adapter. |

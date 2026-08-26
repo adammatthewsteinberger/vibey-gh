@@ -8,6 +8,7 @@ flowchart TB
     Push[Branch push]
     PullRequest[Pull request]
     Issue[Published issue]
+    Comment[Comment mentioning the configured trigger]
   end
 
   subgraph Interfaces["Complete public interface parity"]
@@ -26,6 +27,7 @@ flowchart TB
     Documentation[Documentation contract]
     PRAutomation[PR Automation]
     IssueAutomation[Issue Automation]
+    Conversation["Conversation (comment-driven answer and bounded change, vibey_gh.conversation)"]
     GithubState["Durable marker-comment state (vibey_gh.github_state)"]
     MergeTrain[Merge train]
     Promotion[Promotion]
@@ -57,6 +59,9 @@ flowchart TB
     IssueTrust["Issue eligibility policy (author trust, labels, budget)"]
     Fork[Untrusted fork PR head]
     MirrorFork["Repository-owned replacement PR (mirror-fork)"]
+    UntrustedComment[Untrusted contributor comment text]
+    ConversationBriefing[Bounded untrusted conversation briefing]
+    ConversationTrust["Conversation eligibility policy (mention, trust, interaction budget, self-reply loop guard)"]
   end
 
   subgraph Delivery["Event-driven delivery"]
@@ -81,12 +86,15 @@ flowchart TB
     Conflict[Guarded same-repository conflict resolution]
     BranchSync[Branch sync]
     SelfHeal[Self-heal spent repair budgets]
+    ConversationReply[Guarded conversation reply and optional bounded commit]
   end
 
   Maintainer --> CLI
   Contributor --> Push
   Contributor --> Issue
+  Contributor --> Comment
   Maintainer --> Issue
+  Maintainer --> Comment
   Push --> BranchIntake
   BranchIntake --> PullRequest
   CLI --> CapabilitySurfaces
@@ -208,3 +216,14 @@ flowchart TB
   BranchSync --> SelfHeal
   SelfHeal -->|refill a repair-exhausted PR's budget| PRAutomation
   SelfHeal --> PullRequest
+  Comment --> Conversation
+  Comment --> UntrustedComment
+  Conversation --> ConversationTrust
+  ConversationTrust -->|ineligible: skipped or blocked| Comment
+  ConversationTrust -->|eligible| ConversationBriefing
+  UntrustedComment --> ConversationBriefing
+  ConversationBriefing --> Sandbox
+  Sandbox --> ConversationReply
+  ConversationReply --> Guard
+  Conversation --> GithubState
+  Conversation --> Trusted

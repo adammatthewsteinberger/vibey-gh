@@ -44,7 +44,7 @@ def test_every_claude_json_schema_survives_argument_tokenization():
             assert schema["type"] == "object"
             assert schema["properties"]
             schemas.append((path.name, schema))
-    assert len(schemas) == 6
+    assert len(schemas) == 7
 
 
 @pytest.mark.parametrize("path", REPO_WORKFLOWS, ids=lambda p: p.name)

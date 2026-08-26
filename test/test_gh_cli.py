@@ -517,6 +517,72 @@ def test_self_heal_cli_sweeps_or_targets_one_pull_request(repo, monkeypatch, cap
     assert [item["pr"] for item in json.loads(capsys.readouterr().out)] == [7]
 
 
+def test_conversation_cli_surfaces(repo, monkeypatch, tmp_path, capsys):
+    from vibey_gh import conversation
+
+    thread = {
+        "number": 7,
+        "title": "t",
+        "state": "OPEN",
+        "comments": [
+            {"id": 41, "author": {"login": "owner"}, "body": "earlier"},
+            {"id": 42, "author": {"login": "owner"}, "body": "@vibey explain"},
+        ],
+    }
+    monkeypatch.setattr(conversation, "fetch_subject", lambda n: thread)
+
+    assert main(["conversation", "evaluate", "--subject", "7"]) == 0
+    decision = json.loads(capsys.readouterr().out)
+    assert decision["comment_id"] == 42, "the newest comment is used by default"
+
+    assert main(["conversation", "evaluate", "--subject", "7", "--comment-id", "41"]) == 0
+    assert json.loads(capsys.readouterr().out)["state"] == "skip"
+
+    assert main(["conversation", "context", "--subject", "7"]) == 0
+    assert "Untrusted conversation" in capsys.readouterr().out
+
+    target = tmp_path / "nested" / "thread.md"
+    assert main(["conversation", "context", "--subject", "7", "--output", str(target)]) == 0
+    assert "Untrusted conversation" in target.read_text(encoding="utf-8")
+    assert "wrote" in capsys.readouterr().out
+
+    posted: list = []
+    monkeypatch.setattr(
+        conversation, "reply", lambda n, body, cfg: posted.append((n, body)) or True
+    )
+    body = tmp_path / "answer.md"
+    body.write_text("from a file", encoding="utf-8")
+    assert main(["conversation", "reply", "--subject", "7", "--body", str(body)]) == 0
+    assert posted[-1] == (7, "from a file")
+    assert main(["conversation", "reply", "--subject", "7", "--body", "inline text"]) == 0
+    assert posted[-1] == (7, "inline text")
+    monkeypatch.setattr("sys.stdin.read", lambda: "from stdin")
+    assert main(["conversation", "reply", "--subject", "7", "--body", "-"]) == 0
+    assert posted[-1] == (7, "from stdin")
+
+    state = conversation.ConversationState(subject=7, interactions=1)
+    monkeypatch.setattr(conversation, "record", lambda n, payload: state)
+    capsys.readouterr()  # discard the reply confirmations above
+    assert main(["conversation", "record-response", "--subject", "7", "--input", "{}"]) == 0
+    assert json.loads(capsys.readouterr().out)["interactions"] == 1
+
+
+def test_conversation_cli_reports_failures(repo, monkeypatch, capsys):
+    from vibey_gh import conversation
+
+    monkeypatch.setattr(conversation, "fetch_subject", lambda n: {"number": 7, "comments": []})
+    monkeypatch.setattr(conversation, "reply", lambda n, b, c: False)
+    assert main(["conversation", "reply", "--subject", "7", "--body", "x"]) == 1
+    assert "could not post the reply" in capsys.readouterr().err
+
+    def boom(n):
+        raise RuntimeError("gh issue view: not found")
+
+    monkeypatch.setattr(conversation, "fetch_subject", boom)
+    assert main(["conversation", "evaluate", "--subject", "7"]) == 1
+    assert "not found" in capsys.readouterr().err
+
+
 def test_reconcile_branches_cli_reports_each_decision(repo, monkeypatch, capsys):
     monkeypatch.setattr(
         reconcile,

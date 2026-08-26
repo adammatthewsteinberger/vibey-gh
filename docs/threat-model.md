@@ -27,6 +27,20 @@ being swallowed, because a skipped reconciliation is indistinguishable from a sa
 one from the outside — the same failure mode the exact-head gate and branch reconciliation
 below already refuse to risk.
 
+Comments are the least guarded input in a repository: anyone with an account can write one,
+on anything, at any time. Conversation therefore answers only a configured mention, and
+only from the owner or a trusted author unless `respond_to_untrusted` is deliberately set —
+answering everyone is a spending decision, not a default. Comment text reaches the model
+only through a bounded briefing written by a trusted step; the model holds no `Bash`, `gh`,
+`Agent`, or Git tool, and the answer is posted by a trusted step rather than by the model.
+File changes are narrower still: only on a pull request, only from a trusted commenter,
+never on a fork or a permanent branch, and never more than one commit. Interactions per
+thread are budgeted so a conversation cannot become an unbounded work queue. The loop guard
+comes first in every path — the automation's own reply contains the trigger, so answering
+itself would recurse and bill indefinitely; `ignore_actors` cannot be emptied while
+conversation is enabled, and the workflow additionally refuses any sender GitHub reports as
+a bot before a runner is claimed.
+
 An outside author cannot steer automation at a permanent branch from either end. GitHub
 already refuses them write access; behind that, `evaluate` terminally blocks any untrusted
 pull request whose head ref is the configured integration or release branch (whose repair
