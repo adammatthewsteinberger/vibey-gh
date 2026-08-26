@@ -36,6 +36,15 @@ sanitized_progress = true
 archive_execution_file = true
 allow_private_full_output = false
 
+[conversation]
+enabled = true
+trigger = "@vibey"
+model = "claude-sonnet-5"
+max_interactions = 10
+respond_to_untrusted = false
+allow_changes = true
+ignore_actors = ["vibey[bot]", "github-actions[bot]", "claude[bot]"]
+
 [branch_sync]
 enabled = true
 update_contributor_branches = true

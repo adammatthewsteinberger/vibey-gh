@@ -200,6 +200,39 @@ class IssueAutomationConfig:
 
 
 @dataclass(frozen=True)
+class ConversationConfig:
+    """Answering a mention in a comment, and how far that answer may reach.
+
+    Comments are the least guarded input a repository has, so the defaults are closed:
+    outside commenters get no response at all, because answering everyone is a spending
+    decision rather than something to inherit. `ignore_actors` is the loop guard — the
+    automation must never answer its own reply, which would run and bill forever.
+    """
+
+    enabled: bool = True
+    trigger: str = "@vibey"
+    model: str = "claude-sonnet-5"
+    max_interactions: int = 10
+    respond_to_untrusted: bool = False
+    allow_changes: bool = True
+    ignore_actors: tuple[str, ...] = ("vibey[bot]", "github-actions[bot]", "claude[bot]")
+
+    def __post_init__(self) -> None:
+        _unique_nonempty("conversation.ignore_actors", self.ignore_actors)
+        if not self.trigger.strip() or any(char.isspace() for char in self.trigger):
+            raise ValueError("conversation.trigger must be non-empty and contain no whitespace")
+        if not 1 <= self.max_interactions <= 100:
+            raise ValueError("conversation.max_interactions must be between 1 and 100")
+        if not self.model.strip():
+            raise ValueError("conversation.model must not be empty")
+        if self.enabled and not self.ignore_actors:
+            raise ValueError(
+                "conversation.ignore_actors must name the automation's own identities, "
+                "or it will answer its own replies forever"
+            )
+
+
+@dataclass(frozen=True)
 class BranchSyncConfig:
     """Keeping open topic branches current with the integration branch.
 
@@ -418,6 +451,7 @@ class GhConfig:
     issue_automation: IssueAutomationConfig = IssueAutomationConfig()
     realign: RealignConfig = RealignConfig()
     branch_sync: BranchSyncConfig = BranchSyncConfig()
+    conversation: ConversationConfig = ConversationConfig()
     github_release: GithubReleaseConfig = GithubReleaseConfig()
     rulesets: RulesetsConfig = RulesetsConfig()
     repository_profile: RepositoryProfileConfig = RepositoryProfileConfig()
@@ -487,6 +521,7 @@ def load_config(root: Path | None = None) -> GhConfig:
     issues = data.get("issue_automation", {})
     realigning = data.get("realign", {})
     syncing = data.get("branch_sync", {})
+    talking = data.get("conversation", {})
     release = data.get("github_release", {})
     rulesets_data = data.get("rulesets", {})
     profile = data.get("repository_profile", {})
@@ -536,6 +571,15 @@ def load_config(root: Path | None = None) -> GhConfig:
             open_pull_request=issues.get("open_pull_request", True),
             draft_pull_request=issues.get("draft_pull_request", True),
             retain_schedule_backstop=issues.get("retain_schedule_backstop", True),
+        ),
+        conversation=ConversationConfig(
+            enabled=talking.get("enabled", True),
+            trigger=talking.get("trigger", "@vibey"),
+            model=talking.get("model", "claude-sonnet-5"),
+            max_interactions=talking.get("max_interactions", 10),
+            respond_to_untrusted=talking.get("respond_to_untrusted", False),
+            allow_changes=talking.get("allow_changes", True),
+            ignore_actors=tuple(talking.get("ignore_actors", ConversationConfig().ignore_actors)),
         ),
         branch_sync=BranchSyncConfig(
             enabled=syncing.get("enabled", True),
