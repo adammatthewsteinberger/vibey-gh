@@ -40,6 +40,13 @@ This file follows Keep a Changelog and semantic versioning conventions.
   and rejects the subject. That blocked a pull request outright, and bounded repair could
   not fix it because the problem was history rather than file content. Now
   `chore(release): 1.23.0`.
+- Add `[install].pin_version` to pin every managed workflow's `pip install vibey-gh` to the
+  exact version that rendered it (`vibey-gh==X.Y.Z`) instead of floating on the latest
+  release. An adopter could not previously pin this by hand: `vibey-gh install` regenerates
+  every managed file from its template, so an edited install line was reported as out of
+  date and silently reverted on the next install. `vibey-gh install` now owns bumping the
+  pin, so upgrading is an explicit, reviewable diff. Unset, behavior is unchanged. The
+  self-hosting `pip install -e .` branch is never pinned.
 
 - Declare `CHANGELOG.md merge=union` in `.gitattributes` so branches appending to the same
   section merge instead of conflicting. Every open branch adds an Unreleased entry, so each

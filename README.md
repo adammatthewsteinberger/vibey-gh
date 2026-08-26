@@ -117,6 +117,13 @@ release-site assets used by the dual-channel Pages deployment. Existing hooks ar
 changes; opt out of individual workflows with `[install].workflows` rather than editing a
 generated copy that the next installation will overwrite.
 
+Every managed workflow installs this tooling with `pip install vibey-gh`, floating on
+whatever the latest published release is, by default — so upgrading changes nothing until
+you ask. Set `[install].pin_version = true` to pin that install to the exact version that
+rendered the file (`vibey-gh==X.Y.Z`) instead; `vibey-gh install` then owns bumping the pin
+on every future release, as one visible diff, rather than it moving silently underneath you.
+The self-hosting path this repository uses to install itself from source is never pinned.
+
 `install` does **not** render `CI` or `Release` workflows: every repository's build, test,
 and publish steps are different, so these two stay hand-authored by the adopting
 repository. This is intentional, not an oversight, but the names and behavior are load
@@ -961,6 +968,24 @@ workflows = []          # hooks and the CLI only
 This is not cosmetic. `check` verifies that everything it manages is present and current,
 so without it a repository that deliberately keeps its own workflows would fail the check
 forever — and a check that cannot pass is a check people route around.
+
+### Pinning the tooling version
+
+By default every managed workflow installs this tooling with `pip install vibey-gh`, which
+floats to whatever the latest published release is on every run. Pin it instead:
+
+```toml
+[install]
+pin_version = true
+```
+
+Rendered workflows then install the exact version that rendered them
+(`vibey-gh==X.Y.Z`) rather than the latest one, so a release changing this tool's own
+behavior cannot break your CI with no warning. Upgrading is explicit: run `vibey-gh
+install` from the newer release, and the pin moves forward as one visible diff you review
+and commit like any other change. The self-hosting path this repository uses to install
+itself from source is never pinned, since it cannot depend on a published release that may
+not exist yet.
 
 
 `trusted_authors` is matched after normalising `app/name` and `name[bot]` to the same

@@ -16,6 +16,7 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+from vibey_gh import __version__
 from vibey_gh.config import GhConfig, load_config
 
 TEMPLATES = Path(__file__).parent / "templates" / "githooks"
@@ -182,6 +183,14 @@ def render_workflow(source: Path, cfg: GhConfig) -> str:
         ("__VIBEY_GH_DOC_PREVIEW_INDEX__", cfg.documentation.preview_indexing),
     ):
         wanted = wanted.replace(marker, "true" if enabled else "false")
+    if cfg.pin_version:
+        # Only the floating fallback install is pinned. The self-hosting branch just
+        # above it (`pip install --quiet -e .`) must keep installing from source: this
+        # repository cannot pin itself to a published release that may not exist yet.
+        wanted = wanted.replace(
+            "python -m pip install --quiet vibey-gh\n",
+            f'python -m pip install --quiet "vibey-gh=={__version__}"\n',
+        )
     if source.name != "pr-automation.yml":
         return wanted
     workflows = json.dumps(list(cfg.pr_automation.scan_workflows))

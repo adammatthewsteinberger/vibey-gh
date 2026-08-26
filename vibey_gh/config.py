@@ -19,6 +19,8 @@ Every project-specific decision lives here so the logic beside it can stay gener
 
     [install]
     workflows = []          # omit for all of them; [] for hooks and the CLI only
+    pin_version = false     # pin every rendered `pip install vibey-gh` to the exact
+                            # version that rendered it, instead of the latest release
 
     [issue_automation]
     enabled        = true               # propose a solution branch for a published issue
@@ -534,6 +536,10 @@ class GhConfig:
     # Paths marked `merge=union` in `.gitattributes`. Appended to whatever the
     # repository already has there; an existing `.gitattributes` is never rewritten.
     union_merge_paths: tuple[str, ...] = DEFAULT_UNION_MERGE_PATHS
+    # Pin every rendered managed workflow's `pip install vibey-gh` to the exact version
+    # that rendered it. False keeps the historical floating install, so upgrading this
+    # package changes nothing in an adopting repository until this is turned on.
+    pin_version: bool = False
 
     def __post_init__(self) -> None:
         """Cross-field rules neither dataclass can check on its own.
@@ -621,6 +627,7 @@ def load_config(root: Path | None = None) -> GhConfig:
         code_paths=tuple(ver.get("code_paths", ("src/",))),
         managed_workflows=(tuple(inst["workflows"]) if "workflows" in inst else None),
         union_merge_paths=tuple(inst.get("union_merge_paths", DEFAULT_UNION_MERGE_PATHS)),
+        pin_version=inst.get("pin_version", False),
         integration_branch=br.get("integration", "develop"),
         release_branch=br.get("release", "main"),
         owner=tr.get("owner", ""),

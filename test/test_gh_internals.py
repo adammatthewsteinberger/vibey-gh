@@ -586,6 +586,37 @@ def test_omitting_the_section_means_all_of_them(tmp_path):
     assert load_config(tmp_path).managed_workflows is None
 
 
+# ---------------------------------------------------------------- pinned tooling version
+
+
+def test_pin_version_defaults_to_false_and_is_read_from_config(tmp_path):
+    from vibey_gh.config import load_config
+
+    assert GhConfig(root=tmp_path).pin_version is False
+
+    (tmp_path / ".git").mkdir()
+    (tmp_path / ".vibey-gh.toml").write_text("[install]\npin_version = true\n")
+    assert load_config(tmp_path).pin_version is True
+
+
+def test_pinning_the_tooling_version_is_a_visible_one_line_diff(repo):
+    """Turning the key on, and a later release, both show up as one changed line."""
+    from vibey_gh import __version__
+    from vibey_gh.install import WORKFLOWS, render_workflow
+
+    floating = render_workflow(WORKFLOWS / "merge-train.yml", GhConfig(root=repo))
+    assert 'python -m pip install --quiet vibey-gh\n' in floating
+    assert "vibey-gh==" not in floating
+
+    pinned = render_workflow(WORKFLOWS / "merge-train.yml", GhConfig(root=repo, pin_version=True))
+    assert f'python -m pip install --quiet "vibey-gh=={__version__}"\n' in pinned
+    assert "python -m pip install --quiet vibey-gh\n" not in pinned
+    # The self-hosting branch is untouched either way — it cannot pin to a published
+    # release that may not exist yet.
+    assert "python -m pip install --quiet -e .\n" in floating
+    assert "python -m pip install --quiet -e .\n" in pinned
+
+
 # ---------------------------------------------------------------- holding for review
 
 
