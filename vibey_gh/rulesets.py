@@ -19,7 +19,7 @@ from __future__ import annotations
 import json
 import subprocess
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from vibey_gh import github_state
 from vibey_gh.config import GhConfig, RulesetConfig
@@ -175,7 +175,7 @@ def fetch_ruleset(name: str) -> dict[str, Any] | None:
     listing = _api(f"repos/{repository}/rulesets") or []
     for item in listing:
         if item.get("name") == name:
-            return _api(f"repos/{repository}/rulesets/{item['id']}")
+            return cast("dict[str, Any] | None", _api(f"repos/{repository}/rulesets/{item['id']}"))
     return None
 
 
