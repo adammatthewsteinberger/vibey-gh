@@ -5,6 +5,17 @@ This file follows Keep a Changelog and semantic versioning conventions.
 
 ## Unreleased
 
+- Actually send the ruleset request body. `gh api` ignores stdin unless told to read it, so
+  every reconciliation failed with HTTP 422 "data cannot be null" while the payload it had
+  built was perfectly good — it simply never left the process.
+- Merge the integration branch forward locally when GitHub refuses to. Its update-branch
+  endpoint declines a branch it considers conflicting, which is exactly when a branch needs
+  moving forward, and it computes that without this repository's merge drivers — so a
+  changelog every branch appends to conflicts there while merging cleanly here. The
+  fallback is an ordinary merge commit pushed without force: the branch moves forward and
+  is never rewritten, and forks stay untouched.
+- Report why an update was refused instead of "no detail reported".
+
 - Identify a comment the same way whichever GitHub API produced it. A webhook numbers a
   comment; `gh issue view` returns a GraphQL node instead. They name the same comment and
   never match each other, and `int("IC_kwDO...")` raises — so the first real mention ever
