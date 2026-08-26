@@ -153,6 +153,11 @@ def diff_ruleset(desired: dict[str, Any], existing: dict[str, Any] | None) -> Di
 
 def _api(*args: str, input_json: dict[str, Any] | None = None) -> Any:
     command = ["gh", "api", *args]
+    if input_json is not None:
+        # `gh api` ignores stdin unless it is told to read it. Without this the body is
+        # silently empty and GitHub answers "data cannot be null" — which is how every
+        # ruleset reconciliation failed with a 422 while the payload was perfectly good.
+        command += ["--input", "-"]
     run = subprocess.run(
         command,
         input=json.dumps(input_json) if input_json is not None else None,

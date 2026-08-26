@@ -5,6 +5,17 @@ This file follows Keep a Changelog and semantic versioning conventions.
 
 ## Unreleased
 
+- Actually send the ruleset request body. `gh api` ignores stdin unless told to read it, so
+  every reconciliation failed with HTTP 422 "data cannot be null" while the payload it had
+  built was perfectly good — it simply never left the process.
+- Merge the integration branch forward locally when GitHub refuses to. Its update-branch
+  endpoint declines a branch it considers conflicting, which is exactly when a branch needs
+  moving forward, and it computes that without this repository's merge drivers — so a
+  changelog every branch appends to conflicts there while merging cleanly here. The
+  fallback is an ordinary merge commit pushed without force: the branch moves forward and
+  is never rewritten, and forks stay untouched.
+- Report why an update was refused instead of "no detail reported".
+
 - Identify a comment the same way whichever GitHub API produced it. A webhook numbers a
   comment; `gh issue view` returns a GraphQL node instead. They name the same comment and
   never match each other, and `int("IC_kwDO...")` raises — so the first real mention ever
@@ -23,6 +34,12 @@ This file follows Keep a Changelog and semantic versioning conventions.
   longer demanded. This repository's own contract is unchanged: it declares the narrative
   requirements explicitly in its `.vibey-gh.toml`, so its internals stay fully documented
   and enforced.
+- Make the generated release commit a Conventional Commit. `Release 1.23.0` does not stay
+  on the release branch: any topic branch that later merges the integration branch in pulls
+  it into its own commit range, where the provenance gate reads it like any other commit
+  and rejects the subject. That blocked a pull request outright, and bounded repair could
+  not fix it because the problem was history rather than file content. Now
+  `chore(release): 1.23.0`.
 
 - Declare `CHANGELOG.md merge=union` in `.gitattributes` so branches appending to the same
   section merge instead of conflicting. Every open branch adds an Unreleased entry, so each

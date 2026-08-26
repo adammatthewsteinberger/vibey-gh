@@ -88,7 +88,7 @@ def create_pull_request(cfg: GhConfig, body: str) -> int | None:
         "--head",
         cfg.integration_branch,
         "--title",
-        f"Release {versioning.read_version(cfg)}",
+        f"chore(release): {versioning.read_version(cfg)}",
         "--body",
         body,
     )
@@ -146,7 +146,12 @@ def promote(
             "commit",
             "--quiet",
             "-m",
-            f"Release {new}",
+            # A Conventional Commit, because this subject does not stay on the release
+            # branch: any topic branch that later merges the integration branch in pulls it
+            # into its own commit range, where the provenance gate reads it like any other
+            # commit and rejects it. `Release 1.23.0` blocked a pull request that way, and
+            # the repair could not fix it by editing files because the problem was history.
+            f"chore(release): {new}",
             "-m",
             "Version derived from what changed since the last release, so the "
             "promotion actually publishes.",

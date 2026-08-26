@@ -58,6 +58,8 @@ class Decision:
     reason: str
     delete_branch: bool = False
     notify: bool = False
+    # A fork is never written to locally; only GitHub's own endpoint may move it forward.
+    fork: bool = False
 
     def describe(self) -> str:
         suffix = " and deleted its branch" if self.delete_branch else ""
@@ -94,7 +96,9 @@ def decide(facts: BranchFacts, cfg: GhConfig) -> Decision:
     def result(
         action: str, reason: str, delete_branch: bool = False, notify: bool = False
     ) -> Decision:
-        return Decision(facts.number, facts.branch, action, reason, delete_branch, notify)
+        return Decision(
+            facts.number, facts.branch, action, reason, delete_branch, notify, facts.fork
+        )
 
     if not policy.reconcile_branches:
         return result(LEAVE, "branch reconciliation is disabled")
@@ -162,7 +166,46 @@ def is_behind(cfg: GhConfig, branch: str) -> bool:
     return run.returncode != 0
 
 
-def update_branch(cfg: GhConfig, number: int) -> bool:
+def merge_forward(cfg: GhConfig, branch: str) -> tuple[bool, str]:
+    """Merge the integration branch into `branch` locally and publish the result.
+
+    GitHub's update-branch endpoint refuses a branch it considers conflicting — which is
+    precisely when the branch needs it. Its merge also runs without this repository's
+    `.gitattributes`, so a changelog every branch appends to conflicts there while merging
+    cleanly here. Doing the merge locally uses the declared drivers, and the result is an
+    ordinary commit pushed without force: the branch is moved forward, never rewritten.
+    """
+    if not rebasable(branch, cfg):
+        raise ValueError(f"refusing to merge into protected or unsafe branch {branch!r}")
+    _git(cfg, "fetch", "--quiet", "origin", cfg.integration_branch, branch)
+    before = _git(cfg, "rev-parse", f"origin/{branch}").stdout.strip()
+    if not before:
+        return False, "branch no longer exists"
+    if _git(cfg, "checkout", "--quiet", "--detach", before).returncode:
+        return False, "could not check the branch out"
+    _git(cfg, "config", "user.name", "vibey[bot]")
+    _git(cfg, "config", "user.email", "adam@matthewsteinberger.com")
+    merge = _git(
+        cfg,
+        "merge",
+        "--no-edit",
+        "-m",
+        f"chore: merge {cfg.integration_branch} into {branch}",
+        f"origin/{cfg.integration_branch}",
+    )
+    if merge.returncode:
+        _git(cfg, "merge", "--abort")
+        return False, "merge conflicted; left for ordinary conflict resolution"
+    after = _git(cfg, "rev-parse", "HEAD").stdout.strip()
+    if after == before:
+        return False, "already current"
+    push = _git(cfg, "push", "origin", f"HEAD:refs/heads/{branch}")
+    if push.returncode:
+        return False, f"push refused: {push.stderr.strip()}"
+    return True, f"merged {cfg.integration_branch} forward as {after[:7]}"
+
+
+def update_branch(cfg: GhConfig, number: int) -> tuple[bool, str]:
     """Merge the base forward using GitHub's own update-branch endpoint.
 
     This is the "Update branch" button. It merges rather than rewrites and needs no local
@@ -179,9 +222,12 @@ def update_branch(cfg: GhConfig, number: int) -> bool:
         ],
         cwd=cfg.root,
         capture_output=True,
+        text=True,
         check=False,
     )
-    return run.returncode == 0
+    if run.returncode == 0:
+        return True, "GitHub merged the base forward"
+    return False, (run.stderr or "").strip().splitlines()[-1] if run.stderr else "refused"
 
 
 def open_pull_requests(cfg: GhConfig) -> list[BranchFacts]:
@@ -354,7 +400,14 @@ def reconcile(cfg: GhConfig, *, dry_run: bool = False) -> list[dict[str, Any]]:
                 if decision.delete_branch:
                     outcome["deleted"] = delete_branch(cfg, decision.branch)
             elif decision.action == UPDATE:
-                outcome["applied"] = update_branch(cfg, decision.number)
+                applied, detail = update_branch(cfg, decision.number)
+                if not applied and not decision.fork:
+                    # GitHub refuses a branch it calls conflicting, and computes that
+                    # without this repository's merge drivers. The same merge often
+                    # succeeds here, so try it rather than leaving the branch stuck.
+                    applied, detail = merge_forward(cfg, decision.branch)
+                outcome["applied"] = applied
+                outcome["detail"] = detail
             elif decision.notify:
                 notify(cfg, decision)
                 outcome["notified"] = True
