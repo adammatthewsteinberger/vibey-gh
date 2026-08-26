@@ -13,8 +13,12 @@ and guarded workflow steps. PR automation separates untrusted inspection/editing
 trusted commit and push operations. Issue automation applies the same separation to a
 lower-authority input: `vibey_gh.issue_automation` decides eligibility, renders untrusted
 issue text into a bounded briefing, and leaves branch publication to a trusted step.
-`vibey_gh.github_state` is the single implementation of durable marker-comment state, shared
-by both.
+`vibey_gh.conversation` applies the same pattern to a third, even lower-authority input —
+a comment mentioning the configured trigger — deciding eligibility (mention, trust,
+interaction budget, and a self-reply loop guard checked first), rendering the untrusted
+thread into a bounded briefing, and leaving both the reply and any bounded file change to a
+trusted step. `vibey_gh.github_state` is the single implementation of durable
+marker-comment state, shared by all three.
 
 See also the [threat model](threat-model.md), [workflow reference](workflows.md), and
 [configuration reference](configuration.md).

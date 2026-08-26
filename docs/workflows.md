@@ -59,6 +59,51 @@ Attempts are budgeted per issue content fingerprint and stored in one machine-re
 issue comment, so a redispatch of unchanged text is a no-op and an edit starts a new
 lineage.
 
+## Conversation
+
+`Conversation` runs on `issue_comment` (`created`) and `pull_request_review_comment`
+(`created`) against any thread, plus `workflow_dispatch` with a subject number and an
+optional exact comment ID. The cheapest possible loop guard runs before a runner is even
+claimed: `github.event.sender.type != 'Bot'`, combined with a check that the triggering
+comment contains the configured mention (`workflow_dispatch` is exempt, since a human
+explicitly named the subject). This is the one failure mode unique to conversation — a
+reply that mentions the trigger again would otherwise recurse and bill indefinitely — so it
+is excluded before anything else is considered.
+
+The `evaluate` job holds read-only `contents: read`, `issues: read`, and `pull-requests:
+read`. It runs trusted default-branch workflow code, installs the published `vibey-gh`
+package, resolves the subject and comment ID from either the dispatch inputs or the
+triggering event, and calls `vibey-gh conversation evaluate` to compute one of `skip`,
+`blocked`, `answer`, or `act` with a stated reason. `evaluate` checks, in order: the
+automation's own identities (never answered), whether conversation is enabled, whether the
+comment mentions the configured trigger, whether the thread is open, whether this exact
+comment was already answered, whether the author is trusted or `respond_to_untrusted` is
+set, and whether the thread's interaction budget is exhausted. Only `answer` or `act` starts
+the privileged `respond` job.
+
+The `respond` job checks out trusted automation under `automation/` and the thread's branch
+(a pull request head) or the default branch (an issue) under `target/`, both with
+`persist-credentials: false` for the read-only pull-request case. A trusted step renders the
+thread into `briefing/thread.md` with `vibey-gh conversation context`; the pinned Claude Code
+Action then runs from a disposable credential-free Git context with
+`Read,Glob,Grep,Edit,Write` and no `Bash`, `gh`, or `Agent` tool, and is told the briefing is
+an untrusted report rather than an instruction. When `may_change_files` is false — every case
+except a trusted author on a pull request with changes allowed — it answers only and any
+edits are discarded. When true, it may also make a clear, bounded change to the pull request,
+following existing conventions and updating documentation and tests as the change requires.
+
+Publication is a separate trusted step. When files changed and `may_change_files` was true,
+it refuses an unsafe or permanent (`develop`/`main`) head ref, refuses a cross-repository
+(fork) head, normalizes provenance headers with `vibey-gh check --ci --apply`, commits with
+the repository's own configured trailer, and pushes directly to the existing PR branch — no
+new branch or pull request is opened, since the change belongs to the thread it answers. The
+answer is then always posted with `vibey-gh conversation reply`, noting whether a commit was
+pushed, whether the request needs a human decision, and whether part of the thread tried to
+redirect the request, and the interaction is recorded against the thread's budget with
+`vibey-gh conversation record-response`. Attempts are budgeted per thread and stored in one
+machine-readable issue comment, the same `vibey_gh.github_state` mechanism issue automation
+uses.
+
 ## CodeQL
 
 `CodeQL` runs on push and pull request against `develop` and `main`, plus a weekly Monday
