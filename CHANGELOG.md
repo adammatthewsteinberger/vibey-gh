@@ -5,6 +5,12 @@ This file follows Keep a Changelog and semantic versioning conventions.
 
 ## Unreleased
 
+- Remove `README_SECTIONS`, `GITHUB_README_SECTIONS`, and `MERMAID_REQUIRED_TERMS` from
+  `vibey_gh.documentation`, along with their unreferenced twins in `vibey_gh.config`. The
+  documentation contract became configuration, and these were the literal copies left
+  behind — importable, but describing *this* project's docs, which is exactly what an
+  adopter is not held to. A repository wanting these headings declares them under
+  `[documentation]`. `README_PROVENANCE` is unaffected and still enforced.
 - Require checks that can actually report, and keep a way out when they cannot. The
   default `required_checks` were built from `scan_workflows`, which names *workflows*; a
   required status check names a *check run*, which for Actions is the job's name. So a
