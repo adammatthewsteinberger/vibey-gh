@@ -96,7 +96,7 @@ def state_body(state: ConversationState, summary: str) -> str:
 def mentions(body: str, trigger: str) -> bool:
     """Whether a comment addresses the automation.
 
-    Matched on a word boundary so `@vibey` is a mention and `@vibey-gh-bot` or an email
+    Matched on a word boundary so `@vibey-gh` is a mention and `@vibey-gh-bot` or an email
     address containing it is not. A mention inside a fenced code block still counts: this
     is a cheap check, and the expensive judgement belongs to the model with the whole
     thread in front of it.
