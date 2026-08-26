@@ -51,14 +51,14 @@ class ConversationState:
 
     subject: int
     interactions: int = 0
-    last_comment_id: int | None = None
+    last_comment_id: str | None = None
     history: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
 class Evaluation:
     subject: int
-    comment_id: int
+    comment_id: str
     author: str
     trusted: bool
     is_pull_request: bool
@@ -80,7 +80,9 @@ def parse_state(comments: list[dict[str, Any]]) -> ConversationState | None:
         return ConversationState(
             subject=int(data["subject"]),
             interactions=int(data.get("interactions", 0)),
-            last_comment_id=data.get("last_comment_id"),
+            last_comment_id=(
+                str(data["last_comment_id"]) if data.get("last_comment_id") is not None else None
+            ),
             history=list(data.get("history", [])),
         )
     except (KeyError, TypeError, ValueError):
@@ -94,7 +96,7 @@ def state_body(state: ConversationState, summary: str) -> str:
 def mentions(body: str, trigger: str) -> bool:
     """Whether a comment addresses the automation.
 
-    Matched on a word boundary so `@vibey` is a mention and `@vibey-gh-bot` or an email
+    Matched on a word boundary so `@vibey-gh` is a mention and `@vibey-gh-bot` or an email
     address containing it is not. A mention inside a fenced code block still counts: this
     is a cheap check, and the expensive judgement belongs to the model with the whole
     thread in front of it.
@@ -114,6 +116,30 @@ def request_of(body: str, trigger: str) -> str:
     if match is None:
         return ""
     return sanitize(body[match.end() :].strip(), limit=300)
+
+
+def comment_identity(comment: dict[str, Any]) -> str:
+    """One stable identity for a comment, whichever API produced it.
+
+    A webhook payload numbers a comment (`5419212581`); `gh issue view` returns the GraphQL
+    node instead (`IC_kwDO...`). They name the same comment and never match each other, so
+    the numeric form — recoverable from the comment's own URL when only the node is given —
+    is the identity everything here stores and compares. Getting this wrong is not a
+    mismatch but a crash: `int("IC_kwDO...")` raises, which is how the first real mention
+    ever sent failed.
+    """
+    raw = str(comment.get("id") or "")
+    if raw.isdigit():
+        return raw
+    match = re.search(r"issuecomment-(\d+)", str(comment.get("url") or ""))
+    return match.group(1) if match else raw
+
+
+def matches_comment(comment: dict[str, Any], wanted: str) -> bool:
+    """Whether `wanted` names this comment, in either spelling."""
+    if not wanted:
+        return False
+    return wanted in {comment_identity(comment), str(comment.get("id") or "")}
 
 
 def _is_own_comment(author: str, cfg: GhConfig) -> bool:
@@ -144,7 +170,7 @@ def evaluate(
     """Decide whether one comment gets a response, and how far that response may reach."""
     policy = cfg.conversation
     number = int(subject["number"])
-    comment_id = int(comment.get("id") or 0)
+    comment_id = comment_identity(comment)
     author = str((comment.get("author") or comment.get("user") or {}).get("login", ""))
     body = str(comment.get("body") or "")
     is_pr = bool(subject.get("isPullRequest") or subject.get("pull_request"))
@@ -271,7 +297,7 @@ def updated_state(subject: dict[str, Any], payload: dict[str, Any]) -> Conversat
     state = parse_state(subject.get("comments") or []) or ConversationState(subject=number)
     state.interactions += 1
     if payload.get("comment_id"):
-        state.last_comment_id = int(payload["comment_id"])
+        state.last_comment_id = str(payload["comment_id"])
     state.history.append({"kind": "response", **payload})
     return state
 
