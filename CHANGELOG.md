@@ -23,6 +23,12 @@ This file follows Keep a Changelog and semantic versioning conventions.
   recovered from the comment's own URL when only the node is given, is now the single
   identity stored and compared.
 - Rename the mention trigger to `@vibey-gh`, matching the tool's own name.
+- Make the generated release commit a Conventional Commit. `Release 1.23.0` does not stay
+  on the release branch: any topic branch that later merges the integration branch in pulls
+  it into its own commit range, where the provenance gate reads it like any other commit
+  and rejects the subject. That blocked a pull request outright, and bounded repair could
+  not fix it because the problem was history rather than file content. Now
+  `chore(release): 1.23.0`.
 
 - Declare `CHANGELOG.md merge=union` in `.gitattributes` so branches appending to the same
   section merge instead of conflicting. Every open branch adds an Unreleased entry, so each

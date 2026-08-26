@@ -104,6 +104,24 @@ def advance_develop(work: Path, message: str = "new content") -> None:
 # ── nothing to do ──────────────────────────────────────────────────────────
 
 
+def test_the_release_commit_is_itself_a_conventional_commit():
+    """This subject does not stay on the release branch.
+
+    Any topic branch that later merges the integration branch in pulls it into its own
+    commit range, where the provenance gate reads it like any other commit. `Release
+    1.23.0` blocked a pull request exactly that way, and the repair could not fix it by
+    editing files because the problem was history rather than content.
+    """
+    from vibey_gh.fingerprints import conventional_subject
+    from vibey_gh.promote import promote as _promote
+
+    source = Path(_promote.__code__.co_filename).read_text(encoding="utf-8")
+    assert "chore(release): " in source
+    assert '"Release {' not in source and 'f"Release ' not in source
+    for version in ("1.23.0", "2.0.0", "0.1.0.dev3"):
+        assert conventional_subject(f"chore(release): {version}")
+
+
 def test_identical_trees_promote_nothing(project, fake_gh):
     result = promote_mod.promote(cfg_for(project), wait=True)
     assert result.pull_request is None
