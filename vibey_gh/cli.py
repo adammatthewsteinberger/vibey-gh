@@ -322,8 +322,8 @@ def _conversation(args) -> int:
         comment: dict = {}
         if args.comment_id:
             comment = next(
-                (item for item in comments if int(item.get("id") or 0) == args.comment_id),
-                {},
+                (item for item in comments if conversation.matches_comment(item, args.comment_id)),
+                comments[-1] if comments else {},
             )
         else:
             comment = comments[-1] if comments else {}
@@ -633,7 +633,7 @@ def main(argv: list[str] | None = None) -> int:
     ):
         item = talk_sub.add_parser(name, help=helptext)
         item.add_argument("--subject", type=int, required=True, help="issue or PR number")
-        item.add_argument("--comment-id", type=int, help="exact comment; omit for the newest")
+        item.add_argument("--comment-id", help="exact comment; omit for the newest")
         if name == "context":
             item.add_argument("--output", type=Path)
             item.add_argument("--max-bytes", type=int, default=conversation.DEFAULT_CONTEXT_BYTES)

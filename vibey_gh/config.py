@@ -210,7 +210,7 @@ class ConversationConfig:
     """
 
     enabled: bool = True
-    trigger: str = "@vibey"
+    trigger: str = "@vibey-gh"
     model: str = "claude-sonnet-5"
     max_interactions: int = 10
     respond_to_untrusted: bool = False
@@ -574,7 +574,7 @@ def load_config(root: Path | None = None) -> GhConfig:
         ),
         conversation=ConversationConfig(
             enabled=talking.get("enabled", True),
-            trigger=talking.get("trigger", "@vibey"),
+            trigger=talking.get("trigger", "@vibey-gh"),
             model=talking.get("model", "claude-sonnet-5"),
             max_interactions=talking.get("max_interactions", 10),
             respond_to_untrusted=talking.get("respond_to_untrusted", False),

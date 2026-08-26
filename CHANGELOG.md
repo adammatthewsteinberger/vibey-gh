@@ -5,6 +5,14 @@ This file follows Keep a Changelog and semantic versioning conventions.
 
 ## Unreleased
 
+- Identify a comment the same way whichever GitHub API produced it. A webhook numbers a
+  comment; `gh issue view` returns a GraphQL node instead. They name the same comment and
+  never match each other, and `int("IC_kwDO...")` raises — so the first real mention ever
+  sent to the conversation feature crashed before it could answer. The numeric form,
+  recovered from the comment's own URL when only the node is given, is now the single
+  identity stored and compared.
+- Rename the mention trigger to `@vibey-gh`, matching the tool's own name.
+
 - Declare `CHANGELOG.md merge=union` in `.gitattributes` so branches appending to the same
   section merge instead of conflicting. Every open branch adds an Unreleased entry, so each
   merge stranded every other one on a conflict carrying no information — four manual
@@ -32,7 +40,7 @@ This file follows Keep a Changelog and semantic versioning conventions.
   repository into the stricter behavior.
 - Answer a configured mention in a comment. Everything else here reacts to scans, issues,
   and branches; none of it could hear "also handle the empty case" written under a pull
-  request. Mentioning `@vibey` now has the automation read the thread and answer, and — on
+  request. Mentioning `@vibey-gh` now has the automation read the thread and answer, and — on
   a pull request, from a trusted commenter — make the change and push one guarded commit.
   Outside commenters get no response unless a repository opts in, comment text reaches the
   model only as a bounded untrusted briefing, interactions per thread are budgeted, and the
