@@ -737,7 +737,10 @@ bounded repair loop before merge.
 After the configured `Release` workflow succeeds on `main`, the managed
 `github-release.yml` workflow tags that exact commit and creates a generated-notes GitHub
 Release. It is safe to rerun: an existing matching tag/release is reused, while an
-existing tag at a different SHA is never moved and fails loudly.
+existing tag at a different SHA is never moved. By default that mismatch is treated as an
+intentional no-op — e.g. a versionless docs- or tooling-only push — and is only turned into
+a loud failure when `[github_release] require_new_version = true` opts the repository into
+the stricter behavior.
 
 The managed `release-surfaces.yml` workflow follows every successful release on either
 branch. It builds two persistent ProperDocs sites under the repository's GitHub Pages
