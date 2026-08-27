@@ -145,6 +145,7 @@ def test_an_unreachable_model_fails_closed(monkeypatch, capsys, tmp_path, error)
     [
         {"message": {}},  # no content at all
         {"message": {"content": "not json"}},  # content that is not a verdict
+        {"message": {"content": "[1, 2, 3]"}},  # valid JSON that is not an object
     ],
 )
 def test_an_unusable_response_fails_closed(monkeypatch, capsys, tmp_path, payload):

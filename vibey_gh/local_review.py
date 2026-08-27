@@ -127,7 +127,13 @@ def call_ollama(base_url: str, model: str, diff: str, max_chars: int, timeout: i
     )
     with urllib.request.urlopen(request, timeout=timeout) as response:
         body = json.loads(response.read())
-    return json.loads(body["message"]["content"])
+    verdict = json.loads(body["message"]["content"])
+    # Constrained decoding guarantees the schema, but this is the boundary with an external
+    # process: assert the top-level shape rather than trusting it, so a gateway that is not
+    # actually Ollama cannot hand back something that is not a verdict at all.
+    if not isinstance(verdict, dict):
+        raise TypeError(f"expected a JSON object, got {type(verdict).__name__}")
+    return verdict
 
 
 def review(argv: list[str] | None = None) -> int:
@@ -158,7 +164,7 @@ def review(argv: list[str] | None = None) -> int:
     except (urllib.error.URLError, TimeoutError, OSError) as error:
         print(f"local model unreachable or timed out: {error}", file=sys.stderr)
         return 1
-    except (KeyError, json.JSONDecodeError) as error:
+    except (KeyError, TypeError, json.JSONDecodeError) as error:
         print(f"local model returned an unusable response: {error}", file=sys.stderr)
         return 1
 
