@@ -317,6 +317,22 @@ def _realign(args) -> int:
     return 0
 
 
+def _local_review(args) -> int:
+    from vibey_gh import local_review
+
+    forwarded: list[str] = []
+    for flag, value in (
+        ("--diff", args.diff),
+        ("--model", args.model),
+        ("--base-url", args.base_url),
+        ("--max-chars", args.max_chars),
+        ("--timeout", args.timeout),
+    ):
+        if value is not None:
+            forwarded += [flag, str(value)]
+    return local_review.review(forwarded)
+
+
 def _conversation(args) -> int:
     cfg = load_config()
     try:
@@ -625,6 +641,17 @@ def main(argv: list[str] | None = None) -> int:
 
     r = sub.add_parser("realign", help="realign the integration branch with the release branch")
     r.set_defaults(func=_realign)
+
+    local = sub.add_parser(
+        "local-review",
+        help="review a diff with a local model when the paid review path returns no verdict",
+    )
+    local.add_argument("--diff", help="path to a diff file (default: stdin)")
+    local.add_argument("--model", help="override [pr_automation.fallback] model")
+    local.add_argument("--base-url", help="override [pr_automation.fallback] base_url")
+    local.add_argument("--max-chars", type=int, help="override max_diff_chars")
+    local.add_argument("--timeout", type=int, help="override timeout_seconds")
+    local.set_defaults(func=_local_review)
 
     talk = sub.add_parser("conversation", help="respond to a mention in a comment")
     talk_sub = talk.add_subparsers(dest="action", required=True)

@@ -47,6 +47,7 @@ OWN_JOBS = (
     "Repair failed scans or review findings",
     "Resolve merge conflicts",
     "Escalate exhausted repair lineage",
+    "Local review fallback",
     "gate",
 )
 OWN_CHECKS = frozenset(

@@ -817,9 +817,9 @@ def test_pr_automation_never_assumes_the_adopting_repos_own_package_is_vibey_gh(
     text = (WORKFLOWS / "pr-automation.yml").read_text(encoding="utf-8")
     assert "pip install --quiet ./automation" not in text
     checks = re.findall(r"""grep -qE '\^name = "vibey-gh"' automation/pyproject\.toml""", text)
-    assert len(checks) == 4
+    assert len(checks) == 5  # review, repair, resolve-conflict, escalate, review-fallback
     installs = re.findall(r"python -m pip install --quiet vibey-gh\b", text)
-    assert len(installs) == 5  # the four guarded installs above plus the evaluate job's own
+    assert len(installs) == 6  # the five guarded installs above plus the evaluate job's own
 
 
 def test_promotion_checks_provenance_without_rewriting_or_reauditing_history():
