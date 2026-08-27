@@ -5,6 +5,18 @@ This file follows Keep a Changelog and semantic versioning conventions.
 
 ## Unreleased
 
+- Finish the code-block colours: give every token a legible default rather than naming
+  them one at a time. The previous pass covered strings and keywords and missed
+  `.hljs-subst`, so `$(git rev-parse HEAD)` inside a shell string stayed at 1.33:1 — in
+  the very example that tells a reader how to list their check names. `.hljs-code` and
+  `.hljs-formula` were under the line too, at 4.06:1. A catch-all now sets a readable
+  colour for any token, including ones this stylesheet has never heard of, and the palette
+  overrides the ones worth distinguishing; it precedes the palette because an attribute
+  selector and a class have equal specificity and source order decides. The contrast test
+  could not have caught this on its own — it measured the colours that were declared, and
+  the broken token had none — so a second test asserts the catch-all exists and comes
+  first.
+
 - Make code blocks readable on the published documentation site. The theme ships two
   highlight.js palettes and enables the *light* one by default (`#hljs-dark` carries
   `disabled`), so its token colours are chosen for a white page — while this stylesheet

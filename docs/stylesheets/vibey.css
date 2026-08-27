@@ -301,8 +301,27 @@ pre code,
  * Pygments classes are covered too: `pymdownx.highlight` renders server-side and emits
  * `.highlight .s` rather than `.hljs-string`, so a site configured that way would
  * otherwise keep the same unreadable defaults. */
+/* Nothing in a code block may keep a colour chosen for a white page.
+ *
+ * Naming tokens one at a time only fixes the ones thought of: the first pass covered
+ * strings and keywords and missed `.hljs-subst`, so `$(git rev-parse HEAD)` inside a
+ * shell string stayed at 1.33:1 — still unreadable, in the very example that tells
+ * someone how to list their check names. `.hljs-code` and `.hljs-formula` were a hair
+ * under too, at 4.06:1.
+ *
+ * So a legible default is set for every token first, and the palette below overrides the
+ * ones worth distinguishing. An attribute selector has the same specificity as a class,
+ * so source order decides and these two rules must stay above the palette. A token this
+ * stylesheet has never heard of is then merely undistinguished rather than invisible,
+ * which is the property that actually matters. */
+[class*="hljs-"],
+.highlight span {
+  color: #dce2f5;
+}
+
 .hljs-string,
 .hljs-meta .hljs-string,
+.hljs-regexp,
 .highlight .s,
 .highlight .s1,
 .highlight .s2,
@@ -378,6 +397,8 @@ pre code,
 
 .hljs-comment,
 .hljs-quote,
+.hljs-code,
+.hljs-formula,
 .highlight .c,
 .highlight .c1,
 .highlight .cm,
@@ -391,6 +412,11 @@ pre code,
 
 .hljs-meta,
 .hljs-doctag,
+.hljs-subst,
+.hljs-operator,
+.hljs-punctuation,
+.hljs-params,
+.hljs-property,
 .highlight .o,
 .highlight .p,
 .highlight .nt {
