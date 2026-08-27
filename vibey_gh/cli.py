@@ -317,26 +317,25 @@ def _realign(args) -> int:
     return 0
 
 
-def _yank_superseded(args) -> int:
-    import os
-
+def _report_superseded(args) -> int:
     from vibey_gh import yank
 
-    report = yank.yank_superseded(
-        load_config(),
-        args.index,
-        args.project,
-        args.version,
-        args.token or os.environ.get("VIBEY_GH_YANK_TOKEN", ""),
-    )
+    report = yank.report_superseded(load_config(), args.index, args.project, args.version)
     for problem in report.problems:
         print(f"vibey-gh: {problem}", file=sys.stderr)
     if report.skipped:
         print(f"vibey-gh: {args.index} — {', '.join(report.skipped)}")
-    if report.yanked:
-        print(f"vibey-gh: yanked from {args.index}: {', '.join(report.yanked)}")
-    # A publish has already succeeded by the time this runs. Reporting a bookkeeping
-    # failure as a failed release would misrepresent it, so problems are printed, not fatal.
+    if report.superseded:
+        print(
+            f"vibey-gh: {len(report.superseded)} release(s) on {args.index} superseded by {args.version}:"
+        )
+        for version in report.superseded:
+            print(f"  - {version}")
+        # PyPI has no yank API, so the only thing that can be automated is working out the
+        # list. Print where to act on it; see vibey_gh/yank.py for why.
+        print(f"\n  Yank at: {report.manage_url}")
+    # A publish has already succeeded by the time this runs. Reporting a bookkeeping failure
+    # as a failed release would misrepresent it, so problems are printed, not fatal.
     return 0
 
 
@@ -666,14 +665,13 @@ def main(argv: list[str] | None = None) -> int:
     r.set_defaults(func=_realign)
 
     y = sub.add_parser(
-        "yank-superseded",
-        help="yank releases below the published one from an index (see [yank]; off by default)",
+        "report-superseded",
+        help="report which releases the published one supersedes (PyPI has no yank API)",
     )
     y.add_argument("--index", choices=["pypi", "testpypi"], required=True)
     y.add_argument("--project", required=True, help="the distribution name on the index")
-    y.add_argument("--version", required=True, help="the version just published; never yanked")
-    y.add_argument("--token", default="", help="index API token (default: $VIBEY_GH_YANK_TOKEN)")
-    y.set_defaults(func=_yank_superseded)
+    y.add_argument("--version", required=True, help="the version just published; never listed")
+    y.set_defaults(func=_report_superseded)
 
     local = sub.add_parser(
         "local-review",

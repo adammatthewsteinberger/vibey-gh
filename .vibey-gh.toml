@@ -193,15 +193,12 @@ required_checks = [
 ]
 bypass_actors = ["RepositoryRole:5"]
 
+
 [yank]
-# Yank superseded releases after a publish. See docs/configuration.md: PEP 592 calls a
-# yanked release one with "a serious problem", installers still resolve it when a pin
-# demands it, and on PyPI it is not practically reversible -- so this is off by default
-# everywhere and turned on here deliberately.
-#
-# `keep = 1` leaves the release immediately below the newest one alone, so there is
-# always a rollback target that carries no warning. Set it to 0 to yank everything
-# superseded.
-pypi = true
-testpypi = true
+# Report which releases the just-published one supersedes. It cannot yank them: PyPI has no
+# API for that (405 on the upload endpoint, CSRF on /manage, pypa/packaging-problems#633
+# still open), so the list is printed with a link and a human clicks. Off until that report
+# is actually wanted on every release.
+pypi = false
+testpypi = false
 keep = 1
