@@ -1,14 +1,16 @@
 # Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), Developed by [Adam Matthew Steinberger](https://hire.adam.matthewsteinberger.com/) ([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/)).
-"""Yanking superseded releases.
+"""Reporting which releases a publish supersedes.
 
-Yanking is a destructive, effectively irreversible signal applied to other people's
-builds, so what is pinned here is mostly what it must REFUSE to do: never the version just
-published, never a version it cannot parse, never anything at all unless asked.
+This module used to claim it could yank them. It could not: PyPI exposes no API for
+yanking, and every test here mocked the wire, so 100% coverage said nothing about whether
+the request was even a real one. `test_the_index_still_has_no_yank_api` is the test that
+would have caught it, and it talks to the network on purpose.
 """
 
 from __future__ import annotations
 
 import json
+import os
 import urllib.error
 from pathlib import Path
 
@@ -23,24 +25,21 @@ def _cfg(**kw) -> GhConfig:
 
 
 def test_it_is_off_on_both_indexes_by_default():
-    """This marks other people's working builds as defective. Nobody inherits it."""
     default = YankConfig()
     assert default.pypi is False
     assert default.testpypi is False
 
 
 @pytest.mark.parametrize("index", [yank.PYPI, yank.TESTPYPI])
-def test_disabled_yanks_nothing(index):
-    report = yank.yank_superseded(_cfg(), index, "pkg", "1.2.0", "token")
-    assert report.yanked == ()
+def test_disabled_reports_nothing(index):
+    report = yank.report_superseded(_cfg(), index, "pkg", "1.2.0")
+    assert report.superseded == ()
     assert report.skipped == ("disabled",)
 
 
-def test_the_version_just_published_is_never_yanked():
-    """The one invariant that must hold however the ordering behaves: a publish cannot
-    render itself uninstallable."""
-    versions = ["1.0.0", "1.1.0", "1.2.0"]
-    assert "1.2.0" not in yank.supersede(versions, "1.2.0", keep=0)
+def test_the_version_just_published_is_never_listed():
+    """It must never appear in a list of things to yank, however ordering behaves."""
+    assert "1.2.0" not in yank.supersede(["1.0.0", "1.1.0", "1.2.0"], "1.2.0", keep=0)
 
 
 def test_keep_preserves_a_rollback_target():
@@ -50,16 +49,12 @@ def test_keep_preserves_a_rollback_target():
     assert yank.supersede(versions, "1.3.0", keep=99) == []
 
 
-def test_newer_releases_are_never_yanked():
-    """Only what is BELOW the published version. A version above it is not superseded by
-    it, and yanking one would be actively wrong."""
-    versions = ["1.0.0", "2.0.0", "3.0.0"]
-    assert yank.supersede(versions, "2.0.0", keep=0) == ["1.0.0"]
+def test_newer_releases_are_never_listed():
+    """A version above the published one is not superseded by it."""
+    assert yank.supersede(["1.0.0", "2.0.0", "3.0.0"], "2.0.0", keep=0) == ["1.0.0"]
 
 
 def test_a_dev_build_is_superseded_by_its_own_release():
-    """`1.2.0.dev5` anticipates `1.2.0`, so publishing the release supersedes it. This is
-    the whole point on TestPyPI, where every push leaves another `.devN`."""
     assert yank.order("1.2.0.dev5") < yank.order("1.2.0")
     versions = ["1.2.0.dev4", "1.2.0.dev5", "1.2.0"]
     assert yank.supersede(versions, "1.2.0", keep=0) == ["1.2.0.dev5", "1.2.0.dev4"]
@@ -75,26 +70,19 @@ def test_a_dev_build_is_superseded_by_its_own_release():
         "1.0.0rc1",
         "not-a-version",
         "",
-        "1.2.0.devX",  # a .dev suffix that is not a number
-        "1.2.0.dev",  # ...or is missing entirely
+        "1.2.0.devX",
+        "1.2.0.dev",
     ],
 )
-def test_an_unparseable_version_is_left_alone(version):
-    """This is not a PEP 440 implementation and does not pretend to be. Half a parser
-    applied to epochs, locals and post-releases would mis-order them silently, and here
-    that means yanking something good."""
+def test_an_unparseable_version_is_left_out(version):
+    """Half a PEP 440 parser mis-orders these silently, which here means naming a good
+    release in a list of things to yank."""
     assert yank.order(version) is None
     assert yank.supersede([version], "9.9.9", keep=0) == []
 
 
-def test_an_unparseable_current_version_yanks_nothing():
+def test_an_unparseable_current_version_reports_nothing():
     assert yank.supersede(["1.0.0", "2.0.0"], "not-a-version", keep=0) == []
-
-
-def test_a_missing_token_is_reported_rather_than_silently_skipped():
-    report = yank.yank_superseded(_cfg(pypi=True), yank.PYPI, "pkg", "1.2.0", "")
-    assert not report.ok
-    assert "no token" in report.problems[0]
 
 
 def _index(monkeypatch, payload: dict) -> None:
@@ -114,8 +102,7 @@ def _index(monkeypatch, payload: dict) -> None:
     monkeypatch.setattr(yank.urllib.request, "urlopen", lambda *a, **k: _Response())
 
 
-def test_releases_already_fully_yanked_are_not_yanked_again(monkeypatch):
-    """Re-yanking costs a request and reports as if something happened. It did not."""
+def test_releases_already_fully_yanked_are_not_listed_again(monkeypatch):
     _index(
         monkeypatch,
         {
@@ -123,7 +110,7 @@ def test_releases_already_fully_yanked_are_not_yanked_again(monkeypatch):
                 "1.0.0": [{"yanked": True}],
                 "1.1.0": [{"yanked": False}],
                 "1.2.0": [{"yanked": False}],
-                "1.3.0": [],  # a release with no files at all
+                "1.3.0": [],
             }
         },
     )
@@ -138,27 +125,36 @@ def test_an_unknown_project_has_no_releases(monkeypatch):
     assert yank.released_versions(yank.PYPI, "nope") == []
 
 
-def test_an_unreachable_index_never_fails_the_release(monkeypatch):
-    """The package is already published by the time this runs. A bookkeeping failure must
-    not be reported as a broken release."""
+def test_a_non_404_index_error_is_not_swallowed(monkeypatch):
+    """A 404 means "no such project", a real answer. A 500 is not, and treating it as "no
+    releases" would report success having looked at nothing."""
 
+    def raise500(*a, **k):
+        raise urllib.error.HTTPError("u", 500, "Server Error", {}, None)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(yank.urllib.request, "urlopen", raise500)
+    with pytest.raises(urllib.error.HTTPError):
+        yank.released_versions(yank.PYPI, "pkg")
+
+
+def test_an_unreachable_index_never_fails_the_release(monkeypatch):
     def boom(*a, **k):
         raise urllib.error.URLError("down")
 
     monkeypatch.setattr(yank.urllib.request, "urlopen", boom)
-    report = yank.yank_superseded(_cfg(pypi=True), yank.PYPI, "pkg", "1.2.0", "token")
+    report = yank.report_superseded(_cfg(pypi=True), yank.PYPI, "pkg", "1.2.0")
     assert not report.ok
-    assert report.yanked == ()
+    assert report.superseded == ()
 
 
 def test_nothing_superseded_is_reported_as_such(monkeypatch):
     _index(monkeypatch, {"releases": {"1.2.0": [{"yanked": False}]}})
-    report = yank.yank_superseded(_cfg(pypi=True), yank.PYPI, "pkg", "1.2.0", "token")
+    report = yank.report_superseded(_cfg(pypi=True), yank.PYPI, "pkg", "1.2.0")
     assert report.skipped == ("nothing superseded",)
-    assert report.yanked == ()
 
 
-def test_each_superseded_release_is_yanked_once(monkeypatch):
+def test_the_report_names_where_a_human_can_act_on_it(monkeypatch):
+    """The list is only useful with the page that can action it, since nothing else can."""
     _index(
         monkeypatch,
         {
@@ -169,27 +165,9 @@ def test_each_superseded_release_is_yanked_once(monkeypatch):
             }
         },
     )
-    calls: list[tuple[str, str]] = []
-    monkeypatch.setattr(yank, "_yank_one", lambda i, p, v, r, t: calls.append((i, v)) or None)
-    report = yank.yank_superseded(_cfg(pypi=True), yank.PYPI, "pkg", "1.2.0", "token")
-    assert report.ok
-    assert sorted(report.yanked) == ["1.0.0", "1.1.0"]
-    assert [v for _, v in calls] == ["1.1.0", "1.0.0"]
-
-
-def test_a_failed_yank_is_reported_without_stopping_the_others(monkeypatch):
-    _index(
-        monkeypatch,
-        {"releases": {"1.0.0": [{"yanked": False}], "1.1.0": [{"yanked": False}]}},
-    )
-    monkeypatch.setattr(
-        yank,
-        "_yank_one",
-        lambda i, p, v, r, t: "1.1.0: boom" if v == "1.1.0" else None,
-    )
-    report = yank.yank_superseded(_cfg(pypi=True), yank.PYPI, "pkg", "1.2.0", "token")
-    assert report.yanked == ("1.0.0",)
-    assert not report.ok
+    report = yank.report_superseded(_cfg(pypi=True), yank.PYPI, "pkg", "1.2.0")
+    assert report.superseded == ("1.1.0", "1.0.0")
+    assert report.manage_url == "https://pypi.org/manage/project/pkg/releases/"
 
 
 def test_keep_must_not_be_negative():
@@ -197,102 +175,87 @@ def test_keep_must_not_be_negative():
         YankConfig(keep=-1)
 
 
-def test_reason_must_not_be_empty():
-    with pytest.raises(ValueError, match="reason"):
-        YankConfig(reason="  ")
-
-
-def test_a_non_404_index_error_is_not_swallowed(monkeypatch):
-    """A 404 means "no such project", which is a real answer. A 500 or a 403 is not, and
-    treating it as "no releases" would silently yank nothing while reporting success."""
-
-    def raise500(*a, **k):
-        raise urllib.error.HTTPError("u", 500, "Server Error", {}, None)  # type: ignore[arg-type]
-
-    monkeypatch.setattr(yank.urllib.request, "urlopen", raise500)
-    with pytest.raises(urllib.error.HTTPError):
-        yank.released_versions(yank.PYPI, "pkg")
-
-
-def test_the_upload_call_targets_the_right_index_and_never_logs_the_token(monkeypatch):
-    """The token is passed to curl, so it must not come back in an error string: these
-    reports go to a job summary."""
-    seen: dict[str, object] = {}
-
-    class _Run:
-        returncode = 1
-        stdout = ""
-        stderr = "403 Forbidden"
-
-    def fake_run(argv, **kw):
-        seen["argv"] = argv
-        return _Run()
-
-    monkeypatch.setattr(yank.subprocess, "run", fake_run)
-    error = yank._yank_one(yank.TESTPYPI, "pkg", "1.0.0", "superseded", "secret-token")
-
-    argv = seen["argv"]
-    assert yank._UPLOAD[yank.TESTPYPI] in argv
-    assert ":action=yank" in argv
-    assert "1.0.0" in " ".join(argv)
-    assert error is not None
-    assert "403" in error
-    assert "secret-token" not in error
-
-
-def test_a_successful_upload_reports_no_error(monkeypatch):
-    class _Run:
-        returncode = 0
-        stdout = "ok"
-        stderr = ""
-
-    monkeypatch.setattr(yank.subprocess, "run", lambda *a, **k: _Run())
-    assert yank._yank_one(yank.PYPI, "pkg", "1.0.0", "superseded", "t") is None
-
-
-def test_a_release_whose_files_are_all_yanked_is_skipped_by_supersede(monkeypatch):
-    """The already-yanked filter and the ordering meet here: a release the index reports as
-    fully yanked never reaches `supersede`, so it is never re-yanked."""
-    _index(
-        monkeypatch,
-        {"releases": {"1.0.0": [{"yanked": True}], "1.1.0": [{"yanked": False}]}},
-    )
-    calls: list[str] = []
-    monkeypatch.setattr(yank, "_yank_one", lambda i, p, v, r, t: calls.append(v) or None)
-    report = yank.yank_superseded(_cfg(pypi=True), yank.PYPI, "pkg", "1.2.0", "token")
-    assert calls == ["1.1.0"]
-    assert report.yanked == ("1.1.0",)
-
-
-def test_the_cli_forwards_the_report_and_never_fails_the_release(monkeypatch, capsys):
-    """A publish has already succeeded by the time this runs. Even a total failure to yank
-    must exit 0, or a green release reports as broken."""
+def test_the_cli_prints_the_list_and_never_fails_the_release(monkeypatch, capsys):
     from vibey_gh import cli
 
     monkeypatch.setattr(
         yank,
-        "yank_superseded",
-        lambda *a, **k: yank.YankReport(
-            "pypi", yanked=("1.0.0",), skipped=("x",), problems=("boom",)
+        "report_superseded",
+        lambda *a, **k: yank.SupersededReport(
+            "pypi", superseded=("1.0.0",), problems=("boom",), manage_url="https://example/manage"
         ),
     )
-    code = cli.main(["yank-superseded", "--index", "pypi", "--project", "p", "--version", "1.1.0"])
+    code = cli.main(
+        ["report-superseded", "--index", "pypi", "--project", "p", "--version", "1.1.0"]
+    )
     out = capsys.readouterr()
     assert code == 0
     assert "1.0.0" in out.out
+    assert "https://example/manage" in out.out
     assert "boom" in out.err
 
 
-def test_the_cli_reads_the_token_from_the_environment(monkeypatch):
+def test_the_cli_reports_a_skip(monkeypatch, capsys):
     from vibey_gh import cli
 
-    seen: dict[str, str] = {}
-    monkeypatch.setenv("VIBEY_GH_YANK_TOKEN", "from-env")
     monkeypatch.setattr(
         yank,
-        "yank_superseded",
-        lambda cfg, index, project, version, token: seen.update(token=token)
-        or yank.YankReport(index),
+        "report_superseded",
+        lambda *a, **k: yank.SupersededReport("pypi", skipped=("disabled",)),
     )
-    cli.main(["yank-superseded", "--index", "pypi", "--project", "p", "--version", "1.1.0"])
-    assert seen["token"] == "from-env"
+    assert (
+        cli.main(["report-superseded", "--index", "pypi", "--project", "p", "--version", "1.1.0"])
+        == 0
+    )
+    assert "disabled" in capsys.readouterr().out
+
+
+@pytest.mark.skipif(
+    os.environ.get("VIBEY_GH_NETWORK_TESTS") != "1",
+    reason="talks to PyPI; set VIBEY_GH_NETWORK_TESTS=1",
+)
+@pytest.mark.parametrize(
+    "url", ["https://test.pypi.org/legacy/", "https://upload.pypi.org/legacy/"]
+)
+def test_the_index_still_has_no_yank_api(url):
+    """The test that was missing, and the reason a shipped feature could not work.
+
+    An earlier version POSTed `:action=yank` here and every test mocked the wire, so the
+    suite was green against a request the endpoint has never accepted. The distinction is
+    the whole point: a RECOGNISED action reaches authentication and answers 403 on bad
+    credentials, while `yank` answers 405 -- the action does not exist, and no token helps.
+
+    If this ever starts failing, PyPI has shipped
+    https://github.com/pypi/warehouse/issues/12708 and yanking can be automated for real.
+    """
+    import subprocess
+
+    def status(action: str) -> str:
+        result = subprocess.run(
+            [
+                "curl",
+                "-sS",
+                "-o",
+                "/dev/null",
+                "-w",
+                "%{http_code}",
+                "-X",
+                "POST",
+                "-F",
+                f":action={action}",
+                "-F",
+                "name=vibey-gh",
+                "-F",
+                "version=0.0.0.dev0",
+                "--user",
+                "__token__:bogus",
+                url,
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        return result.stdout.strip()
+
+    assert status("file_upload") == "403", "a recognised action should reach authentication"
+    assert status("yank") == "405", "if this is no longer 405, PyPI may have shipped a yank API"
