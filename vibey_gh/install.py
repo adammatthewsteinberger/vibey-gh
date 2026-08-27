@@ -10,6 +10,7 @@ else thought were important.
 from __future__ import annotations
 
 import json
+import shlex
 import shutil
 import stat
 import subprocess
@@ -186,6 +187,17 @@ def render_workflow(source: Path, cfg: GhConfig) -> str:
     wanted = wanted.replace(
         "__VIBEY_GH_DOC_GOOGLE_ANALYTICS_ID__", cfg.documentation.google_analytics_id
     )
+    # Shell-quoted because these land verbatim in a `pip install` line. A requirement may
+    # legitimately carry spaces and brackets (`mkdocs-material[imaging] >= 9.5`), which
+    # would otherwise split into several arguments or be read as a glob.
+    wanted = wanted.replace(
+        "__VIBEY_GH_DOC_SITE_REQUIREMENTS__",
+        " ".join(shlex.quote(value) for value in cfg.documentation.site_requirements),
+    )
+    wanted = wanted.replace(
+        "__VIBEY_GH_DOC_REQUIREMENTS_FILE__", cfg.documentation.site_requirements_file
+    )
+    wanted = wanted.replace("__VIBEY_GH_PROPERDOCS_VERSION__", cfg.documentation.properdocs_version)
     wanted = wanted.replace(
         "__VIBEY_GH_DOCUMENTATION_FILES__",
         json.dumps(list(cfg.documentation.required_files)),

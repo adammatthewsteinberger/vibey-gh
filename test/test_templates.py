@@ -82,8 +82,11 @@ def test_release_surfaces_preserve_both_docs_channels_and_publish_oci_packages()
     assert "while read -r other_run" in text
     assert '--name "docs-${OTHER_CHANNEL}"' in text
     assert "docs-${OTHER_CHANNEL}" in text
-    assert "properdocs==1.6.7" in text
-    assert "properdocs-theme-mkdocs==1.6.7" in text
+    # Both the version and any extra site packages are rendered from configuration, so the
+    # template carries placeholders rather than a pinned literal.
+    assert "properdocs==__VIBEY_GH_PROPERDOCS_VERSION__" in text
+    assert "properdocs-theme-mkdocs==__VIBEY_GH_PROPERDOCS_VERSION__" in text
+    assert "__VIBEY_GH_DOC_SITE_REQUIREMENTS__" in text
     assert "packages: write" in text
     assert "ghcr.io/${GITHUB_REPOSITORY,,}/python" in text
     assert "application/vnd.pypi.project.release.v1" in text
@@ -126,6 +129,57 @@ def test_release_surfaces_google_analytics_is_generic_and_off_by_default(tmp_pat
         ),
     )
     assert 'GA_ID="G-ABC1234567"' in enabled
+
+
+def test_release_surfaces_installs_the_packages_the_site_actually_declares(tmp_path: Path):
+    """ProperDocs depends on none of the plugins a real site configures.
+
+    The install line named exactly `properdocs` and its theme, with no way to extend it, so
+    a repository whose `properdocs.yml` declared `mkdocs-gen-files` or `pymdownx.*` failed
+    `--strict` on the first one it met — the packages are simply absent. A site's
+    dependencies follow from its own configuration, so they can only be the adopter's to
+    declare.
+    """
+    rendered = render_workflow(
+        WORKFLOWS / "release-surfaces.yml",
+        GhConfig(
+            root=tmp_path,
+            documentation=DocumentationConfig(
+                site_requirements=(
+                    "mkdocs-gen-files",
+                    "pymdown-extensions>=10.7",
+                    "mkdocs-material[imaging] >= 9.5",
+                ),
+                properdocs_version="1.7.0",
+            ),
+        ),
+    )
+    assert "__VIBEY_GH" not in rendered
+    assert "'properdocs==1.7.0'" in rendered
+    assert "mkdocs-gen-files" in rendered
+    # Quoted, so a specifier carrying spaces or brackets stays one argument to pip rather
+    # than splitting into three or being read as a glob.
+    assert shlex.quote("mkdocs-material[imaging] >= 9.5") in rendered
+    assert shlex.quote("pymdown-extensions>=10.7") in rendered
+    install_line = next(line for line in rendered.split("\n") if "mkdocs-material[imaging]" in line)
+    assert shlex.split(install_line) == [
+        "properdocs==1.7.0",
+        "properdocs-theme-mkdocs==1.7.0",
+        "mkdocs-gen-files",
+        "pymdown-extensions>=10.7",
+        "mkdocs-material[imaging] >= 9.5",
+    ]
+
+
+def test_release_surfaces_adds_nothing_to_the_install_by_default(tmp_path: Path):
+    """The default must stay a no-op: an adopter declaring nothing installs nothing extra."""
+    rendered = render_workflow(WORKFLOWS / "release-surfaces.yml", GhConfig(root=tmp_path))
+    assert "__VIBEY_GH" not in rendered
+    assert "'properdocs==1.6.7'" in rendered
+    # The requirements-file hook is guarded by its own existence check, so a repository
+    # without one runs an install of exactly the two packages and nothing else.
+    assert 'if [ -n "docs/requirements.txt" ]' in rendered
+    assert '[ -f "docs/requirements.txt" ]' in rendered
 
 
 def test_documentation_workflow_authors_guarded_refresh_prs():
@@ -476,6 +530,36 @@ def test_a_gateway_endpoint_reaches_every_step_with_both_header_conventions(name
 def test_an_unsafe_ai_endpoint_is_rejected(kwargs, match):
     with pytest.raises(ValueError, match=match):
         AiConfig(**kwargs)
+
+
+@pytest.mark.parametrize(
+    "kwargs,match",
+    [
+        ({"site_requirements": ("a", "a")}, "must be unique"),
+        ({"site_requirements": (" ",)}, "must be non-empty"),
+        # Quoting makes ordinary specifier punctuation safe, but a newline would end the
+        # `pip install` line and start an arbitrary command inside the workflow.
+        ({"site_requirements": ("mkdocs\nrm -rf /",)}, "spans lines"),
+        ({"site_requirements": ("mkdocs\rwhoami",)}, "spans lines"),
+        ({"site_requirements_file": "/etc/requirements.txt"}, "repository-relative"),
+        ({"site_requirements_file": "../elsewhere/requirements.txt"}, "repository-relative"),
+        ({"properdocs_version": "  "}, "must not be empty"),
+    ],
+)
+def test_unsafe_site_requirements_are_rejected(kwargs, match):
+    with pytest.raises(ValueError, match=match):
+        DocumentationConfig(**kwargs)
+
+
+def test_a_repository_may_decline_the_site_requirements_file_entirely(tmp_path):
+    """An empty path is a supported way to say "no requirements file", not a broken one."""
+    rendered = render_workflow(
+        WORKFLOWS / "release-surfaces.yml",
+        GhConfig(root=tmp_path, documentation=DocumentationConfig(site_requirements_file="")),
+    )
+    assert "__VIBEY_GH" not in rendered
+    # The guard survives with an empty operand, so the branch is simply never taken.
+    assert 'if [ -n "" ]' in rendered
 
 
 def test_a_repository_can_decline_the_union_merge_rule_entirely(tmp_path):
