@@ -351,6 +351,49 @@ def test_pr_review_requires_verified_repository_paths():
     assert "fail the review action so infrastructure recovery can retry it" in text
 
 
+def _relative_luminance(hex_colour: str) -> float:
+    value = hex_colour.lstrip("#")
+    channels = [int(value[i : i + 2], 16) / 255 for i in (0, 2, 4)]
+    linear = [c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4 for c in channels]
+    return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
+
+
+def _contrast(foreground: str, background: str) -> float:
+    first, second = _relative_luminance(foreground), _relative_luminance(background)
+    lighter, darker = max(first, second), min(first, second)
+    return (lighter + 0.05) / (darker + 0.05)
+
+
+def test_code_blocks_are_legible_against_the_background_this_theme_forces():
+    """Forcing a dark code background obliges this stylesheet to own the token colours.
+
+    The mkdocs theme ships two highlight.js palettes and enables the *light* one by
+    default — `#hljs-dark` carries `disabled` — so its tokens are picked for a white page.
+    This stylesheet then paints the block `#080c17`. github-light renders a string as
+    `#032f62`, which against that background is 1.48:1: not low-contrast but genuinely
+    unreadable, and every configuration sample in these docs is mostly string literals.
+
+    Measured rather than eyeballed, because "looks fine to me" is what shipped it.
+    """
+    css = (Path(__file__).resolve().parent.parent / "docs/stylesheets/vibey.css").read_text(
+        encoding="utf-8"
+    )
+    background = re.search(r"background:\s*(#[0-9a-fA-F]{6})\s*!important", css)
+    assert background, "the forced code-block background is gone; this test needs rewriting"
+    dark = background.group(1)
+    # Every colour declared in a rule that mentions a syntax token, whichever highlighter
+    # produced it: `.hljs-*` for the client-side theme, `.highlight .x` for Pygments.
+    tokens = re.findall(
+        r"((?:[^{}]*(?:\.hljs-|\.highlight\s+\.)[^{}]*)\{[^}]*?color:\s*(#[0-9a-fA-F]{6}))",
+        css,
+    )
+    assert len(tokens) >= 8, f"expected the token palette to be present, found {len(tokens)}"
+    for rule, colour in tokens:
+        ratio = _contrast(colour, dark)
+        selector = rule.split("{")[0].strip().splitlines()[-1].strip()
+        assert ratio >= 4.5, f"{selector} {colour} is {ratio:.2f}:1 on {dark}, below AA"
+
+
 def test_properdocs_theme_is_channel_aware_and_accessible():
     root = Path(__file__).resolve().parent.parent
     config = (root / "properdocs.yml").read_text(encoding="utf-8")

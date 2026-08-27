@@ -5,6 +5,17 @@ This file follows Keep a Changelog and semantic versioning conventions.
 
 ## Unreleased
 
+- Make code blocks readable on the published documentation site. The theme ships two
+  highlight.js palettes and enables the *light* one by default (`#hljs-dark` carries
+  `disabled`), so its token colours are chosen for a white page — while this stylesheet
+  paints every code block `#080c17`. A string literal rendered `#032f62` on near-black,
+  a contrast ratio of 1.48:1 against a 4.5:1 standard: not merely low-contrast but
+  genuinely unreadable, and a configuration sample is mostly string literals. The
+  stylesheet now supplies its own token palette, every colour of it measured at AA or
+  better, covering both `.hljs-*` and the Pygments classes a `pymdownx.highlight` site
+  emits instead. A test computes the contrast of every token colour against the forced
+  background and fails below AA, since "looks fine to me" is what shipped this.
+
 - Add `[ai]`, so the AI steps can be pointed at an endpoint other than Anthropic's. Every
   one of them runs Claude Code, which honours `ANTHROPIC_BASE_URL`, so a gateway serving
   the Anthropic Messages API — LiteLLM and similar translate it to Gemini, Qwen, GitHub
