@@ -83,25 +83,28 @@ def check(cfg: GhConfig) -> DocumentationReport:
         if cfg.documentation.require_provenance and not text.rstrip().endswith(README_PROVENANCE):
             problems.append("README.md must end with the exact Vibey provenance sentence")
 
-    github_readme = cfg.root / ".github/README.md"
-    if github_readme.is_file() and (
-        cfg.documentation.github_readme_sections
-        or cfg.documentation.github_readme_min_words
+    automation_doc = cfg.root / cfg.documentation.automation_doc
+    if automation_doc.is_file() and (
+        cfg.documentation.automation_doc_sections
+        or cfg.documentation.automation_doc_min_words
         or cfg.documentation.require_provenance
     ):
-        text = github_readme.read_text(encoding="utf-8")
-        for heading in cfg.documentation.github_readme_sections:
+        text = automation_doc.read_text(encoding="utf-8")
+        for heading in cfg.documentation.automation_doc_sections:
             if heading not in text:
                 problems.append(
-                    f".github/README.md is missing automation documentation section: {heading}"
+                    f"{cfg.documentation.automation_doc} is missing automation section: {heading}"
                 )
-        minimum = cfg.documentation.github_readme_min_words
+        minimum = cfg.documentation.automation_doc_min_words
         if minimum and len(text.split()) < minimum:
             problems.append(
-                f".github/README.md is not comprehensive enough: expected at least {minimum} words"
+                f"{cfg.documentation.automation_doc} is not comprehensive enough: "
+                f"expected at least {minimum} words"
             )
         if cfg.documentation.require_provenance and not text.rstrip().endswith(README_PROVENANCE):
-            problems.append(".github/README.md must end with the exact Vibey provenance sentence")
+            problems.append(
+                f"{cfg.documentation.automation_doc} must end with the exact Vibey provenance sentence"
+            )
 
     diagram = cfg.root / "docs/project.mmd"
     if diagram.is_file() and (

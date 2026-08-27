@@ -117,6 +117,13 @@ GOOGLE_ANALYTICS_ID_PATTERN = re.compile(r"^G-[A-Z0-9]+$")
 # this shape is accepted, so a configured name cannot close the expression and append an
 # arbitrary one of its own.
 SECRET_NAME_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+# Where a repository's automation documentation lives. Deliberately NOT `.github/README.md`:
+# GitHub resolves a repository's landing README as `.github/README.md` first and the root
+# `README.md` only if that is absent, so requiring the former replaced every adopter's
+# product README with maintainer-facing automation notes on their repository's front page.
+# Both this project and its first adopter were serving the wrong document, and nothing in
+# the file itself could fix it — the name is what GitHub reads.
+DEFAULT_AUTOMATION_DOC = ".github/AUTOMATION.md"
 # The agent-docs layout every repository this tool manages is expected to carry. These
 # files describe the ADOPTER's own project and make it navigable to an agent, so unlike the
 # narrative contracts on `DocumentationConfig` — which default to empty and are declared
@@ -129,7 +136,7 @@ DEFAULT_DOCUMENTATION_FILES = (
     ".agents/skills/README.md",
     ".agent/rules/project.md",
     ".githooks/README.md",
-    ".github/README.md",
+    DEFAULT_AUTOMATION_DOC,
     "docs/index.md",
     "docs/project.mmd",
     "AGENTS.md",
@@ -532,8 +539,9 @@ class DocumentationConfig:
     # A project that installs vibey-gh documents its product, not this tool, so each of
     # these is empty until the repository declares it.
     readme_sections: tuple[str, ...] = ()
-    github_readme_sections: tuple[str, ...] = ()
-    github_readme_min_words: int = 0
+    automation_doc: str = DEFAULT_AUTOMATION_DOC
+    automation_doc_sections: tuple[str, ...] = ()
+    automation_doc_min_words: int = 0
     mermaid_terms: tuple[str, ...] = ()
     mermaid_min_edges: int = 0
     require_provenance: bool = False
@@ -553,13 +561,13 @@ class DocumentationConfig:
         _unique_nonempty("documentation.required_files", self.required_files)
         for name, values in (
             ("readme_sections", self.readme_sections),
-            ("github_readme_sections", self.github_readme_sections),
+            ("automation_doc_sections", self.automation_doc_sections),
             ("mermaid_terms", self.mermaid_terms),
             ("provenance_files", self.provenance_files),
         ):
             _unique_nonempty(f"documentation.{name}", values)
         for name, threshold in (
-            ("github_readme_min_words", self.github_readme_min_words),
+            ("automation_doc_min_words", self.automation_doc_min_words),
             ("mermaid_min_edges", self.mermaid_min_edges),
         ):
             if threshold < 0:
@@ -832,8 +840,17 @@ def load_config(root: Path | None = None) -> GhConfig:
             author_name=documentation.get("author_name", "Adam Matthew Steinberger"),
             author_url=documentation.get("author_url", "https://hire.adam.matthewsteinberger.com"),
             readme_sections=tuple(documentation.get("readme_sections", ())),
-            github_readme_sections=tuple(documentation.get("github_readme_sections", ())),
-            github_readme_min_words=documentation.get("github_readme_min_words", 0),
+            automation_doc=documentation.get("automation_doc", DEFAULT_AUTOMATION_DOC),
+            # The former names are still read. They described a file this no longer points
+            # at, but an adopter's config predates the rename and should not break on it.
+            automation_doc_sections=tuple(
+                documentation.get(
+                    "automation_doc_sections", documentation.get("github_readme_sections", ())
+                )
+            ),
+            automation_doc_min_words=documentation.get(
+                "automation_doc_min_words", documentation.get("github_readme_min_words", 0)
+            ),
             mermaid_terms=tuple(documentation.get("mermaid_terms", ())),
             mermaid_min_edges=documentation.get("mermaid_min_edges", 0),
             require_provenance=documentation.get("require_provenance", False),

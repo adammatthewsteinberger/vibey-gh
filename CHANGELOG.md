@@ -5,6 +5,19 @@ This file follows Keep a Changelog and semantic versioning conventions.
 
 ## Unreleased
 
+- Stop the required automation document from hijacking an adopter's front page. GitHub
+  resolves a repository's landing README as `.github/README.md` first and the root
+  `README.md` only if that is absent — so requiring `.github/README.md` replaced every
+  adopting repository's *product* README with maintainer-facing automation notes, on the
+  page a user lands on. Both this project and its first adopter were serving the wrong
+  document, and nothing written inside the file could change it: the name is what GitHub
+  reads. The required file is now `.github/AUTOMATION.md`, configurable as
+  `[documentation].automation_doc`, and `github_readme_sections` /
+  `github_readme_min_words` are renamed to `automation_doc_sections` /
+  `automation_doc_min_words` — the former names are still read, so existing configuration
+  keeps working. An adopting repository should rename its own `.github/README.md` to
+  match, which is what makes its product README the one GitHub shows again.
+
 - Stop the gate deadlocking on a pull request with nothing wrong with it. Two faults met.
   The rollup counted `Evaluate current head` — the job computing the rollup, still running
   while it counts — so the state reads "pending" from inside its own run; that survived
