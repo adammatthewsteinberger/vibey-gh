@@ -317,6 +317,29 @@ def _realign(args) -> int:
     return 0
 
 
+def _yank_superseded(args) -> int:
+    import os
+
+    from vibey_gh import yank
+
+    report = yank.yank_superseded(
+        load_config(),
+        args.index,
+        args.project,
+        args.version,
+        args.token or os.environ.get("VIBEY_GH_YANK_TOKEN", ""),
+    )
+    for problem in report.problems:
+        print(f"vibey-gh: {problem}", file=sys.stderr)
+    if report.skipped:
+        print(f"vibey-gh: {args.index} — {', '.join(report.skipped)}")
+    if report.yanked:
+        print(f"vibey-gh: yanked from {args.index}: {', '.join(report.yanked)}")
+    # A publish has already succeeded by the time this runs. Reporting a bookkeeping
+    # failure as a failed release would misrepresent it, so problems are printed, not fatal.
+    return 0
+
+
 def _local_review(args) -> int:
     from vibey_gh import local_review
 
@@ -641,6 +664,16 @@ def main(argv: list[str] | None = None) -> int:
 
     r = sub.add_parser("realign", help="realign the integration branch with the release branch")
     r.set_defaults(func=_realign)
+
+    y = sub.add_parser(
+        "yank-superseded",
+        help="yank releases below the published one from an index (see [yank]; off by default)",
+    )
+    y.add_argument("--index", choices=["pypi", "testpypi"], required=True)
+    y.add_argument("--project", required=True, help="the distribution name on the index")
+    y.add_argument("--version", required=True, help="the version just published; never yanked")
+    y.add_argument("--token", default="", help="index API token (default: $VIBEY_GH_YANK_TOKEN)")
+    y.set_defaults(func=_yank_superseded)
 
     local = sub.add_parser(
         "local-review",
