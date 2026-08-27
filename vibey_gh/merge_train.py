@@ -26,6 +26,7 @@ from vibey_gh.pr_automation import (
     EXHAUSTED_LABEL,
     EXTERNAL_REPAIR_LABEL,
     OWN_CHECKS,
+    newest_per_name,
 )
 
 NEEDS_REVIEW_LABEL = "needs-human-review"
@@ -110,7 +111,11 @@ def hold_for_review(verdict: Verdict, cfg: GhConfig, label: str = NEEDS_REVIEW_L
 
 def judge(pr: dict, cfg: GhConfig) -> Verdict:
     author = (pr.get("author") or {}).get("login", "")
-    rollup = pr.get("statusCheckRollup") or []
+    # Deduplicated the same way the gate deduplicates, and for the same reason: a rollup
+    # carries every check run for the head, so a superseded run's CANCELLED jobs sit beside
+    # the successful jobs that replaced them. Judging both would skip a pull request over
+    # evidence the gate has already discarded.
+    rollup = newest_per_name(pr.get("statusCheckRollup") or [])
     # The same exclusion set the gate uses, not just `gate`. A superseded PR-automation run
     # leaves CANCELLED check runs behind for every job it did not finish — `Resolve merge
     # conflicts`, `Mirror fork for safe repair`, `Repair failed scans or review findings`,

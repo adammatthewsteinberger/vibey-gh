@@ -749,3 +749,76 @@ def test_a_gating_check_belongs_to_a_workflow_that_can_re_trigger_evaluation(tmp
     triggers = next(line for line in rendered.splitlines() if line.strip().startswith("workflows:"))
     for workflow in DEFAULT_SCAN_WORKFLOWS:
         assert workflow in triggers, f"{workflow} gates but cannot re-trigger evaluation"
+
+
+def test_a_superseded_runs_cancelled_jobs_do_not_block_the_gate():
+    """Concurrency cancelling a superseded run is ordinary, not exceptional.
+
+    Its jobs stay in the rollup as CANCELLED beside the successful jobs of the run that
+    replaced them — same head, same names, two verdicts. Counting both read as "cancelled
+    or stale checks require a rerun" and left the pull request blocked with nothing wrong
+    and nothing to do but rerun a workflow that had already succeeded. Seen on
+    vibey-gh #114, #117 and vibey-skills #62.
+    """
+    rollup = [
+        {
+            "name": "enforce",
+            "status": "COMPLETED",
+            "conclusion": "CANCELLED",
+            "startedAt": "2026-08-27T16:05:51Z",
+        },
+        {
+            "name": "enforce",
+            "status": "COMPLETED",
+            "conclusion": "SUCCESS",
+            "startedAt": "2026-08-27T16:12:10Z",
+        },
+    ]
+    kept = pa.newest_per_name(rollup)
+    assert len(kept) == 1
+    assert kept[0]["conclusion"] == "SUCCESS"
+
+    # Rollup order is not guaranteed, so the newest must win from either direction.
+    kept = pa.newest_per_name(list(reversed(rollup)))
+    assert len(kept) == 1
+    assert kept[0]["conclusion"] == "SUCCESS"
+
+
+def test_a_newer_failure_is_never_masked_by_an_older_success():
+    """The dedupe keeps the NEWEST run, not the happiest one. A check that passed and then
+    failed on a rerun must read as failing, or this would hide real breakage."""
+    rollup = [
+        {
+            "name": "CI",
+            "status": "COMPLETED",
+            "conclusion": "SUCCESS",
+            "startedAt": "2026-08-27T10:00:00Z",
+        },
+        {
+            "name": "CI",
+            "status": "COMPLETED",
+            "conclusion": "FAILURE",
+            "startedAt": "2026-08-27T11:00:00Z",
+        },
+    ]
+    kept = pa.newest_per_name(rollup)
+    assert len(kept) == 1
+    assert kept[0]["conclusion"] == "FAILURE"
+
+
+def test_dedupe_keeps_distinct_checks_and_tolerates_missing_timestamps():
+    """Different names are different checks and all survive. An entry with no timestamp
+    sorts oldest, so a real result always displaces a placeholder rather than the reverse."""
+    rollup = [
+        {"name": "CI", "status": "COMPLETED", "conclusion": "SUCCESS"},
+        {"name": "Provenance", "status": "COMPLETED", "conclusion": "SUCCESS"},
+        {
+            "name": "CI",
+            "status": "COMPLETED",
+            "conclusion": "FAILURE",
+            "startedAt": "2026-08-27T11:00:00Z",
+        },
+    ]
+    kept = {c["name"]: c for c in pa.newest_per_name(rollup)}
+    assert set(kept) == {"CI", "Provenance"}
+    assert kept["CI"]["conclusion"] == "FAILURE"

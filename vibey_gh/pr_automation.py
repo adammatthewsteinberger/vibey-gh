@@ -198,6 +198,35 @@ def _check(raw: dict[str, Any]) -> Check:
     )
 
 
+def newest_per_name(rollup: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
+    """One entry per check name: the most recently started run of it.
+
+    A rollup carries EVERY check run for the head, not the current one per name. When
+    concurrency cancels a superseded run, its jobs stay in the rollup as CANCELLED beside
+    the successful jobs of the run that replaced them — same head, same names, two verdicts.
+    Counting both reads as "cancelled or stale checks require a rerun", and the pull request
+    sits blocked with nothing wrong and nothing to fix but a manual rerun of a workflow that
+    already succeeded. Cancelling a superseded run is ordinary, so this was ordinary too.
+
+    Deduplicating by name keeps the exact-head guarantee: every entry still belongs to this
+    head. It drops only the older of two runs OF THE SAME CHECK, which is precisely the
+    stale evidence the check was refusing to trust.
+
+    Entries with no timestamp sort oldest, so a real result always displaces a placeholder.
+    """
+    newest: dict[str, dict[str, Any]] = {}
+    for item in rollup:
+        name = str(item.get("name") or item.get("context") or "unnamed check")
+        current = newest.get(name)
+        if current is None or _started(item) >= _started(current):
+            newest[name] = item
+    return list(newest.values())
+
+
+def _started(raw: dict[str, Any]) -> str:
+    return str(raw.get("startedAt") or raw.get("completedAt") or "")
+
+
 def parse_state(comments: Sequence[dict[str, Any] | str]) -> AutomationState | None:
     """Return the newest valid state marker, ignoring ordinary or malformed comments."""
     data = github_state.parse_payload(comments, _STATE_RE)
@@ -344,7 +373,7 @@ def evaluate(
         return result("blocked", "a human requested changes")
 
     ignored = set(cfg.pr_automation.ignored_checks) | OWN_CHECKS
-    checks = [_check(item) for item in pr.get("statusCheckRollup") or []]
+    checks = [_check(item) for item in newest_per_name(pr.get("statusCheckRollup") or [])]
     checks = [item for item in checks if item.name not in ignored]
     if not checks:
         return result("pending", "no current-head scan results are available")
