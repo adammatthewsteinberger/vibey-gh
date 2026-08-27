@@ -221,8 +221,9 @@ Every entry in `required_files` is required: having one never excuses another.
 |---|---|---|
 | `required_files` | string list / the agent-docs layout | Files that must exist and be non-empty, each one individually. |
 | `readme_sections` | string list / empty | Headings required in `README.md`, in your own words. |
-| `github_readme_sections` | string list / empty | Headings required in `.github/README.md`. |
-| `github_readme_min_words` | integer / `0` | Minimum length for `.github/README.md`; `0` disables. |
+| `automation_doc` | path / `.github/AUTOMATION.md` | Where this repository's automation documentation lives. **Not `.github/README.md`** — GitHub resolves that as the repository's landing README ahead of the root one, so naming it that replaces your product README on your repository's front page. |
+| `automation_doc_sections` | string list / empty | Headings required in `automation_doc`. Also read from the former name `github_readme_sections`. |
+| `automation_doc_min_words` | integer / `0` | Minimum length for `automation_doc`; `0` disables. Also read from the former name `github_readme_min_words`. |
 | `mermaid_terms` | string list / empty | Surfaces that must appear in `docs/project.mmd`. |
 | `mermaid_min_edges` | integer / `0` | Minimum `-->` edges in that diagram; `0` disables. |
 | `require_provenance` | boolean / `false` | Require the Vibey provenance sentence in `provenance_files`. |
