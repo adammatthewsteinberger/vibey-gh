@@ -178,8 +178,9 @@ jobs:
       - name: Answer without executing repository code
         id: claude
         uses: anthropics/claude-code-action@8569a83495a3f6f0c50a90e46351d3816fed1a75 # v1
+        # __VIBEY_GH_AI_ENV__
         with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          anthropic_api_key: ${{ secrets.__VIBEY_GH_AI_AUTH_SECRET__ }}
           allowed_non_write_users: "__vibey_gh_no_nonwrite_users__"
           track_progress: ${{ __VIBEY_GH_SANITIZED_PROGRESS__ && (github.event_name == 'issue_comment' || github.event_name == 'pull_request_review_comment') }}
           plugin_marketplaces: |

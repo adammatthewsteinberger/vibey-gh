@@ -31,6 +31,45 @@ defaults below. Paths are repository-relative unless stated otherwise.
 | `install.union_merge_paths` | string list / `["CHANGELOG.md"]` | Files declared `merge=union` in `.gitattributes`, so two branches appending to the same section merge instead of conflicting. Appended to an existing `.gitattributes`, never rewriting it. `[]` declares none. |
 | `install.pin_version` | boolean / `false` | Pin every managed workflow's `pip install vibey-gh` to the exact version that rendered it (`vibey-gh==X.Y.Z`), instead of the latest release on every run. `false` keeps the historical floating install. The self-hosting path (this repository, and anything else installing from its own `pyproject.toml`) is never pinned — it installs from source regardless. Running `vibey-gh install` from a newer release moves the pin forward as one visible diff. |
 
+## `[ai]`
+
+Where every AI step sends its requests. Unset, nothing changes: requests go to Anthropic
+exactly as before this existed.
+
+| Field | Type / default | Meaning |
+|---|---|---|
+| `base_url` | URL / empty | Endpoint override. Empty uses the Anthropic default. Must be `http(s)` and contain no whitespace. |
+| `auth_secret` | secret name / `ANTHROPIC_API_KEY` | The repository secret authorising those requests. A name only — never a token; this file is committed. |
+
+### Running the automation somewhere other than Anthropic
+
+Every AI step runs Claude Code, which honours `ANTHROPIC_BASE_URL`. Any gateway serving
+the Anthropic Messages API — LiteLLM and similar translate it to Gemini, Qwen, GitHub
+Models, a model on your own machine — therefore works without this project learning a
+second vendor's request shape:
+
+```toml
+[ai]
+base_url = "https://your-gateway.example/v1"
+auth_secret = "LITELLM_KEY"
+```
+
+That secret fills both `x-api-key` and `Authorization`, because Claude Code sends the
+former while some gateways read the latter. A gateway must serve `/v1/messages` **and**
+`/v1/messages/count_tokens`, and forward the `anthropic-beta` and `anthropic-version`
+headers.
+
+One caveat worth testing before you rely on it: the review and repair steps depend on
+structured JSON output and tool calls, and translation layers vary in how faithfully they
+carry `tool_use` arguments across providers. A provider that mangles them makes the gate
+report `review incomplete` rather than approving anything — it fails closed — but the
+review is then no longer running. Verify against a real pull request before turning off
+the endpoint you trust.
+
+`auth_secret` is validated as a bare secret identifier. It is rendered inside a
+`${{ secrets.… }}` expression in a privileged workflow, so a name that could close that
+expression is refused at load time.
+
 ## `[pr_automation]`
 
 | Field | Type / default | Meaning |
