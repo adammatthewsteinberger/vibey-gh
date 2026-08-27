@@ -96,6 +96,39 @@ Raw output additionally requires a manual `workflow_dispatch` with
 `full_claude_output = true`. Event-triggered runs can never enable it, and the workflow
 fails closed when repository visibility is not private.
 
+### `[pr_automation.fallback]`
+
+Reviews with a local model when the paid path returns **no verdict at all** — an exhausted
+API key, expired credentials, an unavailable model. Because the gate is a required check,
+that failure otherwise turns a billing problem into a hard stop on every pull request.
+
+| Field | Type / default | Meaning |
+|---|---|---|
+| `enabled` | boolean / `false` | Off unless a repository opts in. It needs a self-hosted runner, so nothing should inherit it. |
+| `runner_label` | string / `"vibey-local"` | Label the fallback job targets, alongside `self-hosted`. |
+| `model` | string / `"qwen2.5-coder:14b"` | Model tag served by the Ollama-compatible endpoint. |
+| `base_url` | string / `"http://127.0.0.1:11434"` | Where the local model listens. |
+| `trusted_only` | boolean / `true` | Never run the fallback for a fork pull request. |
+| `max_diff_chars` | integer / `60000` | Diff is truncated past this, and the model is told it was. |
+| `timeout_seconds` | integer / `600` | Bound on one review. |
+
+It never overrides a review that actually ran: the job requires the primary to have
+produced no verdict, so findings are never discarded in favour of a weaker opinion. The
+diff is passed to the model as text — repository code is never executed, and the model has
+no shell, no tools, and no network beyond the local port.
+
+The verdict is deliberately narrower than the primary review's. Ollama constrains decoding
+to the schema, so the output *shape* is guaranteed; the *judgments* are not, and a 14B model
+will emit confident booleans it has no basis for. So it assesses only what it can ground in
+a diff — `pass`, `summary`, `findings` — and reports the documentation-contract fields as
+unevaluated. The gate titles the result `PR automation: gate (local fallback)` so a
+degraded verdict is never mistaken for a full one.
+
+`trusted_only` carries the safety argument. GitHub says self-hosted runners should "almost
+never be used for public repositories" because any user can open a pull request against
+them; excluding forks is what removes that. Leave it on, register the runner as ephemeral
+so it takes one job and exits, and run it in a container rather than on the host.
+
 ## `[conversation]`
 
 Answers a mention in a comment on an issue or pull request. Comments are the least guarded

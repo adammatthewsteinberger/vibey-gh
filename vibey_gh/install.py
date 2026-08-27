@@ -99,6 +99,21 @@ def render_workflow(source: Path, cfg: GhConfig) -> str:
             else "        # ai: the default Anthropic endpoint"
         ),
     )
+    # The local review fallback. `enabled` renders as a literal `true`/`false` into the
+    # job's `if:`, so a repository that has not opted in emits a job GitHub always skips
+    # rather than one that fails looking for a runner label nobody registered.
+    fallback = cfg.pr_automation.fallback
+    wanted = wanted.replace(
+        "__VIBEY_GH_FALLBACK_ENABLED__", "true" if fallback.enabled else "false"
+    )
+    wanted = wanted.replace(
+        "__VIBEY_GH_FALLBACK_TRUSTED_ONLY__", "true" if fallback.trusted_only else "false"
+    )
+    wanted = wanted.replace("__VIBEY_GH_FALLBACK_RUNNER_LABEL__", fallback.runner_label)
+    wanted = wanted.replace("__VIBEY_GH_FALLBACK_MODEL__", fallback.model)
+    wanted = wanted.replace("__VIBEY_GH_FALLBACK_BASE_URL__", fallback.base_url)
+    wanted = wanted.replace("__VIBEY_GH_FALLBACK_MAX_DIFF_CHARS__", str(fallback.max_diff_chars))
+    wanted = wanted.replace("__VIBEY_GH_FALLBACK_TIMEOUT_SECONDS__", str(fallback.timeout_seconds))
     wanted = wanted.replace(
         "__VIBEY_GH_SANITIZED_PROGRESS__",
         "true" if cfg.pr_automation.observability.sanitized_progress else "false",
