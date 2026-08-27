@@ -48,12 +48,15 @@ DEFAULT_TEXT = (
 DEFAULT_TRAILER_KEY = "Made-With"
 DEFAULT_TRAILER = f"{DEFAULT_TRAILER_KEY}: {DEFAULT_TEXT}"
 DEFAULT_SOURCES = ("tools/*.py", "src/**/*.py", ".github/workflows/*.yml")
+# Workflows whose completion makes a pull request worth re-evaluating. Only names a
+# repository plausibly has: "API drift (Cloud Agents OpenAPI)" used to be here and is not
+# an adopter's workflow at all — it is this project's own five-surface self-test, so every
+# adopter had to notice it and take it back out.
 DEFAULT_SCAN_WORKFLOWS = (
     "CI",
     "Provenance",
     "CodeQL",
     "Docs",
-    "API drift (Cloud Agents OpenAPI)",
 )
 # Files every branch appends to, so two branches almost always touch the same lines.
 # Git's built-in `union` driver keeps both sides instead of reporting a conflict, which is
