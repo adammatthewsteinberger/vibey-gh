@@ -294,6 +294,56 @@ jobs:
           payload=$(jq -c --arg comment_id "${COMMENT:-0}" --arg committed "${COMMITTED:-false}" \
             '. + {comment_id: ($comment_id | tonumber), committed: ($committed == "true")}' <<<"$STRUCTURED")
           vibey-gh conversation record-response --subject "$SUBJECT" --input "$payload"
+      - name: Say why the model call failed
+        # The action reports only "did not return structured_output", which names the
+        # symptom and not the cause, and the gate then tells an operator to read a log
+        # that does not contain it. The execution record does: an immediate `is_error`
+        # with zero cost and an empty `modelUsage` is the API refusing the call — credit,
+        # credentials, availability — rather than a model that answered badly. Without
+        # this the difference is only inferable, and every diagnosis starts from scratch.
+        #
+        # `-s` normalises the three shapes this file has been seen to take (a JSON array,
+        # a bare object, or JSONL) into one list before the last result is picked out.
+        if: failure() && steps.claude.outputs.execution_file != ''
+        env:
+          EXECUTION_FILE: ${{ steps.claude.outputs.execution_file }}
+        run: |
+          set -euo pipefail
+          if [ ! -f "$EXECUTION_FILE" ]; then
+            echo "no execution record was written: the action failed before running" \
+              | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          normalise='[.[] | if type=="array" then .[] else . end]
+            | map(select(.type=="result")) | last'
+          facts=$(jq -rs "$normalise"' as $r
+            | "is_error=\($r.is_error // "unknown") subtype=\($r.subtype // "unknown")
+               turns=\($r.num_turns // 0) cost_usd=\($r.total_cost_usd // 0)
+               model_calls=\(($r.modelUsage // {}) | length)"' "$EXECUTION_FILE" 2>/dev/null \
+            | tr -s '[:space:]' ' ') || facts="execution record unreadable"
+          # Bounded, and fenced rather than interpolated: this text is model output and
+          # may quote the pull request, so it is reported as data and never as markup.
+          reason=$(jq -rs "$normalise"' | (.result // .error // "") | tostring' \
+            "$EXECUTION_FILE" 2>/dev/null | head -c 2000) || reason=""
+          {
+            echo "### The model call did not complete"
+            echo
+            echo "\`$facts\`"
+            echo
+            if [ -n "$reason" ]; then
+              echo "What the run reported:"
+              echo '```'
+              echo "$reason"
+              echo '```'
+            fi
+            if [ "${facts#*model_calls=0}" != "$facts" ] \
+              && [ "${facts#*cost_usd=0 }" != "$facts" ]; then
+              echo
+              echo "Zero model calls at zero cost: the request was refused before any"
+              echo "model ran. Check API credit balance, credentials, and model"
+              echo "availability — this is not a defect in the pull request."
+            fi
+          } | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Archive the conversation record
         if: always() && steps.claude.outputs.execution_file != '' && __VIBEY_GH_ARCHIVE_EXECUTION_FILE__
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

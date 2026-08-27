@@ -5,6 +5,19 @@ This file follows Keep a Changelog and semantic versioning conventions.
 
 ## Unreleased
 
+- Say why a model call failed, at every AI step. The action reports only
+  `--json-schema was provided but Claude did not return structured_output` — the symptom —
+  and the gate then tells an operator to check a log that does not contain the cause. It
+  is in the execution record the run already writes: an immediate `is_error` at zero cost
+  with an empty `modelUsage` is the API refusing the call outright, which is a different
+  thing from a model that answered badly, and the two want different responses. Each step
+  now reports `is_error`, `subtype`, turns, cost and model-call count into the job summary,
+  quotes what the run said, and adds an explicit note when there were no model calls at
+  all. A failure that genuinely burned tokens does not get that note, so exhausted credit
+  and an exhausted turn budget stop looking identical. The step runs only on failure and
+  never masks it, and the quoted text is fenced rather than interpolated, since model
+  output may echo the pull request.
+
 - Add `[ai]`, so the AI steps can be pointed at an endpoint other than Anthropic's. Every
   one of them runs Claude Code, which honours `ANTHROPIC_BASE_URL`, so a gateway serving
   the Anthropic Messages API — LiteLLM and similar translate it to Gemini, Qwen, GitHub

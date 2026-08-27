@@ -562,6 +562,33 @@ def test_a_repository_may_decline_the_site_requirements_file_entirely(tmp_path):
     assert 'if [ -n "" ]' in rendered
 
 
+def test_every_ai_step_says_why_it_failed():
+    """A gate that says "check the log" is worth nothing if the log lacks the reason.
+
+    The action reports only `--json-schema was provided but Claude did not return
+    structured_output`, which is the symptom. The cause lives in the execution record: an
+    immediate `is_error` at zero cost with an empty `modelUsage` is the API refusing the
+    call, not a model answering badly. Every diagnosis of this in practice has been
+    inferred from `total_cost_usd: 0` rather than read, so each AI step now reports it.
+    """
+    total = 0
+    for name in AI_TEMPLATES:
+        text = (WORKFLOWS / name).read_text(encoding="utf-8")
+        calls = text.count("uses: anthropics/claude-code-action")
+        diagnostics = text.count("Say why the model call failed")
+        assert diagnostics == calls, f"{name}: {diagnostics} diagnostics for {calls} calls"
+        total += diagnostics
+    assert total == 7
+    text = (WORKFLOWS / "pr-automation.yml").read_text(encoding="utf-8")
+    # Only on failure, and never masking the failure it explains.
+    assert "if: failure() && steps.claude.outputs.execution_file != ''" in text
+    assert "GITHUB_STEP_SUMMARY" in text
+    # The refusal note is conditional on there having been no model call at all, so a
+    # genuine failure that burned tokens is not misreported as a credit problem.
+    assert "model_calls=0" in text
+    assert "not a defect in the pull request" in text
+
+
 def test_a_repository_can_decline_the_union_merge_rule_entirely(tmp_path):
     from vibey_gh.config import GhConfig
     from vibey_gh.install import apply_union_merge, missing_union_merge_lines
