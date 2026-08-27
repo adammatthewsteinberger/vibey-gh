@@ -44,7 +44,11 @@ jobs:
           python-version: "3.12"
       - run: python -m pip install --quiet -e ".[dev]"
       - run: python -m black --check vibey_gh test
-      - run: python -m isort --check-only vibey_gh test
+        # `isort` by console script, not `python -m isort`: isort 9.0.0 dropped the
+        # runnable `__main__`, so `python -m` fails before reading a single file — and
+        # with an unpinned floor that arrived on its own and broke every pull request at
+        # once. The console script is the documented entry point and is version-stable.
+      - run: isort --check-only vibey_gh test
       - run: python -m ruff check vibey_gh test
       - run: python -m mypy vibey_gh
       - name: Dogfood the managed automation
