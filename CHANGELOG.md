@@ -5,6 +5,29 @@ This file follows Keep a Changelog and semantic versioning conventions.
 
 ## Unreleased
 
+- Make code blocks readable on the published documentation site. The theme ships two
+  highlight.js palettes and enables the *light* one by default (`#hljs-dark` carries
+  `disabled`), so its token colours are chosen for a white page — while this stylesheet
+  paints every code block `#080c17`. A string literal rendered `#032f62` on near-black,
+  a contrast ratio of 1.48:1 against a 4.5:1 standard: not merely low-contrast but
+  genuinely unreadable, and a configuration sample is mostly string literals. The
+  stylesheet now supplies its own token palette, every colour of it measured at AA or
+  better, covering both `.hljs-*` and the Pygments classes a `pymdownx.highlight` site
+  emits instead. A test computes the contrast of every token colour against the forced
+  background and fails below AA, since "looks fine to me" is what shipped this.
+- Say why a model call failed, at every AI step. The action reports only
+  `--json-schema was provided but Claude did not return structured_output` — the symptom —
+  and the gate then tells an operator to check a log that does not contain the cause. It
+  is in the execution record the run already writes: an immediate `is_error` at zero cost
+  with an empty `modelUsage` is the API refusing the call outright, which is a different
+  thing from a model that answered badly, and the two want different responses. Each step
+  now reports `is_error`, `subtype`, turns, cost and model-call count into the job summary,
+  quotes what the run said, and adds an explicit note when there were no model calls at
+  all. A failure that genuinely burned tokens does not get that note, so exhausted credit
+  and an exhausted turn budget stop looking identical. The step runs only on failure and
+  never masks it, and the quoted text is fenced rather than interpolated, since model
+  output may echo the pull request.
+
 - Stop shipping this project's own self-test to the repositories that install it.
   `api-drift.yml` calls `vibey_gh.surfaces.parity()` — a statement about vibey-gh, not
   about an adopter's product — yet it was a managed template installed everywhere *and*
