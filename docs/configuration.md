@@ -252,6 +252,31 @@ a workflow run applies it.
 | `author_name` | string / `Adam Matthew Steinberger` | Reserved documentation-provenance author label. Parsed and validated (non-empty), but not yet emitted into any generated asset. |
 | `author_url` | URL / `https://hire.adam.matthewsteinberger.com` | Reserved documentation-provenance author destination. Same current scope as `author_name`. |
 | `google_analytics_id` | string / empty (disabled) | GA4 measurement ID (`G-<alphanumeric>`) injected into every page of both generated documentation channels and the channel-picker page. Empty disables Google Analytics entirely: no script tag is emitted and no request ever reaches Google. |
+| `site_requirements` | string list / empty | Extra packages installed before the published site is built, as PEP 508 requirement specifiers. Each is shell-quoted, so `"mkdocs-material[imaging] >= 9.5"` stays one argument. |
+| `site_requirements_file` | path / `docs/requirements.txt` | Installed with `pip install -r` when the file exists. Absent, the step is skipped; empty disables the hook entirely. |
+| `properdocs_version` | string / `1.6.7` | The `properdocs` and `properdocs-theme-mkdocs` version the site build pins. |
+
+### Installing what your site actually needs
+
+ProperDocs depends on `properdocs` and its theme, and on nothing your `properdocs.yml`
+declares. A site configuring `mkdocs-gen-files`, `mkdocs-literate-nav`, a Material theme,
+or any `pymdownx.*` markdown extension needs those packages present, or the `--strict`
+build fails on the first one it reaches — the plugin is simply not installed.
+
+Declare them once, either inline or in the conventional requirements file:
+
+```toml
+[documentation]
+site_requirements = [
+  "mkdocs-gen-files",
+  "mkdocs-literate-nav",
+  "pymdown-extensions>=10.7",
+]
+```
+
+Both hooks are no-ops when unused, so a repository whose site needs nothing extra is
+unaffected. This cannot have a useful default: which packages a site needs follows from
+that site's own configuration.
 
 `author_name` and `author_url` exist for a planned author credit in the generated
 Pages sites and are exercised by config parsing, validation, and tests today. The

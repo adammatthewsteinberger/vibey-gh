@@ -640,6 +640,11 @@ generate_json_ld = true
 author_name = "Adam Matthew Steinberger"
 author_url = "https://hire.adam.matthewsteinberger.com"
 google_analytics_id = ""                    # empty disables it; set a GA4 ID like "G-XXXXXXXXXX" to enable
+# ProperDocs depends on none of the plugins your site declares, so a site using
+# mkdocs-gen-files or pymdownx.* must name them here or the --strict build fails.
+site_requirements = []                      # e.g. ["mkdocs-gen-files", "pymdown-extensions>=10.7"]
+site_requirements_file = "docs/requirements.txt"   # installed when present; "" disables
+properdocs_version = "1.6.7"
 ```
 
 `CodeQL` is a real managed Python security-analysis workflow using an immutably pinned

@@ -185,7 +185,14 @@ jobs:
           set -euo pipefail
           export GA_ID="__VIBEY_GH_DOC_GOOGLE_ANALYTICS_ID__"
           python -m pip install --quiet \
-            'properdocs==1.6.7' 'properdocs-theme-mkdocs==1.6.7'
+            'properdocs==__VIBEY_GH_PROPERDOCS_VERSION__' 'properdocs-theme-mkdocs==__VIBEY_GH_PROPERDOCS_VERSION__' __VIBEY_GH_DOC_SITE_REQUIREMENTS__
+          # A site declaring plugins or markdown extensions needs them installed before
+          # `--strict` will build it, and ProperDocs depends on none of them. Both hooks
+          # are no-ops when unused: the list renders empty, and an absent file skips.
+          if [ -n "__VIBEY_GH_DOC_REQUIREMENTS_FILE__" ] \
+            && [ -f "__VIBEY_GH_DOC_REQUIREMENTS_FILE__" ]; then
+            python -m pip install --quiet -r "__VIBEY_GH_DOC_REQUIREMENTS_FILE__"
+          fi
           if [ ! -f properdocs.yml ]; then
             mkdir -p .properdocs-source
             if [ -f README.md ]; then

@@ -185,7 +185,14 @@ jobs:
           set -euo pipefail
           export GA_ID=""
           python -m pip install --quiet \
-            'properdocs==1.6.7' 'properdocs-theme-mkdocs==1.6.7'
+            'properdocs==1.6.7' 'properdocs-theme-mkdocs==1.6.7' 
+          # A site declaring plugins or markdown extensions needs them installed before
+          # `--strict` will build it, and ProperDocs depends on none of them. Both hooks
+          # are no-ops when unused: the list renders empty, and an absent file skips.
+          if [ -n "docs/requirements.txt" ] \
+            && [ -f "docs/requirements.txt" ]; then
+            python -m pip install --quiet -r "docs/requirements.txt"
+          fi
           if [ ! -f properdocs.yml ]; then
             mkdir -p .properdocs-source
             if [ -f README.md ]; then
