@@ -56,6 +56,12 @@ runner_label = "vibey-local-gh"
 model        = "qwen2.5-coder:14b"
 trusted_only = true
 
+# 600 timed out in production on this repository's own PR #140: a ~700-line diff, the 14B
+# model cold-loading, and seven runner containers sharing the machine. The fallback failed
+# closed exactly as designed -- but a fallback that cannot finish is no fallback, and the
+# cost of a longer wait is only paid on the degraded path.
+timeout_seconds = 1800
+
 [conversation]
 enabled = true
 trigger = "@vibey-gh"

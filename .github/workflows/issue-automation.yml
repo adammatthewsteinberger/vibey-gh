@@ -550,7 +550,7 @@ jobs:
                 --model 'qwen2.5-coder:14b' \
                 --base-url "${VIBEY_OLLAMA_URL:-http://127.0.0.1:11434}" \
                 --max-chars 60000 \
-                --timeout 600 \
+                --timeout 1800 \
                 > "${RUNNER_TEMP}/triage.json"; then
             echo "::warning::local triage fallback produced no verdict"
             exit 1
