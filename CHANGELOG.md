@@ -5,6 +5,24 @@ This file follows Keep a Changelog and semantic versioning conventions.
 
 ## Unreleased
 
+- Install the packages a documentation site actually declares. The published-site build
+  named exactly `properdocs` and its theme, with no way to extend the list, and ProperDocs
+  depends on none of the plugins a real site configures — so a repository whose
+  `properdocs.yml` used `mkdocs-gen-files`, `mkdocs-literate-nav`, a Material theme, or any
+  `pymdownx.*` extension failed the `--strict` build on the first one it reached. Adding
+  them was impossible without forking the workflow. `[documentation].site_requirements`
+  now extends the install, a `site_requirements_file` (`docs/requirements.txt` by
+  convention) is installed when present, and `properdocs_version` is no longer hardcoded.
+  Each requirement is shell-quoted, so a specifier carrying spaces or extras stays one
+  argument; a newline in one is refused at load time rather than quoted away, since it
+  would otherwise end the install line and begin an arbitrary command. Both hooks are
+  no-ops by default.
+- Remove `README_SECTIONS`, `GITHUB_README_SECTIONS`, and `MERMAID_REQUIRED_TERMS` from
+  `vibey_gh.documentation`, along with their unreferenced twins in `vibey_gh.config`. The
+  documentation contract became configuration, and these were the literal copies left
+  behind — importable, but describing *this* project's docs, which is exactly what an
+  adopter is not held to. A repository wanting these headings declares them under
+  `[documentation]`. `README_PROVENANCE` is unaffected and still enforced.
 - Require checks that can actually report, and keep a way out when they cannot. The
   default `required_checks` were built from `scan_workflows`, which names *workflows*; a
   required status check names a *check run*, which for Actions is the job's name. So a

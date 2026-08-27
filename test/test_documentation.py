@@ -12,13 +12,7 @@ from vibey_gh.config import (
     GhConfig,
     load_config,
 )
-from vibey_gh.documentation import (
-    GITHUB_README_SECTIONS,
-    MERMAID_REQUIRED_TERMS,
-    README_PROVENANCE,
-    README_SECTIONS,
-    check,
-)
+from vibey_gh.documentation import check
 
 
 def test_documentation_can_be_disabled(tmp_path: Path):
@@ -111,7 +105,7 @@ def test_documentation_rejects_incomplete_mermaid_project_map(tmp_path: Path):
             root=tmp_path,
             documentation=DocumentationConfig(
                 required_files=("docs/project.mmd",),
-                mermaid_terms=MERMAID_REQUIRED_TERMS,
+                mermaid_terms=("flowchart", "CLI", "API", "Provenance", "Realign"),
                 mermaid_min_edges=20,
             ),
         )
@@ -121,6 +115,7 @@ def test_documentation_rejects_incomplete_mermaid_project_map(tmp_path: Path):
 
 
 def test_documentation_rejects_placeholder_github_automation_guide(tmp_path: Path):
+    sections = ("## Delivery model", "## Workflow inventory", "## Failure recovery")
     guide = tmp_path / ".github/README.md"
     guide.parent.mkdir()
     guide.write_text("# GitHub automation\n\nSee docs/workflows.md.\n")
@@ -129,13 +124,13 @@ def test_documentation_rejects_placeholder_github_automation_guide(tmp_path: Pat
             root=tmp_path,
             documentation=DocumentationConfig(
                 required_files=(".github/README.md",),
-                github_readme_sections=GITHUB_README_SECTIONS,
+                github_readme_sections=sections,
                 github_readme_min_words=500,
                 require_provenance=True,
             ),
         )
     )
-    for heading in GITHUB_README_SECTIONS:
+    for heading in sections:
         assert any(heading in problem for problem in report.problems)
     assert any("at least 500 words" in problem for problem in report.problems)
     assert any("exact Vibey provenance" in problem for problem in report.problems)
@@ -222,21 +217,21 @@ def test_documentation_rejects_unsafe_or_empty_configuration(kwargs):
 
 def test_this_repository_documentation_contract_is_complete():
     root = Path(__file__).resolve().parent.parent
-    report = check(load_config(root))
+    cfg = load_config(root)
+    report = check(cfg)
     assert report.ok, report.problems
+    # `report.ok` says something only if this repository actually declares a contract for
+    # `check` to enforce. Every narrative field defaults to empty — that is the point, for
+    # an adopter — so dropping one from `.vibey-gh.toml` would leave the assertion above
+    # passing vacuously instead of failing. These pin the declaration, not the prose.
+    doc = cfg.documentation
+    assert doc.require_provenance
+    assert doc.readme_sections and doc.github_readme_sections and doc.mermaid_terms
+    assert doc.github_readme_min_words >= 500
+    assert doc.mermaid_min_edges >= 20
     marketplace = json.loads((root / ".claude-plugin/marketplace.json").read_text())
     assert len(marketplace["plugins"]) >= 4
     for plugin in marketplace["plugins"]:
         path = root / plugin["source"]
         assert (path / ".claude-plugin/plugin.json").is_file()
         assert list((path / "skills").glob("*/SKILL.md"))
-    readme = (root / "README.md").read_text()
-    assert readme.rstrip().endswith(README_PROVENANCE)
-    assert all(section in readme for section in README_SECTIONS)
-    github_readme = (root / ".github/README.md").read_text()
-    assert all(section in github_readme for section in GITHUB_README_SECTIONS)
-    assert len(github_readme.split()) >= 500
-    assert github_readme.rstrip().endswith(README_PROVENANCE)
-    diagram = (root / "docs/project.mmd").read_text()
-    assert all(term in diagram for term in MERMAID_REQUIRED_TERMS)
-    assert diagram.count("-->") >= 20

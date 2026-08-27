@@ -101,52 +101,10 @@ DEFAULT_IGNORED_ISSUE_LABELS = (
     SOLVE_BLOCKED_LABEL,
 )
 GOOGLE_ANALYTICS_ID_PATTERN = re.compile(r"^G-[A-Z0-9]+$")
-# What this repository requires of its OWN documentation. None of it is imposed on an
-# adopter: a project that installs vibey-gh documents its own product, not this tool's
-# internals, so every one of these defaults to empty and is declared per repository.
-VIBEY_README_SECTIONS = (
-    "## Why vibey-gh",
-    "## Requirements",
-    "## Quick start",
-    "## Architecture",
-    "## Security model",
-    "## Commands",
-    "## Configuration",
-    "## Workflows",
-    "## Troubleshooting",
-    "## Contributing",
-    "## Licence",
-)
-VIBEY_GITHUB_README_SECTIONS = (
-    "## Delivery model",
-    "## Workflow inventory",
-    "## Exact-head PR automation",
-    "## AI trust boundary",
-    "## Credentials and settings",
-    "## Permanent-branch safety",
-    "## Failure recovery",
-    "## Changing workflows",
-)
-VIBEY_MERMAID_TERMS = (
-    "flowchart",
-    "CLI",
-    "SDK",
-    "API",
-    "MCP",
-    "Webhook",
-    "PR Automation",
-    "develop",
-    "main",
-    "TestPyPI",
-    "PyPI",
-    "GitHub Pages",
-    "Provenance",
-    "Realign",
-    "Security Boundary",
-)
 # The agent-docs layout every repository this tool manages is expected to carry. These
 # files describe the ADOPTER's own project and make it navigable to an agent, so unlike the
-# narrative contracts above they are a standard worth holding everyone to.
+# narrative contracts on `DocumentationConfig` — which default to empty and are declared
+# per repository — they are a standard worth holding everyone to.
 DEFAULT_DOCUMENTATION_FILES = (
     ".claude-plugin/marketplace.json",
     ".claude/settings.json",
@@ -490,6 +448,15 @@ class DocumentationConfig:
     require_provenance: bool = False
     provenance_files: tuple[str, ...] = ("README.md", "docs/index.md")
     google_analytics_id: str = ""
+    # What the published-site build installs. ProperDocs renders whatever the repository's
+    # `properdocs.yml` declares, and a site that declares plugins or markdown extensions
+    # cannot build without them — `properdocs` and its theme pull in none of that, so a
+    # `--strict` build of a real documentation site fails on the first `mkdocs-gen-files`
+    # or `pymdownx.*` it meets. Neither of these can be a default: the packages a site
+    # needs follow from its own configuration, which is the adopter's.
+    site_requirements: tuple[str, ...] = ()
+    site_requirements_file: str = "docs/requirements.txt"
+    properdocs_version: str = "1.6.7"
 
     def __post_init__(self) -> None:
         _unique_nonempty("documentation.required_files", self.required_files)
@@ -510,6 +477,24 @@ class DocumentationConfig:
             Path(value).is_absolute() or ".." in Path(value).parts for value in self.required_files
         ):
             raise ValueError("documentation.required_files must be repository-relative paths")
+        _unique_nonempty("documentation.site_requirements", self.site_requirements)
+        # Each requirement is shell-quoted where it is rendered, so ordinary specifier
+        # punctuation is safe. A newline is not: it would end the `pip install` line and
+        # begin an arbitrary command inside the workflow, so it is refused here rather
+        # than quoted away, where the error can still name the field.
+        for requirement in self.site_requirements:
+            if any(character in requirement for character in "\r\n\x00"):
+                raise ValueError(
+                    f"documentation.site_requirements entry spans lines: {requirement!r}"
+                )
+        if self.site_requirements_file:
+            path = Path(self.site_requirements_file)
+            if path.is_absolute() or ".." in path.parts:
+                raise ValueError(
+                    "documentation.site_requirements_file must be a repository-relative path"
+                )
+        if not self.properdocs_version.strip():
+            raise ValueError("documentation.properdocs_version must not be empty")
         for name, value in (
             ("model", self.model),
             ("production_label", self.production_label),
@@ -750,6 +735,13 @@ def load_config(root: Path | None = None) -> GhConfig:
                 documentation.get("provenance_files", ("README.md", "docs/index.md"))
             ),
             google_analytics_id=documentation.get("google_analytics_id", ""),
+            site_requirements=tuple(documentation.get("site_requirements", ())),
+            site_requirements_file=documentation.get(
+                "site_requirements_file", DocumentationConfig.site_requirements_file
+            ),
+            properdocs_version=documentation.get(
+                "properdocs_version", DocumentationConfig.properdocs_version
+            ),
         ),
     )
 
