@@ -14,48 +14,6 @@ README_PROVENANCE = (
     "(https://hire.adam.matthewsteinberger.com/) "
     "([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/))."
 )
-# Retained for the repositories that import them directly; the contract itself now comes
-# from configuration. `vibey_gh.config` holds this repository's own declaration.
-README_SECTIONS = (
-    "## Why vibey-gh",
-    "## Requirements",
-    "## Quick start",
-    "## Architecture",
-    "## Security model",
-    "## Commands",
-    "## Configuration",
-    "## Workflows",
-    "## Troubleshooting",
-    "## Contributing",
-    "## Licence",
-)
-GITHUB_README_SECTIONS = (
-    "## Delivery model",
-    "## Workflow inventory",
-    "## Exact-head PR automation",
-    "## AI trust boundary",
-    "## Credentials and settings",
-    "## Permanent-branch safety",
-    "## Failure recovery",
-    "## Changing workflows",
-)
-MERMAID_REQUIRED_TERMS = (
-    "flowchart",
-    "CLI",
-    "SDK",
-    "API",
-    "MCP",
-    "Webhook",
-    "PR Automation",
-    "develop",
-    "main",
-    "TestPyPI",
-    "PyPI",
-    "GitHub Pages",
-    "Provenance",
-    "Realign",
-    "Security Boundary",
-)
 
 
 @dataclass(frozen=True)

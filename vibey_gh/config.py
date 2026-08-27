@@ -101,52 +101,10 @@ DEFAULT_IGNORED_ISSUE_LABELS = (
     SOLVE_BLOCKED_LABEL,
 )
 GOOGLE_ANALYTICS_ID_PATTERN = re.compile(r"^G-[A-Z0-9]+$")
-# What this repository requires of its OWN documentation. None of it is imposed on an
-# adopter: a project that installs vibey-gh documents its own product, not this tool's
-# internals, so every one of these defaults to empty and is declared per repository.
-VIBEY_README_SECTIONS = (
-    "## Why vibey-gh",
-    "## Requirements",
-    "## Quick start",
-    "## Architecture",
-    "## Security model",
-    "## Commands",
-    "## Configuration",
-    "## Workflows",
-    "## Troubleshooting",
-    "## Contributing",
-    "## Licence",
-)
-VIBEY_GITHUB_README_SECTIONS = (
-    "## Delivery model",
-    "## Workflow inventory",
-    "## Exact-head PR automation",
-    "## AI trust boundary",
-    "## Credentials and settings",
-    "## Permanent-branch safety",
-    "## Failure recovery",
-    "## Changing workflows",
-)
-VIBEY_MERMAID_TERMS = (
-    "flowchart",
-    "CLI",
-    "SDK",
-    "API",
-    "MCP",
-    "Webhook",
-    "PR Automation",
-    "develop",
-    "main",
-    "TestPyPI",
-    "PyPI",
-    "GitHub Pages",
-    "Provenance",
-    "Realign",
-    "Security Boundary",
-)
 # The agent-docs layout every repository this tool manages is expected to carry. These
 # files describe the ADOPTER's own project and make it navigable to an agent, so unlike the
-# narrative contracts above they are a standard worth holding everyone to.
+# narrative contracts on `DocumentationConfig` — which default to empty and are declared
+# per repository — they are a standard worth holding everyone to.
 DEFAULT_DOCUMENTATION_FILES = (
     ".claude-plugin/marketplace.json",
     ".claude/settings.json",
