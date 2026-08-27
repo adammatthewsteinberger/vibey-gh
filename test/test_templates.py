@@ -413,6 +413,33 @@ def test_a_repository_that_is_vibey_gh_runs_its_own_working_tree(hook):
     assert "[ -d vibey_gh ]" in text
 
 
+def test_no_code_token_can_keep_a_colour_meant_for_a_white_page():
+    """The gap the contrast test alone could not close.
+
+    Measuring the colours a stylesheet declares says nothing about the tokens it never
+    mentions. The first pass at this passed green while `.hljs-subst` was still inheriting
+    github-light's near-black — so `$(git rev-parse HEAD)` sat at 1.33:1 inside the very
+    example that tells a reader how to list their check names.
+
+    A catch-all fixes the class rather than the instance: any token, including ones this
+    stylesheet has never heard of, starts legible. It has to come *before* the palette,
+    because an attribute selector and a class have equal specificity and source order is
+    what decides between them.
+    """
+    css = (Path(__file__).resolve().parent.parent / "docs/stylesheets/vibey.css").read_text(
+        encoding="utf-8"
+    )
+    catch_all = css.find('[class*="hljs-"]')
+    assert catch_all != -1, "no catch-all: an unlisted token would inherit the light theme"
+    assert ".highlight span" in css, "Pygments needs the same catch-all"
+    first_token_rule = css.find(".hljs-string,")
+    assert first_token_rule != -1
+    assert catch_all < first_token_rule, (
+        "the catch-all must precede the palette, or equal specificity lets it win and "
+        "every token collapses to one colour"
+    )
+
+
 def test_code_blocks_are_legible_against_the_background_this_theme_forces():
     """Forcing a dark code background obliges this stylesheet to own the token colours.
 
