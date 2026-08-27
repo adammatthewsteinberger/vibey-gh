@@ -15,6 +15,18 @@ This file follows Keep a Changelog and semantic versioning conventions.
   better, covering both `.hljs-*` and the Pygments classes a `pymdownx.highlight` site
   emits instead. A test computes the contrast of every token colour against the forced
   background and fails below AA, since "looks fine to me" is what shipped this.
+- Say why a model call failed, at every AI step. The action reports only
+  `--json-schema was provided but Claude did not return structured_output` — the symptom —
+  and the gate then tells an operator to check a log that does not contain the cause. It
+  is in the execution record the run already writes: an immediate `is_error` at zero cost
+  with an empty `modelUsage` is the API refusing the call outright, which is a different
+  thing from a model that answered badly, and the two want different responses. Each step
+  now reports `is_error`, `subtype`, turns, cost and model-call count into the job summary,
+  quotes what the run said, and adds an explicit note when there were no model calls at
+  all. A failure that genuinely burned tokens does not get that note, so exhausted credit
+  and an exhausted turn budget stop looking identical. The step runs only on failure and
+  never masks it, and the quoted text is fenced rather than interpolated, since model
+  output may echo the pull request.
 
 - Stop shipping this project's own self-test to the repositories that install it.
   `api-drift.yml` calls `vibey_gh.surfaces.parity()` — a statement about vibey-gh, not
