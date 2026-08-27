@@ -9,7 +9,7 @@ on:
     branches: [develop, main]
     types: [opened, reopened, synchronize, ready_for_review]
   workflow_run:
-    workflows: ["CI", "Provenance", "CodeQL", "Docs", "API drift (Cloud Agents OpenAPI)"]
+    workflows: ["CI", "Provenance", "CodeQL", "Docs", "Conventional Commits", "API drift (Cloud Agents OpenAPI)"]
     types: [completed]
   workflow_dispatch:
     inputs:

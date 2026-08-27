@@ -16,7 +16,7 @@ from vibey_gh.config import (
     PrAutomationObservabilityConfig,
     load_config,
 )
-from vibey_gh.install import installation_notices, render_workflow
+from vibey_gh.install import WORKFLOWS, installation_notices, render_workflow
 
 
 def cfg(tmp_path: Path, **automation) -> GhConfig:
@@ -699,3 +699,53 @@ def test_a_workflow_with_no_trigger_block_reports_no_triggers():
     assert pa._workflow_triggers("") == set()
     # And one that does declare them is still read correctly.
     assert pa._workflow_triggers("on:\n  pull_request:\n  push:\n") == {"pull_request", "push"}
+
+
+def test_the_evaluation_never_waits_on_the_job_computing_it(tmp_path: Path):
+    """The rollup counted `Evaluate current head`, which is running while it counts.
+
+    That makes the state permanently "pending" from inside its own run. It survived only
+    because a later run saw the earlier evaluate completed — so it bit the moment no later
+    run was coming: a pull request sat blocked with every check green, nothing failing and
+    nothing to rerun, waiting on the job that was doing the waiting.
+    """
+    rollup = [
+        check(name="CI"),
+        check(name="Evaluate current head", status="IN_PROGRESS", conclusion=None),
+        check(name="PR automation / gate", status="IN_PROGRESS", conclusion=None),
+    ]
+    decision = pa.evaluate(pr(statusCheckRollup=rollup), cfg(tmp_path), expected_sha="abc")
+    # The point is not which state it reaches but that it stops waiting on itself: the
+    # rollup is complete, so evaluation proceeds instead of reporting its own job pending.
+    assert decision.state != "pending", decision.reason
+    assert not decision.pending_checks
+
+
+def test_every_job_this_workflow_publishes_is_excluded_from_its_own_rollup():
+    """Pinned against the template, so a job added later cannot start gating itself."""
+    text = (WORKFLOWS / "pr-automation.yml").read_text(encoding="utf-8")
+    published = {
+        line.split("name:", 1)[1].strip()
+        for line in text.splitlines()
+        if line.startswith("    name:")
+    }
+    assert published, "no job names parsed out of pr-automation.yml"
+    missing = sorted(job for job in published if job not in pa.OWN_CHECKS)
+    assert not missing, f"these publish a check but are not excluded from the rollup: {missing}"
+
+
+def test_a_gating_check_belongs_to_a_workflow_that_can_re_trigger_evaluation(tmp_path: Path):
+    """`scan_workflows` is also the `workflow_run` trigger list, which is the trap.
+
+    A workflow whose check gates but which is absent there can never announce that it
+    finished. `Conventional Commits` was exactly that: its `enforce` check was counted,
+    the last scan to complete fired the final evaluation, `enforce` finished after it, and
+    nothing looked again.
+    """
+    from vibey_gh.config import DEFAULT_SCAN_WORKFLOWS
+
+    assert "Conventional Commits" in DEFAULT_SCAN_WORKFLOWS
+    rendered = render_workflow(WORKFLOWS / "pr-automation.yml", cfg(tmp_path))
+    triggers = next(line for line in rendered.splitlines() if line.strip().startswith("workflows:"))
+    for workflow in DEFAULT_SCAN_WORKFLOWS:
+        assert workflow in triggers, f"{workflow} gates but cannot re-trigger evaluation"

@@ -5,6 +5,19 @@ This file follows Keep a Changelog and semantic versioning conventions.
 
 ## Unreleased
 
+- Stop the gate deadlocking on a pull request with nothing wrong with it. Two faults met.
+  The rollup counted `Evaluate current head` — the job computing the rollup, still running
+  while it counts — so the state reads "pending" from inside its own run; that survived
+  only because a later run saw the earlier evaluate completed. And `Conventional Commits`
+  gated through its `enforce` check while being absent from `scan_workflows`, which is
+  also what `pr-automation.yml` renders into its `workflow_run` trigger, so finishing
+  announced nothing. Put together: the last scan fires the final evaluation, `enforce`
+  completes after it, and no run ever looks again. The pull request sits blocked with
+  every check green, nothing failing and nothing to rerun, until the scheduled backstop
+  notices hours later. Every job this workflow publishes is now excluded from its own
+  rollup, pinned against the template so a job added later cannot start gating itself, and
+  `Conventional Commits` is a scan workflow so its completion re-triggers evaluation.
+
 - Finish the code-block colours: give every token a legible default rather than naming
   them one at a time. The previous pass covered strings and keywords and missed
   `.hljs-subst`, so `$(git rev-parse HEAD)` inside a shell string stayed at 1.33:1 — in
