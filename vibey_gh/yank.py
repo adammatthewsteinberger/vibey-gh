@@ -1,37 +1,39 @@
 # Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), Developed by [Adam Matthew Steinberger](https://hire.adam.matthewsteinberger.com/) ([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/)).
-"""Yank superseded releases from a package index after a successful publish.
+"""Report which releases on an index have been superseded by the one just published.
 
-What this does is narrower than it sounds, and the semantics are worth stating plainly
-because the mechanism is routinely reached for to mean something it does not mean.
+**This reports. It cannot yank, because PyPI provides no way to.** An earlier version of
+this module POSTed `:action=yank` to the legacy upload endpoint. That action does not
+exist: the endpoint answers `405 Method Not Allowed`, while a recognised action such as
+`:action=file_upload` answers `403` on bad credentials. Auth is never reached, so no token
+makes it work.
 
-PEP 592 defines a yanked release as one with "a serious problem which should prevent it
-from being installed". Installers still resolve it when a pin demands it, so nothing is
-reclaimed and no disk is freed; what changes is that every consumer pinned to that version
-starts seeing a warning about a release that may be perfectly good.
+Yanking is a browser-only operation. PyPI's own documentation gives exactly one method --
+the release management page, Options, Yank
+(https://docs.pypi.org/project-management/yanking/) -- and the `/manage/...` route it uses
+is CSRF-protected against non-browser callers. Programmatic access is an open request
+upstream, not a shipped capability:
 
-There is no standard mechanism that expresses "superseded" per release. A Development
-Status classifier is per-release metadata and published distributions are immutable, so it
-cannot be applied after the fact. PEP 792 project status markers — `archived`,
-`deprecated`, `quarantined` — are per-PROJECT and specify only read-side APIs, so they can
-neither be scoped to an old release nor set programmatically. Yanking is the only
-per-release lever an index exposes.
+- https://github.com/pypa/packaging-problems/issues/633
+- https://github.com/pypi/warehouse/issues/12708
 
-Two invariants make it survivable anyway:
+That is arguably the correct design. PEP 592 defines a yanked release as one with "a
+serious problem which should prevent it from being installed" -- a distress signal, not a
+tidiness marker. Installers still resolve a yanked version when a pin demands it, so
+nothing is reclaimed; what changes is that everyone pinned to it starts seeing a warning
+about a release that may be perfectly good. The manual click is the friction that keeps
+that deliberate.
 
-- the version just published is NEVER yanked, so a publish cannot render itself unusable;
-- `keep` holds back the newest N superseded releases, so a rollback target still exists.
-
-Both indexes are off by default. TestPyPI is the defensible one to enable: a `.devN` build
-there is disposable by construction and has no consumers to mislead.
+So the analysis is automated and the click is left to a human: this works out exactly which
+releases are superseded, honouring `keep`, and prints them with a direct link to the page
+where they can be actioned.
 """
 
 from __future__ import annotations
 
 import json
-import subprocess
 import urllib.error
 import urllib.request
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from vibey_gh.config import GhConfig
 
@@ -42,18 +44,21 @@ _INDEX_JSON = {
     PYPI: "https://pypi.org/pypi/{project}/json",
     TESTPYPI: "https://test.pypi.org/pypi/{project}/json",
 }
-_UPLOAD = {
-    PYPI: "https://upload.pypi.org/legacy/",
-    TESTPYPI: "https://test.pypi.org/legacy/",
+# Where a human actually performs the yank. Printed beside the list so acting on it is one
+# click rather than a hunt through the project settings.
+_MANAGE = {
+    PYPI: "https://pypi.org/manage/project/{project}/releases/",
+    TESTPYPI: "https://test.pypi.org/manage/project/{project}/releases/",
 }
 
 
 @dataclass
-class YankReport:
+class SupersededReport:
     index: str
-    yanked: tuple[str, ...] = ()
+    superseded: tuple[str, ...] = ()
     skipped: tuple[str, ...] = ()
-    problems: tuple[str, ...] = field(default=())
+    problems: tuple[str, ...] = ()
+    manage_url: str = ""
 
     @property
     def ok(self) -> bool:
@@ -63,9 +68,9 @@ class YankReport:
 def released_versions(index: str, project: str, timeout: int = 30) -> list[str]:
     """Every version the index holds that is not already yanked.
 
-    A release whose files are all yanked is already in the state this would put it in, so
-    it is not reported — re-yanking it would be a no-op that still costs a request and
-    still shows up in the summary as if something happened.
+    A release whose files are all yanked is already in the state a yank would put it in, so
+    it is not reported -- listing it again would be noise in a report whose whole purpose is
+    to be a short, actionable list.
     """
     url = _INDEX_JSON[index].format(project=project)
     try:
@@ -90,21 +95,20 @@ def order(version: str) -> tuple[int, ...] | None:
 
     Deliberately not a PEP 440 implementation. This project has no dependencies, so
     `packaging` is not available, and half a version parser applied to epochs, local
-    segments and post-releases would mis-order them silently — which here means warning on
-    a release that is fine. Anything outside the shape this project actually publishes
-    returns None and is left alone.
+    segments and post-releases would mis-order them silently -- which here means naming a
+    good release in a list of things to yank. Anything outside the shape this project
+    publishes returns None and is left out.
 
-    A release sorts BELOW its own dev builds' base version: `1.2.0.dev5` precedes `1.2.0`,
-    which is what makes a final release supersede the dev builds that anticipated it.
+    A release sorts ABOVE its own dev builds: `1.2.0.dev5` precedes `1.2.0`, which is what
+    makes a final release supersede the dev builds that anticipated it.
     """
     base, separator, dev = version.partition(".dev")
     parts = base.split(".")
     if len(parts) != 3 or not all(part.isdigit() for part in parts):
         return None
     # `separator`, not `dev`: `1.2.0.dev` has the marker and an empty number, and testing
-    # the number alone let it fall through and parse as the FINAL release `1.2.0` — a
-    # malformed version silently read as a real one, which is how something good gets
-    # yanked.
+    # the number alone let it fall through and parse as the FINAL release `1.2.0` -- a
+    # malformed version silently read as a real one.
     if separator and not dev.isdigit():
         return None
     major, minor, patch = (int(part) for part in parts)
@@ -113,11 +117,11 @@ def order(version: str) -> tuple[int, ...] | None:
 
 
 def supersede(versions: list[str], current: str, keep: int) -> list[str]:
-    """Which versions to yank: everything below `current`, minus the newest `keep`.
+    """Which versions are superseded: everything below `current`, minus the newest `keep`.
 
-    `current` is excluded by identity, not by ordering. A publish that yanked the thing it
-    had just uploaded would be worse than useless, and leaving that to a version
-    comparison is one parsing quirk away from exactly that.
+    `current` is excluded by identity, not by ordering -- naming the release that was just
+    published as a candidate for yanking would be worse than useless, and leaving that to a
+    version comparison is one parsing quirk away from exactly that.
     """
     here = order(current)
     if here is None:
@@ -135,67 +139,25 @@ def supersede(versions: list[str], current: str, keep: int) -> list[str]:
     return [version for _, version in candidates[keep:]]
 
 
-def _yank_one(index: str, project: str, version: str, reason: str, token: str) -> str | None:
-    """Yank one release. Returns an error string, or None on success."""
-    run = subprocess.run(
-        [
-            "curl",
-            "--silent",
-            "--show-error",
-            "--fail",
-            "--request",
-            "POST",
-            "--form",
-            ":action=yank",
-            "--form",
-            f"name={project}",
-            "--form",
-            f"version={version}",
-            "--form",
-            f"reason={reason}",
-            "--user",
-            f"__token__:{token}",
-            _UPLOAD[index],
-        ],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if run.returncode:
-        return f"{version}: {(run.stderr or run.stdout).strip()[:200]}"
-    return None
-
-
-def yank_superseded(
-    cfg: GhConfig, index: str, project: str, current: str, token: str
-) -> YankReport:
-    """Yank everything the index holds below `current`, honouring `keep`."""
+def report_superseded(cfg: GhConfig, index: str, project: str, current: str) -> SupersededReport:
+    """Work out what `current` supersedes on `index`, honouring `keep`."""
     enabled = cfg.yank.pypi if index == PYPI else cfg.yank.testpypi
     if not enabled:
-        return YankReport(index, skipped=("disabled",))
-    if not token:
-        return YankReport(index, problems=(f"no token supplied for {index}",))
+        return SupersededReport(index, skipped=("disabled",))
 
     try:
         versions = released_versions(index, project)
     except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError) as error:
-        # Never fail the release over this. The package is already published; a failure
-        # here is bookkeeping, and turning it into a red release would misreport a
-        # successful publish as a broken one.
-        return YankReport(index, problems=(f"could not read {index}: {error}",))
+        # Never fail the release over this. The package is already published; a failure here
+        # is bookkeeping, and turning it into a red release would misreport a successful
+        # publish as a broken one.
+        return SupersededReport(index, problems=(f"could not read {index}: {error}",))
 
     targets = supersede(versions, current, cfg.yank.keep)
     if not targets:
-        return YankReport(index, skipped=("nothing superseded",))
-
-    yanked: list[str] = []
-    problems: list[str] = []
-    for version in targets:
-        # Not `error`: that name belongs to the `except ... as error` above, which Python
-        # deletes when the block exits, so reusing it here reads a deleted variable.
-        failure = _yank_one(index, project, version, cfg.yank.reason, token)
-        if failure:
-            problems.append(failure)
-        else:
-            yanked.append(version)
-    return YankReport(index, yanked=tuple(yanked), problems=tuple(problems))
+        return SupersededReport(index, skipped=("nothing superseded",))
+    return SupersededReport(
+        index,
+        superseded=tuple(targets),
+        manage_url=_MANAGE[index].format(project=project),
+    )

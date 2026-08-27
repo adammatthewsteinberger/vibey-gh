@@ -235,48 +235,56 @@ are visible rather than compiled in.
 
 ## `[yank]`
 
-Yank superseded releases from a package index after a successful publish.
+Report which releases on an index the just-published version supersedes.
 
-**Read this before enabling it.** [PEP 592](https://peps.python.org/pep-0592/) defines a
+**It reports. It cannot yank, and neither can anything else you write.** PyPI exposes no
+API for yanking. The legacy upload endpoint answers `405 Method Not Allowed` for
+`:action=yank` (a recognised action such as `:action=file_upload` answers `403` on bad
+credentials, so authentication is never even reached), and the `/manage/...` route the web
+UI uses is CSRF-protected against non-browser callers. Programmatic access is an open
+upstream request, not a shipped capability:
+
+- [pypa/packaging-problems#633](https://github.com/pypa/packaging-problems/issues/633)
+- [pypi/warehouse#12708](https://github.com/pypi/warehouse/issues/12708)
+
+[PyPI's own documentation](https://docs.pypi.org/project-management/yanking/) gives exactly
+one method: the release management page, **Options → Yank**. No token changes this; do not
+try to add one.
+
+That is arguably the right design. [PEP 592](https://peps.python.org/pep-0592/) defines a
 yanked release as one with *"a serious problem which should prevent it from being
-installed"*. It is a distress signal, not a tidiness marker. Installers still resolve a
-yanked version when a pin demands one, so nothing is reclaimed and no storage is freed;
-what changes is that everyone pinned to that version starts seeing a warning about a
-release that may be perfectly good. On PyPI it is not practically reversible.
+installed"* — a distress signal, not a tidiness marker. Installers still resolve a yanked
+version when a pin demands one, so nothing is reclaimed; what changes is that everyone
+pinned to it starts seeing a warning about a release that may be perfectly good. The manual
+click is the friction that keeps that deliberate.
 
-No standard alternative expresses "superseded" per release. A `Development Status`
-classifier is per-release metadata and published distributions are immutable, so it cannot
-be applied retroactively. [PEP 792](https://peps.python.org/pep-0792/) status markers —
-including `deprecated` — are per-**project** and specify only read-side APIs, so they can
-neither be scoped to an old release nor set programmatically. Yanking is the only
-per-release lever an index exposes, which is precisely why using it for housekeeping
-overstates the case.
+So this automates the analysis and leaves the click: it works out exactly which releases
+are superseded and prints them with a link to the page that can action them.
 
 | Field | Type / default | Meaning |
 |---|---|---|
-| `pypi` | boolean / `false` | Yank superseded releases from PyPI. This is the one that talks to other people's builds. |
-| `testpypi` | boolean / `false` | Yank superseded releases from TestPyPI. The defensible one: a `.devN` build there is disposable by construction and has no consumers to mislead. |
-| `keep` | integer / `0` | How many releases below the newest to leave alone, so a rollback target survives. `0` yanks everything superseded. |
-| `reason` | string / `superseded by a newer release` | Shown by installers beside the warning. |
+| `pypi` | boolean / `false` | Report superseded PyPI releases after a publish. |
+| `testpypi` | boolean / `false` | Report superseded TestPyPI releases. |
+| `keep` | integer / `0` | How many releases below the newest to leave out of the report, so a rollback target is never suggested. |
 
 Two invariants hold regardless of configuration:
 
-- **the version just published is never yanked**, so a publish cannot render itself
-  uninstallable — it is excluded by identity, not by version ordering;
-- **a version this cannot parse is never yanked.** Version handling here covers `N.N.N`
-  and `N.N.N.devN` only, which is what this tooling publishes. Epochs, local segments,
-  post-releases and pre-releases return no ordering and are left alone, because half a
-  PEP 440 parser mis-orders them silently and here that means warning on a good release.
+- **the version just published is never listed**, excluded by identity rather than by
+  version ordering;
+- **a version this cannot parse is never listed.** Ordering covers `N.N.N` and
+  `N.N.N.devN`, which is what this tooling publishes. Epochs, local segments, post- and
+  pre-releases are left out, because half a PEP 440 parser mis-orders them silently and
+  here that means naming a good release as a candidate for yanking.
 
-Run it from a release workflow after the upload step:
+Run it from a release workflow after the upload step. No credentials are involved — the
+index JSON it reads is public:
 
 ```bash
-vibey-gh yank-superseded --index testpypi --project my-package --version "$VERSION"
+vibey-gh report-superseded --index pypi --project my-package --version "$VERSION"
 ```
 
-The token comes from `--token` or `$VIBEY_GH_YANK_TOKEN`. The command always exits 0: the
-package is already published by the time it runs, so a bookkeeping failure is reported
-rather than turning a successful release red.
+It always exits 0: the package is already published by the time it runs, so a bookkeeping
+failure is reported rather than turning a successful release red.
 
 ## `[github_release]`
 

@@ -432,40 +432,35 @@ class GithubReleaseConfig:
 
 @dataclass(frozen=True)
 class YankConfig:
-    """Yank superseded releases from a package index after a successful publish.
+    """Report which releases an index holds below the one just published.
 
-    Read the semantics before enabling this. PEP 592 defines a yanked release as one with
-    "a serious problem which should prevent it from being installed" — a distress signal,
-    not a tidiness marker. Installers still resolve a yanked version when a pin demands
-    one, so nothing is reclaimed; what changes is that everyone pinned to that version
-    starts seeing a warning about a release that is fine.
+    Named `yank` because that is what a human does with the list. **Nothing here yanks
+    anything: PyPI provides no way to.** The legacy upload endpoint answers `405 Method Not
+    Allowed` for `:action=yank`, the `/manage/...` route the web UI uses is CSRF-protected
+    against non-browser callers, and programmatic access is an open upstream request
+    (pypa/packaging-problems#633, pypi/warehouse#12708). No token changes that. See
+    vibey_gh/yank.py.
 
-    No standard alternative does what this is usually reached for. A Development Status
-    classifier is per-release metadata and published distributions are immutable, so it
-    cannot be applied retroactively. PEP 792 status markers — including `deprecated` — are
-    per-PROJECT and define no write API, so they can neither be scoped to old releases nor
-    set autonomously. Yanking is the only per-release lever that exists, which is exactly
-    why reaching for it here overstates the case.
+    That is arguably correct. PEP 592 defines a yanked release as one with "a serious
+    problem which should prevent it from being installed" — a distress signal, not a
+    tidiness marker. Installers still resolve a yanked version when a pin demands one, so
+    nothing is reclaimed; what changes is that everyone pinned to it starts seeing a warning
+    about a release that may be fine. The manual click keeps that deliberate.
 
-    So: off by default on both indexes, and separately switchable. TestPyPI is the
-    defensible one — a `.devN` build there is disposable by construction and has no
-    consumers to mislead. `pypi` is the one that talks to other people's builds.
-
-    The version just published is never yanked, whatever these are set to.
+    Off by default on both indexes and separately switchable, because even the report is
+    noise for a repository that does not want it. The version just published is never
+    listed, whatever these are set to.
     """
 
     pypi: bool = False
     testpypi: bool = False
     # How many releases below the newest to leave alone, so a rollback target survives.
-    # 0 yanks everything superseded.
+    # 0 reports everything superseded.
     keep: int = 0
-    reason: str = "superseded by a newer release"
 
     def __post_init__(self) -> None:
         if self.keep < 0:
             raise ValueError("yank.keep must not be negative")
-        if not self.reason.strip():
-            raise ValueError("yank.reason must not be empty")
 
 
 @dataclass(frozen=True)
@@ -837,7 +832,6 @@ def load_config(root: Path | None = None) -> GhConfig:
             pypi=yanking.get("pypi", False),
             testpypi=yanking.get("testpypi", False),
             keep=yanking.get("keep", 0),
-            reason=yanking.get("reason", "superseded by a newer release"),
         ),
         github_release=GithubReleaseConfig(
             enabled=release.get("enabled", True),
