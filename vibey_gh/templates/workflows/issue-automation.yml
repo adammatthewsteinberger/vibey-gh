@@ -227,8 +227,9 @@ jobs:
       - name: Design and implement a solution without executing repository code
         id: claude
         uses: anthropics/claude-code-action@8569a83495a3f6f0c50a90e46351d3816fed1a75 # v1
+        # __VIBEY_GH_AI_ENV__
         with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          anthropic_api_key: ${{ secrets.__VIBEY_GH_AI_AUTH_SECRET__ }}
           # A nonmatching sentinel activates the action's token-free credential-helper
           # path without authorizing any non-write actor.
           allowed_non_write_users: "__vibey_gh_no_nonwrite_users__"
