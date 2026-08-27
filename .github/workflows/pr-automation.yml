@@ -957,9 +957,90 @@ jobs:
           Repair history and run links are retained in the PR automation state comment. A new contributor commit starts a new lineage."
           fi
 
+  review-fallback:
+    name: Local review fallback
+    needs: [evaluate, review]
+    # Runs ONLY when the paid review path returned no verdict at all — an exhausted API
+    # key, expired credentials, an unavailable model. A review that ran and returned
+    # findings is a real verdict and must never be overridden by a weaker local model:
+    # that is why this tests `passed == ''` rather than `result == 'failure'`.
+    #
+    # `trusted_only` keeps fork pull requests off the self-hosted runner entirely. GitHub
+    # warns that self-hosted runners should "almost never be used for public repositories"
+    # precisely because any user can open a pull request against them; excluding forks is
+    # what removes that attack. A fork pull request falls through to the existing
+    # behaviour — a failed gate a human resolves.
+    if: >-
+      false &&
+      always() && !cancelled() && github.event_name != 'schedule' &&
+      inputs.dry_run != true &&
+      needs.review.result == 'failure' &&
+      needs.review.outputs.passed == '' &&
+      (true == false ||
+       needs.evaluate.outputs.head_repo == github.repository)
+    runs-on: [self-hosted, vibey-local]
+    # No secrets. This path exists precisely because the API key is unusable, so it needs
+    # none, and it must never hold a token that could merge or mutate the repository.
+    permissions:
+      contents: read
+    outputs:
+      passed: ${{ steps.result.outputs.passed }}
+    steps:
+      - name: Check out trusted automation
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          path: automation
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+      - name: Install the tooling
+        run: |
+          set -euo pipefail
+          if grep -qE '^name = "vibey-gh"' automation/pyproject.toml; then
+            python -m pip install --quiet -e ./automation
+          else
+            python -m pip install --quiet vibey-gh
+          fi
+      # The diff arrives through the API and reaches the model as text. Repository code is
+      # never checked out here and never executed: the model has no shell, no tools, and no
+      # network beyond the local inference port.
+      - name: Fetch the exact-head diff
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ needs.evaluate.outputs.pr }}
+        run: gh pr diff "$PR" --repo "$REPO" > "${RUNNER_TEMP}/pr.diff"
+      - name: Review with the local model
+        id: result
+        run: |
+          set -euo pipefail
+          # Fail closed. An unreachable model or an unusable response must leave the gate
+          # red for a human, never resolve to a default pass.
+          if ! vibey-gh local-review \
+                --diff "${RUNNER_TEMP}/pr.diff" \
+                --model 'qwen2.5-coder:14b' \
+                --base-url "${VIBEY_OLLAMA_URL:-http://127.0.0.1:11434}" \
+                --max-chars 60000 \
+                --timeout 600 \
+                > "${RUNNER_TEMP}/verdict.json"; then
+            echo "::warning::local review fallback produced no verdict"
+            exit 1
+          fi
+          cat "${RUNNER_TEMP}/verdict.json"
+          echo "passed=$(jq -r .pass "${RUNNER_TEMP}/verdict.json")" >> "$GITHUB_OUTPUT"
+      - name: Archive the fallback verdict
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: pr-review-fallback-${{ needs.evaluate.outputs.pr }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/verdict.json
+          if-no-files-found: ignore
+
   gate:
     name: gate
-    needs: [evaluate, review, mirror-fork, repair, resolve-conflict, escalate]
+    needs:
+      [evaluate, review, review-fallback, mirror-fork, repair, resolve-conflict, escalate]
     # A superseded workflow_run is cancelled by the per-PR concurrency group. `always()`
     # alone would still run this job with empty needs outputs and publish a bogus failing
     # check. Pending scans likewise must produce no terminal gate yet.
@@ -989,6 +1070,8 @@ jobs:
           REASON: ${{ needs.evaluate.outputs.reason }}
           REVIEW_PASSED: ${{ needs.review.outputs.passed }}
           REVIEW_RESULT: ${{ needs.review.result }}
+          FALLBACK_PASSED: ${{ needs.review-fallback.outputs.passed }}
+          FALLBACK_MODEL: qwen2.5-coder:14b
         run: |
           set -euo pipefail
           conclusion=failure
@@ -1010,8 +1093,18 @@ jobs:
                 summary="Scans passed for this exact head, but the exact-head review returned actionable findings. Bounded repair addresses them and rescans; the findings are in the review job log and the PR automation state comment."
                 ;;
               *)
-                title="PR automation: review incomplete"
-                summary="Scans passed for this exact head, but the exact-head review returned no verdict (review job: ${REVIEW_RESULT}). This is an infrastructure or operator failure rather than a defect in the pull request. Check the review job log for API credit balance, credentials, or model availability, then rerun."
+                # No verdict from the paid path. If a local fallback reviewed the diff and
+                # found nothing blocking, admit it — but never present a degraded verdict
+                # as a full one. The title names the reviewer so someone reading this check
+                # months from now can tell the two apart without digging through logs.
+                if [ "$FALLBACK_PASSED" = true ]; then
+                  conclusion=success
+                  title="PR automation: gate (local fallback)"
+                  summary="Scans passed for this exact head. The primary exact-head review returned no verdict (review job: ${REVIEW_RESULT}), so a LOCAL FALLBACK model (${FALLBACK_MODEL}) reviewed the diff and found no blocking defect. It reviewed the DIFF ONLY — the documentation-contract fields were not evaluated, and this is a weaker signal than the primary review."
+                else
+                  title="PR automation: review incomplete"
+                  summary="Scans passed for this exact head, but the exact-head review returned no verdict (review job: ${REVIEW_RESULT}). This is an infrastructure or operator failure rather than a defect in the pull request. Check the review job log for API credit balance, credentials, or model availability, then rerun."
+                fi
                 ;;
             esac
           fi

@@ -153,6 +153,46 @@ class PrAutomationObservabilityConfig:
 
 
 @dataclass(frozen=True)
+class PrAutomationFallbackConfig:
+    """A local model that reviews when the paid path returns no verdict at all.
+
+    An exhausted API key fails the review job before the model ever runs, and because the
+    gate is a required check that turns a billing problem into a hard stop on every pull
+    request. This runs a local model on a self-hosted runner in that case only — never in
+    place of a review that actually ran and returned findings.
+
+    Off by default, deliberately. It requires a self-hosted runner, which GitHub says
+    should "almost never be used for public repositories" because any user can open a pull
+    request against them, so no repository should inherit this path without asking for it.
+    `trusted_only` keeps fork pull requests away from the runner entirely; leaving it true
+    is what makes the configuration defensible on a public repository.
+    """
+
+    enabled: bool = False
+    runner_label: str = "vibey-local"
+    model: str = "qwen2.5-coder:14b"
+    base_url: str = "http://127.0.0.1:11434"
+    trusted_only: bool = True
+    max_diff_chars: int = 60000
+    timeout_seconds: int = 600
+
+    def __post_init__(self) -> None:
+        if not self.enabled:
+            return
+        for name, value in (
+            ("runner_label", self.runner_label),
+            ("model", self.model),
+            ("base_url", self.base_url),
+        ):
+            if not value.strip():
+                raise ValueError(f"pr_automation.fallback.{name} must not be empty")
+        if self.max_diff_chars < 1000:
+            raise ValueError("pr_automation.fallback.max_diff_chars must be at least 1000")
+        if not 30 <= self.timeout_seconds <= 3600:
+            raise ValueError("pr_automation.fallback.timeout_seconds must be between 30 and 3600")
+
+
+@dataclass(frozen=True)
 class PrAutomationConfig:
     enabled: bool = True
     scan_workflows: tuple[str, ...] = DEFAULT_SCAN_WORKFLOWS
@@ -164,6 +204,7 @@ class PrAutomationConfig:
     replace_fork_prs: bool = True
     retain_schedule_backstop: bool = True
     observability: PrAutomationObservabilityConfig = PrAutomationObservabilityConfig()
+    fallback: PrAutomationFallbackConfig = PrAutomationFallbackConfig()
 
     def __post_init__(self) -> None:
         _unique_nonempty("pr_automation.scan_workflows", self.scan_workflows)
@@ -652,6 +693,7 @@ def load_config(root: Path | None = None) -> GhConfig:
     inst = data.get("install", {})
     auto = data.get("pr_automation", {})
     observability = auto.get("observability", {})
+    fallback = auto.get("fallback", {})
     issues = data.get("issue_automation", {})
     realigning = data.get("realign", {})
     syncing = data.get("branch_sync", {})
@@ -674,6 +716,15 @@ def load_config(root: Path | None = None) -> GhConfig:
             sanitized_progress=observability.get("sanitized_progress", True),
             archive_execution_file=observability.get("archive_execution_file", True),
             allow_private_full_output=observability.get("allow_private_full_output", False),
+        ),
+        fallback=PrAutomationFallbackConfig(
+            enabled=fallback.get("enabled", False),
+            runner_label=fallback.get("runner_label", "vibey-local"),
+            model=fallback.get("model", "qwen2.5-coder:14b"),
+            base_url=fallback.get("base_url", "http://127.0.0.1:11434"),
+            trusted_only=fallback.get("trusted_only", True),
+            max_diff_chars=fallback.get("max_diff_chars", 60000),
+            timeout_seconds=fallback.get("timeout_seconds", 600),
         ),
     )
     return GhConfig(

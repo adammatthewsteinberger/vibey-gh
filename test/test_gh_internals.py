@@ -756,3 +756,22 @@ def test_event_driven_merge_guards_and_single_pr_lookup(monkeypatch):
         {"number": 8, "title": "t", "isDraft": True, "author": {"login": "outsider"}}, cfg
     )
     assert draft.held_for_review is False  # a draft is the contributor's to fix
+
+
+def test_read_text_uses_the_value_when_the_path_probe_itself_fails(monkeypatch):
+    """`_read_text` accepts a literal value, a path, or `-`. Deciding which means probing
+    the filesystem, and that probe can itself raise: a long inline JSON payload can exceed
+    the platform's filename limit. The value must still be usable when it does — the probe
+    failing says nothing about the value being valid.
+    """
+    from pathlib import Path
+
+    from vibey_gh import cli
+
+    def explode(self: Path) -> bool:
+        raise OSError(63, "File name too long")
+
+    monkeypatch.setattr(Path, "is_file", explode)
+
+    payload = '{"pass": true}'
+    assert cli._read_text(payload) == payload
