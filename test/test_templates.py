@@ -16,7 +16,13 @@ from pathlib import Path
 import pytest
 import yaml
 
-from vibey_gh.config import AiConfig, DocumentationConfig, GhConfig, load_config
+from vibey_gh.config import (
+    DEFAULT_SCAN_WORKFLOWS,
+    AiConfig,
+    DocumentationConfig,
+    GhConfig,
+    load_config,
+)
 from vibey_gh.install import TEMPLATES, WORKFLOWS, installed, render_workflow
 
 WORKFLOW_TEMPLATES = sorted(WORKFLOWS.glob("*.yml"))
@@ -211,19 +217,35 @@ def test_pr_gate_requires_exact_head_semantic_documentation_review_for_every_aut
     assert "Bash(gh:pr:diff:*)" not in text
 
 
+def test_the_five_surface_self_test_is_this_project_s_own_and_ships_to_nobody():
+    """`api-drift.yml` tests vibey-gh, so it is hand-authored here and shipped to no one.
+
+    It ran `from vibey_gh.surfaces import …` and asserted *this* project's capability
+    registry — while being installed into every adopting repository as a managed workflow
+    and named in the default `scan_workflows`. An adopter got a required-looking gate that
+    tested a library rather than their product, and had to work out for themselves that it
+    should come back out. `ci.yml` and `release.yml` set the precedent: what is specific to
+    one repository is that repository's to author.
+    """
+    assert not (WORKFLOWS / "api-drift.yml").exists()
+    assert "API drift (Cloud Agents OpenAPI)" not in DEFAULT_SCAN_WORKFLOWS
+    drift = Path(__file__).resolve().parent.parent / ".github/workflows/api-drift.yml"
+    assert drift.is_file(), "this repository still needs its own five-surface self-test"
+    text = drift.read_text(encoding="utf-8")
+    assert "name: API drift (Cloud Agents OpenAPI)" in text
+    assert "MCP, API, CLI, SDK, and webhook parity" in text
+    assert "from vibey_gh.surfaces import CAPABILITIES, SURFACES, parity" in text
+    assert "if tuple(actual) != expected_capabilities:" in text
+    assert "if tuple(surfaces) != expected_surfaces" in text
+    assert "if tuple(actual) != tuple(SURFACES):" not in text
+
+
 def test_security_and_api_drift_workflows_are_real_managed_gates():
     text = (WORKFLOWS / "pr-automation.yml").read_text(encoding="utf-8")
     codeql = (WORKFLOWS / "codeql.yml").read_text(encoding="utf-8")
-    drift = (WORKFLOWS / "api-drift.yml").read_text(encoding="utf-8")
     assert "name: CodeQL" in codeql
     assert "github/codeql-action/init@6d786de4d6f3531a740e445b53a42b622bbbace8" in codeql
     assert "github/codeql-action/analyze@6d786de4d6f3531a740e445b53a42b622bbbace8" in codeql
-    assert "name: API drift (Cloud Agents OpenAPI)" in drift
-    assert "MCP, API, CLI, SDK, and webhook parity" in drift
-    assert "from vibey_gh.surfaces import CAPABILITIES, SURFACES, parity" in drift
-    assert "if tuple(actual) != expected_capabilities:" in drift
-    assert "if tuple(surfaces) != expected_surfaces" in drift
-    assert "if tuple(actual) != tuple(SURFACES):" not in drift
     assert "Do not spawn subagents" in text
     assert text.count("GH_REPO: ${{ github.repository }}") >= 2
     assert "isolated temporary" in text

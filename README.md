@@ -531,7 +531,7 @@ left alone and says so.
 ```toml
 [pr_automation]
 enabled = true
-scan_workflows = ["CI", "Provenance", "CodeQL", "Docs", "API drift (Cloud Agents OpenAPI)"]
+scan_workflows = ["CI", "Provenance", "CodeQL", "Docs"]
 ignored_checks = ["PR automation / gate", "gate", "Merge train / merge"]
 max_repair_attempts = 3
 model = "claude-sonnet-5"
@@ -648,9 +648,9 @@ properdocs_version = "1.6.7"
 ```
 
 `CodeQL` is a real managed Python security-analysis workflow using an immutably pinned
-official action. `API drift (Cloud Agents OpenAPI)` executes the capability registry and
-requires identical coverage through MCP, API, CLI, SDK, and webhook adapters. The scan
-names above therefore map to concrete required checks rather than advisory placeholders.
+official action. The scan names above therefore map to concrete required checks rather
+than advisory placeholders. Add your own workflow names to `scan_workflows` — each must
+have a `pull_request` or `pull_request_target` trigger, which `vibey-gh check` verifies.
 
 `[rulesets]` is what actually sets the branch protection the rest of this document
 describes, rather than leaving it for an adopter to configure by hand from prose.
