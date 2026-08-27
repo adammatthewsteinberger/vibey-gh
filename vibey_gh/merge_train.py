@@ -21,7 +21,12 @@ from typing import Any, cast
 
 from vibey_gh import reconcile
 from vibey_gh.config import GhConfig, normalise_actor
-from vibey_gh.pr_automation import BLOCKED_LABEL, EXHAUSTED_LABEL, EXTERNAL_REPAIR_LABEL
+from vibey_gh.pr_automation import (
+    BLOCKED_LABEL,
+    EXHAUSTED_LABEL,
+    EXTERNAL_REPAIR_LABEL,
+    OWN_CHECKS,
+)
 
 NEEDS_REVIEW_LABEL = "needs-human-review"
 # The phrase the owner-notification comment is recognised by. Matching on our own text is
@@ -106,7 +111,13 @@ def hold_for_review(verdict: Verdict, cfg: GhConfig, label: str = NEEDS_REVIEW_L
 def judge(pr: dict, cfg: GhConfig) -> Verdict:
     author = (pr.get("author") or {}).get("login", "")
     rollup = pr.get("statusCheckRollup") or []
-    ignored = set(cfg.pr_automation.ignored_checks) | {"gate"}
+    # The same exclusion set the gate uses, not just `gate`. A superseded PR-automation run
+    # leaves CANCELLED check runs behind for every job it did not finish — `Resolve merge
+    # conflicts`, `Mirror fork for safe repair`, `Repair failed scans or review findings`,
+    # and the rest. Excluding only `gate` meant this counted its own leftovers as failures
+    # and skipped a pull request the gate had already certified: "skipped — 7 check(s)
+    # failing" beside a green `PR automation / gate`, with nothing actually wrong.
+    ignored = set(cfg.pr_automation.ignored_checks) | OWN_CHECKS
     policy_rollup = [check for check in rollup if check.get("name") not in ignored]
     review = pr.get("reviewDecision") or ""
     labels = {

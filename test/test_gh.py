@@ -448,3 +448,52 @@ def test_cli_prints_the_trailer(repo, monkeypatch, capsys):
     monkeypatch.chdir(repo)
     cli_main(["trailer-key"])
     assert capsys.readouterr().out.strip() == "Made-With"
+
+
+def test_the_train_ignores_pr_automations_own_superseded_jobs():
+    """A superseded PR-automation run leaves CANCELLED check runs for every job it did not
+    finish. Those are this automation's own bookkeeping, not evidence about the change, and
+    the gate already excludes them — the train excluding only `gate` meant it counted them
+    as failures and skipped a pull request the gate had certified green.
+    """
+    from vibey_gh import merge_train
+    from vibey_gh.config import GhConfig
+
+    cfg = GhConfig(root=Path("."), owner="owner", trusted_authors=("owner",))
+    leftovers = [
+        {"name": name, "status": "COMPLETED", "conclusion": "CANCELLED"}
+        for name in (
+            "Resolve merge conflicts",
+            "Mirror fork for safe repair",
+            "Repair failed scans or review findings",
+            "Escalate exhausted repair lineage",
+            "Local review fallback",
+            "Exact-head code and documentation review",
+            "Evaluate current head",
+        )
+    ]
+    gate = {
+        "name": "PR automation / gate",
+        "status": "COMPLETED",
+        "conclusion": "SUCCESS",
+    }
+    real = {"name": "CI", "status": "COMPLETED", "conclusion": "SUCCESS"}
+
+    verdict = merge_train.judge(_pr(statusCheckRollup=[*leftovers, gate, real]), cfg)
+    assert verdict.ready, verdict.reason
+
+
+def test_the_train_still_requires_the_gate_it_excludes_from_the_policy_set():
+    """Excluding `PR automation / gate` from the failure count must not stop it being
+    REQUIRED: the readiness check reads the unfiltered rollup for exactly that reason. A
+    change that loses this distinction would merge pull requests the gate never certified.
+    """
+    from vibey_gh import merge_train
+    from vibey_gh.config import GhConfig
+
+    cfg = GhConfig(root=Path("."), owner="owner", trusted_authors=("owner",))
+    real = {"name": "CI", "status": "COMPLETED", "conclusion": "SUCCESS"}
+
+    verdict = merge_train.judge(_pr(statusCheckRollup=[real]), cfg)
+    assert not verdict.ready
+    assert "gate has not passed" in (verdict.reason or "")
