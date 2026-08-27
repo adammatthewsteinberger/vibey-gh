@@ -52,11 +52,20 @@ DEFAULT_SOURCES = ("tools/*.py", "src/**/*.py", ".github/workflows/*.yml")
 # repository plausibly has: "API drift (Cloud Agents OpenAPI)" used to be here and is not
 # an adopter's workflow at all — it is this project's own five-surface self-test, so every
 # adopter had to notice it and take it back out.
+# This list is two things at once, and the second is easy to miss: it names the workflows
+# whose completion re-triggers evaluation, *and* it is rendered into `pr-automation.yml`'s
+# `workflow_run` trigger. So a workflow whose check gates a merge but is absent here can
+# never announce that it finished — the rollup counts it as pending, the last scan to
+# complete triggers the final evaluation, and if this one finishes after that, nothing
+# looks again. `Conventional Commits` is in this list for exactly that reason: it is a
+# managed template, its `enforce` check gates, and leaving it out deadlocked a pull
+# request that had nothing wrong with it.
 DEFAULT_SCAN_WORKFLOWS = (
     "CI",
     "Provenance",
     "CodeQL",
     "Docs",
+    "Conventional Commits",
 )
 # Files every branch appends to, so two branches almost always touch the same lines.
 # Git's built-in `union` driver keeps both sides instead of reporting a conflict, which is

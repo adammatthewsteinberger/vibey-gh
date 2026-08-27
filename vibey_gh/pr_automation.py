@@ -29,6 +29,29 @@ AUTOMATION_LABELS = (EXTERNAL_REPAIR_LABEL, REPAIRING_LABEL, EXHAUSTED_LABEL, BL
 PASSING = {"SUCCESS", "NEUTRAL", "SKIPPED"}
 FAILING = {"FAILURE", "TIMED_OUT", "STARTUP_FAILURE", "ACTION_REQUIRED"}
 OPERATIONAL = {"CANCELLED", "STALE"}
+# Every check this workflow publishes itself. None may be counted in the rollup it
+# computes, and one of them makes that urgent rather than tidy: `Evaluate current head` is
+# still IN_PROGRESS *while* it computes the rollup, so counting it means the state is
+# always "pending". That normally survives only because a later run sees the earlier
+# evaluate completed — and when the last scan finishes before some other gating check
+# does, no later run is coming. The pull request then sits blocked with every check green
+# and nothing to rerun, until the scheduled backstop notices hours later.
+#
+# GitHub names a check run for its job, and prefixes it with the workflow name when the
+# run came from `workflow_run`, so both spellings are excluded.
+OWN_JOBS = (
+    "Dispatch recovery evaluations",
+    "Evaluate current head",
+    "Exact-head code and documentation review",
+    "Mirror fork for safe repair",
+    "Repair failed scans or review findings",
+    "Resolve merge conflicts",
+    "Escalate exhausted repair lineage",
+    "gate",
+)
+OWN_CHECKS = frozenset(
+    [name for job in OWN_JOBS for name in (job, f"PR automation / {job}")] + ["Merge train / merge"]
+)
 PULL_REQUEST_TRIGGERS = ("pull_request", "pull_request_target")
 _STATE_RE = github_state.marker_pattern(STATE_MARKER)
 _NAME_RE = re.compile(r"""^(?:name|"name"|'name'):\s*(.*?)\s*(?:#.*)?$""")
@@ -319,11 +342,7 @@ def evaluate(
     if pr.get("reviewDecision") == "CHANGES_REQUESTED":
         return result("blocked", "a human requested changes")
 
-    ignored = set(cfg.pr_automation.ignored_checks) | {
-        "PR automation / gate",
-        "gate",
-        "Merge train / merge",
-    }
+    ignored = set(cfg.pr_automation.ignored_checks) | OWN_CHECKS
     checks = [_check(item) for item in pr.get("statusCheckRollup") or []]
     checks = [item for item in checks if item.name not in ignored]
     if not checks:
