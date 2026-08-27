@@ -36,6 +36,26 @@ sanitized_progress = true
 archive_execution_file = true
 allow_private_full_output = false
 
+[pr_automation.fallback]
+# This project ships the fallback; not using it here meant its own pull requests still
+# stopped dead when the API key ran out of credit — the exact failure the feature exists to
+# absorb, and the reason several recent merges here needed an administrator override while
+# the first adopter's went through untouched.
+#
+# A runner is per-repository on a user account (organisation-wide runners are not available
+# outside an organisation), so this needs its own registration rather than sharing the
+# adopter's. The supervisor reads `VIBEY_REPO_URL`, so one script serves both; the distinct
+# label is what keeps the two from answering each other's jobs.
+#
+# `trusted_only` keeps fork pull requests off the runner, which is what makes a self-hosted
+# runner defensible on a public repository at all. When the runner is not up the job cannot
+# be scheduled and behaviour degrades to what it was before — a failed gate a human
+# resolves, which is the correct direction to fail.
+enabled      = true
+runner_label = "vibey-local-gh"
+model        = "qwen2.5-coder:14b"
+trusted_only = true
+
 [conversation]
 enabled = true
 trigger = "@vibey-gh"
