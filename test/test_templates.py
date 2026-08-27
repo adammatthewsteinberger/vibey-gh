@@ -1048,3 +1048,19 @@ def test_every_shipped_hook_is_valid_shell(name):
         ["sh", "-n", str(TEMPLATES / name)], capture_output=True, text=True, check=False
     )
     assert result.returncode == 0, result.stderr
+
+
+def test_the_merge_train_does_not_filter_on_the_triggering_runs_conclusion():
+    """Observed in production: every PR held green and unmerged while credits were out.
+
+    "PR automation" concludes `failure` whenever its exact-head review job fails — which
+    is precisely the case the local review fallback exists to cover. The fallback then
+    succeeds, publishes a green `PR automation / gate`, and the run as a whole still ends
+    `failure` because one job in it did. Filtering the merge train on that conclusion
+    skipped it on every such pull request and defeated the fallback at the last step.
+
+    Nothing is relaxed by its absence: `judge()` re-reads each pull request and requires a
+    completed, successful gate before merging, which is asserted separately.
+    """
+    spec = yaml.safe_load((WORKFLOWS / "merge-train.yml").read_text(encoding="utf-8"))
+    assert "conclusion" not in str(spec["jobs"]["merge"].get("if", ""))
