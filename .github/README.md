@@ -18,7 +18,7 @@ document when reviewing or operating GitHub Actions. Deeper references cover
 ```text
 topic branch push
   -> Branch intake opens or reuses a draft PR
-  -> CI, CodeQL, API drift, Provenance, and Docs settle for the exact head
+  -> CI, CodeQL, Provenance, and Docs settle for the exact head
   -> PR automation reviews, repairs, or resolves conflicts within a bounded budget
   -> PR automation publishes an exact-head gate
   -> Merge train squash-merges into develop
@@ -43,7 +43,6 @@ events. A skipped stale run is expected. A current-head failure is never bypasse
 | `issue-automation.yml` | Issue automation | Decides whether a published issue is eligible for an autonomous solution and, if it is, publishes one guarded solution branch and linked pull request. |
 | `ci.yml` | CI | Runs the supported Python matrix, 100% coverage, lint, formatting, typing, managed-workflow dogfood, and package builds. |
 | `codeql.yml` | CodeQL | Runs immutably pinned Python CodeQL analysis for pull requests and both delivery branches. |
-| `api-drift.yml` | API drift (Cloud Agents OpenAPI) | Proves that every canonical capability is available through MCP, API, CLI, SDK, and webhook adapters. |
 | `provenance.yml` | Provenance | Verifies source fingerprints, Conventional Commit subjects, and the required `Made-With` trailer without rewriting permanent history. |
 | `conventional-commits.yml` | Conventional Commits | Audits commit subjects and may safely normalize a linear same-repository topic branch with an exact-head lease. |
 | `documentation.yml` | Docs | Enforces the FOSS, human, agent, plugin-marketplace, Mermaid, SEO, crawler, and LLM documentation contract. |
@@ -58,7 +57,7 @@ events. A skipped stale run is expected. A current-head failure is never bypasse
 | `release-repair.yml` | Release repair | Reviews trusted post-merge failures and returns fixable changes through a guarded PR instead of patching a permanent branch directly. |
 
 Workflow `name:` values are event contracts. Renaming `CI`, `Release`, `Docs`, `CodeQL`,
-`Provenance`, or API drift without updating configured scans and `workflow_run` lists can
+`Provenance`, or `Docs` without updating configured scans and `workflow_run` lists can
 prevent downstream automation from firing.
 
 ## Exact-head PR automation

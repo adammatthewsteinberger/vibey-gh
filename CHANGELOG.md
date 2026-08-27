@@ -18,6 +18,16 @@ This file follows Keep a Changelog and semantic versioning conventions.
   never masks it, and the quoted text is fenced rather than interpolated, since model
   output may echo the pull request.
 
+- Stop shipping this project's own self-test to the repositories that install it.
+  `api-drift.yml` calls `vibey_gh.surfaces.parity()` — a statement about vibey-gh, not
+  about an adopter's product — yet it was a managed template installed everywhere *and*
+  named in the default `scan_workflows`. An adopting repository therefore received a
+  required-looking gate that tested this library, and had to work out on its own that it
+  should be excluded again; at least one did exactly that, permanently, with a comment
+  explaining why. It is now hand-authored in this repository alongside `ci.yml` and
+  `release.yml`, which already establish that repository-specific workflows are that
+  repository's to author. Adopters get neither the workflow nor the scan entry. A
+  repository that had excluded it can drop that exclusion.
 - Add `[ai]`, so the AI steps can be pointed at an endpoint other than Anthropic's. Every
   one of them runs Claude Code, which honours `ANTHROPIC_BASE_URL`, so a gateway serving
   the Anthropic Messages API — LiteLLM and similar translate it to Gemini, Qwen, GitHub

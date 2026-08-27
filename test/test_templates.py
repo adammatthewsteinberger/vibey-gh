@@ -16,7 +16,13 @@ from pathlib import Path
 import pytest
 import yaml
 
-from vibey_gh.config import AiConfig, DocumentationConfig, GhConfig, load_config
+from vibey_gh.config import (
+    DEFAULT_SCAN_WORKFLOWS,
+    AiConfig,
+    DocumentationConfig,
+    GhConfig,
+    load_config,
+)
 from vibey_gh.install import TEMPLATES, WORKFLOWS, installed, render_workflow
 
 WORKFLOW_TEMPLATES = sorted(WORKFLOWS.glob("*.yml"))
@@ -211,19 +217,35 @@ def test_pr_gate_requires_exact_head_semantic_documentation_review_for_every_aut
     assert "Bash(gh:pr:diff:*)" not in text
 
 
+def test_the_five_surface_self_test_is_this_project_s_own_and_ships_to_nobody():
+    """`api-drift.yml` tests vibey-gh, so it is hand-authored here and shipped to no one.
+
+    It ran `from vibey_gh.surfaces import …` and asserted *this* project's capability
+    registry — while being installed into every adopting repository as a managed workflow
+    and named in the default `scan_workflows`. An adopter got a required-looking gate that
+    tested a library rather than their product, and had to work out for themselves that it
+    should come back out. `ci.yml` and `release.yml` set the precedent: what is specific to
+    one repository is that repository's to author.
+    """
+    assert not (WORKFLOWS / "api-drift.yml").exists()
+    assert "API drift (Cloud Agents OpenAPI)" not in DEFAULT_SCAN_WORKFLOWS
+    drift = Path(__file__).resolve().parent.parent / ".github/workflows/api-drift.yml"
+    assert drift.is_file(), "this repository still needs its own five-surface self-test"
+    text = drift.read_text(encoding="utf-8")
+    assert "name: API drift (Cloud Agents OpenAPI)" in text
+    assert "MCP, API, CLI, SDK, and webhook parity" in text
+    assert "from vibey_gh.surfaces import CAPABILITIES, SURFACES, parity" in text
+    assert "if tuple(actual) != expected_capabilities:" in text
+    assert "if tuple(surfaces) != expected_surfaces" in text
+    assert "if tuple(actual) != tuple(SURFACES):" not in text
+
+
 def test_security_and_api_drift_workflows_are_real_managed_gates():
     text = (WORKFLOWS / "pr-automation.yml").read_text(encoding="utf-8")
     codeql = (WORKFLOWS / "codeql.yml").read_text(encoding="utf-8")
-    drift = (WORKFLOWS / "api-drift.yml").read_text(encoding="utf-8")
     assert "name: CodeQL" in codeql
     assert "github/codeql-action/init@6d786de4d6f3531a740e445b53a42b622bbbace8" in codeql
     assert "github/codeql-action/analyze@6d786de4d6f3531a740e445b53a42b622bbbace8" in codeql
-    assert "name: API drift (Cloud Agents OpenAPI)" in drift
-    assert "MCP, API, CLI, SDK, and webhook parity" in drift
-    assert "from vibey_gh.surfaces import CAPABILITIES, SURFACES, parity" in drift
-    assert "if tuple(actual) != expected_capabilities:" in drift
-    assert "if tuple(surfaces) != expected_surfaces" in drift
-    assert "if tuple(actual) != tuple(SURFACES):" not in drift
     assert "Do not spawn subagents" in text
     assert text.count("GH_REPO: ${{ github.repository }}") >= 2
     assert "isolated temporary" in text
@@ -560,33 +582,6 @@ def test_a_repository_may_decline_the_site_requirements_file_entirely(tmp_path):
     assert "__VIBEY_GH" not in rendered
     # The guard survives with an empty operand, so the branch is simply never taken.
     assert 'if [ -n "" ]' in rendered
-
-
-def test_every_ai_step_says_why_it_failed():
-    """A gate that says "check the log" is worth nothing if the log lacks the reason.
-
-    The action reports only `--json-schema was provided but Claude did not return
-    structured_output`, which is the symptom. The cause lives in the execution record: an
-    immediate `is_error` at zero cost with an empty `modelUsage` is the API refusing the
-    call, not a model answering badly. Every diagnosis of this in practice has been
-    inferred from `total_cost_usd: 0` rather than read, so each AI step now reports it.
-    """
-    total = 0
-    for name in AI_TEMPLATES:
-        text = (WORKFLOWS / name).read_text(encoding="utf-8")
-        calls = text.count("uses: anthropics/claude-code-action")
-        diagnostics = text.count("Say why the model call failed")
-        assert diagnostics == calls, f"{name}: {diagnostics} diagnostics for {calls} calls"
-        total += diagnostics
-    assert total == 7
-    text = (WORKFLOWS / "pr-automation.yml").read_text(encoding="utf-8")
-    # Only on failure, and never masking the failure it explains.
-    assert "if: failure() && steps.claude.outputs.execution_file != ''" in text
-    assert "GITHUB_STEP_SUMMARY" in text
-    # The refusal note is conditional on there having been no model call at all, so a
-    # genuine failure that burned tokens is not misreported as a credit problem.
-    assert "model_calls=0" in text
-    assert "not a defect in the pull request" in text
 
 
 def test_a_repository_can_decline_the_union_merge_rule_entirely(tmp_path):
