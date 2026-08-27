@@ -33,7 +33,16 @@ concurrency:
 jobs:
   merge:
     name: merge
-    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    # Deliberately NOT gated on the triggering run's conclusion. "PR automation" concludes
+    # `failure` whenever its exact-head review job fails -- which is exactly the case the
+    # local review fallback exists to cover: the fallback job then succeeds, publishes a
+    # green `PR automation / gate`, and the run as a whole still ends `failure` because one
+    # job in it did. Filtering on that conclusion skipped the merge train on every such PR
+    # and silently defeated the fallback at the last step.
+    #
+    # Nothing is relaxed by dropping it. The conclusion was never the authority: the
+    # decision is made below by `vibey-gh merge-train`, which re-reads each PR and requires
+    # a completed, successful `PR automation / gate` on the head before merging anything.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
