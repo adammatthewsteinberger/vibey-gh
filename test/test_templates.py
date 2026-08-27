@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from vibey_gh.config import DocumentationConfig, GhConfig, load_config
+from vibey_gh.config import AiConfig, DocumentationConfig, GhConfig, load_config
 from vibey_gh.install import TEMPLATES, WORKFLOWS, installed, render_workflow
 
 WORKFLOW_TEMPLATES = sorted(WORKFLOWS.glob("*.yml"))
@@ -452,6 +452,84 @@ def test_unsafe_union_merge_paths_are_rejected(tmp_path, paths, match):
 
     with pytest.raises(ValueError, match=match):
         GhConfig(root=tmp_path, union_merge_paths=paths)
+
+
+AI_TEMPLATES = (
+    "conversation.yml",
+    "documentation.yml",
+    "issue-automation.yml",
+    "pr-automation.yml",
+    "release-repair.yml",
+)
+
+
+def test_every_ai_step_can_be_pointed_at_another_endpoint():
+    """One marker per AI step, or a repository can only redirect some of its spending.
+
+    Claude Code honours `ANTHROPIC_BASE_URL`, so a gateway serving the Anthropic Messages
+    API is the whole of what it takes to run this somewhere other than Anthropic. That is
+    only true if *every* step carries the hook: a missed one keeps billing the original
+    endpoint, and silently.
+    """
+    marked = tokens = 0
+    for name in AI_TEMPLATES:
+        text = (WORKFLOWS / name).read_text(encoding="utf-8")
+        marked += text.count("# __VIBEY_GH_AI_ENV__")
+        tokens += text.count("secrets.__VIBEY_GH_AI_AUTH_SECRET__")
+    call_sites = sum(
+        (WORKFLOWS / name).read_text(encoding="utf-8").count("uses: anthropics/claude-code-action")
+        for name in AI_TEMPLATES
+    )
+    assert call_sites == 7
+    assert marked == call_sites
+    assert tokens == call_sites
+
+
+@pytest.mark.parametrize("name", AI_TEMPLATES)
+def test_the_default_endpoint_is_unchanged_and_no_base_url_is_set(name, tmp_path: Path):
+    """Empty is not the same as unset: an empty `ANTHROPIC_BASE_URL` points at nothing."""
+    rendered = render_workflow(WORKFLOWS / name, GhConfig(root=tmp_path))
+    assert "__VIBEY_GH" not in rendered
+    assert yaml.safe_load(rendered)
+    assert "ANTHROPIC_BASE_URL" not in rendered
+    assert "${{ secrets.ANTHROPIC_API_KEY }}" in rendered
+
+
+@pytest.mark.parametrize("name", AI_TEMPLATES)
+def test_a_gateway_endpoint_reaches_every_step_with_both_header_conventions(name, tmp_path: Path):
+    rendered = render_workflow(
+        WORKFLOWS / name,
+        GhConfig(
+            root=tmp_path,
+            ai=AiConfig(base_url="https://gateway.example.test/v1", auth_secret="LITELLM_KEY"),
+        ),
+    )
+    assert "__VIBEY_GH" not in rendered
+    assert yaml.safe_load(rendered)
+    calls = rendered.count("uses: anthropics/claude-code-action")
+    assert rendered.count('ANTHROPIC_BASE_URL: "https://gateway.example.test/v1"') == calls
+    # Claude Code sends `x-api-key`; some gateways read `Authorization`. One secret fills
+    # both, so a gateway works without the repository having to know which it wants.
+    assert rendered.count("ANTHROPIC_AUTH_TOKEN: ${{ secrets.LITELLM_KEY }}") == calls
+    assert "ANTHROPIC_API_KEY" not in rendered
+
+
+@pytest.mark.parametrize(
+    "kwargs,match",
+    [
+        # A name that could close the expression and append another would be an injection
+        # into a privileged workflow, so only a bare secret identifier is accepted.
+        ({"auth_secret": "A }} ${{ secrets.OTHER"}, "not a valid secret name"),
+        ({"auth_secret": "9LEADING_DIGIT"}, "not a valid secret name"),
+        ({"auth_secret": ""}, "not a valid secret name"),
+        ({"base_url": "ftp://gateway.example.test"}, "must be an http"),
+        ({"base_url": "gateway.example.test"}, "must be an http"),
+        ({"base_url": "https://gateway.example.test\nkey: value"}, "no whitespace"),
+    ],
+)
+def test_an_unsafe_ai_endpoint_is_rejected(kwargs, match):
+    with pytest.raises(ValueError, match=match):
+        AiConfig(**kwargs)
 
 
 @pytest.mark.parametrize(

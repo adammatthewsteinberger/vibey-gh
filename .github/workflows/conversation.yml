@@ -178,6 +178,7 @@ jobs:
       - name: Answer without executing repository code
         id: claude
         uses: anthropics/claude-code-action@8569a83495a3f6f0c50a90e46351d3816fed1a75 # v1
+        # ai: the default Anthropic endpoint
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           allowed_non_write_users: "__vibey_gh_no_nonwrite_users__"
