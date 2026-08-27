@@ -78,6 +78,10 @@ delete_duplicate_branches = true
 notify_contributor_branches = true
 
 [issue_automation]
+# The issue path's local fallback, sharing [pr_automation.fallback]'s runner and model.
+# Observed need: with credits exhausted, issue solving failed silently red — the artifact
+# read "Credit balance is too low" and the issue got nothing at all.
+fallback_enabled = true
 enabled = true
 model = "claude-sonnet-5"
 max_attempts = 2

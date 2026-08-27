@@ -284,3 +284,182 @@ def test_fallback_is_off_by_default_and_excludes_forks():
     fallback = PrAutomationConfig().fallback
     assert fallback.enabled is False
     assert fallback.trusted_only is True
+
+
+# ---------------------------------------------------------------------------
+# local-triage: the issue path's fallback. Same fail-closed rules as review,
+# but a smaller contract on purpose — analysis only, never code.
+# ---------------------------------------------------------------------------
+
+
+def _triage_verdict(**overrides: object) -> dict:
+    verdict = {
+        "root_cause": "the parser drops stderr",
+        "approach": "surface the captured stderr in the error message",
+        "files_likely_involved": ["vibey_gh/promote.py"],
+        "risks": ["none"],
+        "needs_human": False,
+        "summary": "triaged",
+    }
+    verdict.update(overrides)
+    return verdict
+
+
+def test_triage_sends_the_triage_schema(monkeypatch, tmp_path):
+    """Constrained decoding needs the schema on the wire, and it must be the TRIAGE
+    schema, not the review one — a triage constrained to review fields would emit
+    pass/findings booleans nothing reads."""
+    issue = tmp_path / "issue.md"
+    issue.write_text("# Bug\n\nIt breaks.")
+    sent: list[dict] = []
+
+    def fake_urlopen(request, timeout=None):
+        sent.append(json.loads(request.data))
+        return _Response({"message": {"content": json.dumps(_triage_verdict())}})
+
+    monkeypatch.setattr(local_review.urllib.request, "urlopen", fake_urlopen)
+    assert local_review.triage(["--issue", str(issue)]) == 0
+    assert sent[0]["format"] == local_review.TRIAGE_SCHEMA
+    assert sent[0]["options"] == {"temperature": 0}
+
+
+def test_triage_forces_needs_human_whatever_the_model_claims(monkeypatch, capsys, tmp_path):
+    """A triage that marks itself sufficient would quietly close the gap the paid solver
+    was meant to fill. The model said needs_human=false above; the output must say true."""
+    issue = tmp_path / "issue.md"
+    issue.write_text("# Bug\n\nIt breaks.")
+
+    def fake_urlopen(request, timeout=None):
+        return _Response({"message": {"content": json.dumps(_triage_verdict(needs_human=False))}})
+
+    monkeypatch.setattr(local_review.urllib.request, "urlopen", fake_urlopen)
+    assert local_review.triage(["--issue", str(issue)]) == 0
+    out = json.loads(capsys.readouterr().out)
+    assert out["needs_human"] is True
+    assert out["summary"].startswith("[LOCAL FALLBACK TRIAGE")
+    assert "No code was written" in out["summary"]
+
+
+def test_triage_reads_stdin_by_default(monkeypatch, capsys):
+    monkeypatch.setattr("sys.stdin", io.StringIO("# Bug\n\nIt breaks."))
+
+    def fake_urlopen(request, timeout=None):
+        return _Response({"message": {"content": json.dumps(_triage_verdict())}})
+
+    monkeypatch.setattr(local_review.urllib.request, "urlopen", fake_urlopen)
+    assert local_review.triage([]) == 0
+    assert json.loads(capsys.readouterr().out)["root_cause"]
+
+
+def test_triage_refuses_an_empty_issue(monkeypatch, capsys, tmp_path):
+    issue = tmp_path / "issue.md"
+    issue.write_text("   \n")
+    assert local_review.triage(["--issue", str(issue)]) == 1
+    assert "refusing to triage" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    "error",
+    [urllib.error.URLError("down"), TimeoutError("slow"), OSError("no route")],
+)
+def test_triage_fails_closed_when_the_model_is_unreachable(monkeypatch, capsys, tmp_path, error):
+    issue = tmp_path / "issue.md"
+    issue.write_text("# Bug\n\nIt breaks.")
+
+    def boom(request, timeout=None):
+        raise error
+
+    monkeypatch.setattr(local_review.urllib.request, "urlopen", boom)
+    assert local_review.triage(["--issue", str(issue)]) == 1
+    assert "unreachable" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"message": {"content": "not json {"}},
+        {"unexpected": "shape"},
+        {"message": {"content": json.dumps(["a", "list"])}},
+    ],
+)
+def test_triage_fails_closed_on_an_unusable_response(monkeypatch, capsys, tmp_path, payload):
+    issue = tmp_path / "issue.md"
+    issue.write_text("# Bug\n\nIt breaks.")
+    monkeypatch.setattr(
+        local_review.urllib.request,
+        "urlopen",
+        lambda request, timeout=None: _Response(payload),
+    )
+    assert local_review.triage(["--issue", str(issue)]) == 1
+    assert "unusable" in capsys.readouterr().err
+
+
+def test_triage_truncates_an_oversized_issue_and_says_so(monkeypatch, tmp_path):
+    issue = tmp_path / "issue.md"
+    issue.write_text("x" * 500)
+    sent: list[dict] = []
+
+    def fake_urlopen(request, timeout=None):
+        sent.append(json.loads(request.data))
+        return _Response({"message": {"content": json.dumps(_triage_verdict())}})
+
+    monkeypatch.setattr(local_review.urllib.request, "urlopen", fake_urlopen)
+    assert local_review.triage(["--issue", str(issue), "--max-chars", "100"]) == 0
+    user = sent[0]["messages"][1]["content"]
+    assert "truncated" in user
+    assert "x" * 101 not in user
+
+
+def test_the_cli_forwards_local_triage(monkeypatch, tmp_path):
+    from vibey_gh import cli
+
+    issue = tmp_path / "issue.md"
+    issue.write_text("# Bug\n\nIt breaks.")
+    seen: dict = {}
+
+    def fake_triage(argv):
+        seen["argv"] = argv
+        return 0
+
+    monkeypatch.setattr(local_review, "triage", fake_triage)
+    assert (
+        cli.main(
+            [
+                "local-triage",
+                "--issue",
+                str(issue),
+                "--model",
+                "m",
+                "--base-url",
+                "http://x",
+                "--max-chars",
+                "9",
+                "--timeout",
+                "7",
+            ]
+        )
+        == 0
+    )
+    assert seen["argv"] == [
+        "--issue",
+        str(issue),
+        "--model",
+        "m",
+        "--base-url",
+        "http://x",
+        "--max-chars",
+        "9",
+        "--timeout",
+        "7",
+    ]
+
+
+def test_the_cli_omits_unset_triage_arguments(monkeypatch):
+    """Unset flags must not be forwarded, so local_review.triage falls back to the
+    configured defaults instead of receiving empty strings as literal values."""
+    from vibey_gh import cli
+
+    seen: dict = {}
+    monkeypatch.setattr(local_review, "triage", lambda argv: seen.update(argv=argv) or 0)
+    assert cli.main(["local-triage"]) == 0
+    assert seen["argv"] == []
