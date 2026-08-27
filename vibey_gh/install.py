@@ -81,6 +81,23 @@ def render_workflow(source: Path, cfg: GhConfig) -> str:
     wanted = wanted.replace("__VIBEY_GH_INTEGRATION_BRANCH__", cfg.integration_branch)
     wanted = wanted.replace("__VIBEY_GH_RELEASE_BRANCH__", cfg.release_branch)
     wanted = wanted.replace("__VIBEY_GH_MODEL__", cfg.pr_automation.model)
+    # The secret's NAME, rendered inside `${{ secrets.… }}`. `AiConfig` has already refused
+    # anything that is not a bare secret identifier, so this cannot close the expression.
+    wanted = wanted.replace("__VIBEY_GH_AI_AUTH_SECRET__", cfg.ai.auth_secret)
+    # An endpoint override is emitted as a whole `env:` block or not at all: an empty
+    # `ANTHROPIC_BASE_URL` is not the same as an absent one, and would point Claude Code at
+    # nothing rather than at its default. Both header conventions are filled from the one
+    # secret, since Claude Code sends `x-api-key` while some gateways read `Authorization`.
+    wanted = wanted.replace(
+        "        # __VIBEY_GH_AI_ENV__",
+        (
+            "        env:\n"
+            f"          ANTHROPIC_BASE_URL: {json.dumps(cfg.ai.base_url)}\n"
+            "          ANTHROPIC_AUTH_TOKEN: ${{ secrets." + cfg.ai.auth_secret + " }}"
+            if cfg.ai.base_url
+            else "        # ai: the default Anthropic endpoint"
+        ),
+    )
     wanted = wanted.replace(
         "__VIBEY_GH_SANITIZED_PROGRESS__",
         "true" if cfg.pr_automation.observability.sanitized_progress else "false",

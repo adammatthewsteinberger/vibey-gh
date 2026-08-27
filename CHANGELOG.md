@@ -5,6 +5,19 @@ This file follows Keep a Changelog and semantic versioning conventions.
 
 ## Unreleased
 
+- Add `[ai]`, so the AI steps can be pointed at an endpoint other than Anthropic's. Every
+  one of them runs Claude Code, which honours `ANTHROPIC_BASE_URL`, so a gateway serving
+  the Anthropic Messages API — LiteLLM and similar translate it to Gemini, Qwen, GitHub
+  Models, or a model on your own hardware — is the whole of what it takes. Teaching five
+  workflows a second vendor's request shape would buy nothing the gateway does not.
+  `base_url` empty keeps the current endpoint, so nothing changes until asked, and
+  `auth_secret` names a repository secret rather than carrying a token, because this file
+  is committed. All seven call sites carry the hook, asserted by a test: a missed one
+  would keep billing the original endpoint silently. The whole `env:` block is emitted or
+  omitted rather than set empty, since an empty `ANTHROPIC_BASE_URL` points at nothing
+  rather than at the default, and the secret fills both header conventions because Claude
+  Code sends `x-api-key` while some gateways read `Authorization`.
+
 - Remove `README_SECTIONS`, `GITHUB_README_SECTIONS`, and `MERMAID_REQUIRED_TERMS` from
   `vibey_gh.documentation`, along with their unreferenced twins in `vibey_gh.config`. The
   documentation contract became configuration, and these were the literal copies left

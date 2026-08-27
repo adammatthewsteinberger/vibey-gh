@@ -101,6 +101,10 @@ DEFAULT_IGNORED_ISSUE_LABELS = (
     SOLVE_BLOCKED_LABEL,
 )
 GOOGLE_ANALYTICS_ID_PATTERN = re.compile(r"^G-[A-Z0-9]+$")
+# A GitHub secret name, which is what `${{ secrets.NAME }}` will be rendered around. Only
+# this shape is accepted, so a configured name cannot close the expression and append an
+# arbitrary one of its own.
+SECRET_NAME_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 # The agent-docs layout every repository this tool manages is expected to carry. These
 # files describe the ADOPTER's own project and make it navigable to an agent, so unlike the
 # narrative contracts on `DocumentationConfig` — which default to empty and are declared
@@ -226,6 +230,40 @@ class IssueAutomationConfig:
             raise ValueError(f"issue_automation.branch_prefix is unsafe: {prefix!r}")
         if any(char.isspace() for char in self.required_label):
             raise ValueError("issue_automation.required_label must contain no whitespace")
+
+
+@dataclass(frozen=True)
+class AiConfig:
+    """Where the AI steps send their requests, and which secret authorises them.
+
+    Every AI step runs Claude Code, which honours `ANTHROPIC_BASE_URL`. Pointing that at a
+    gateway serving the Anthropic Messages API — LiteLLM and friends translate it to
+    Gemini, Qwen, a local model, anything — is the whole of what it takes to run this
+    automation somewhere other than Anthropic. The alternative, teaching five workflows
+    about a second vendor's request shape, buys nothing the gateway does not.
+
+    Nothing here changes behaviour until `base_url` is set: empty means the default
+    endpoint, exactly as before this existed.
+
+    `auth_secret` names a repository secret rather than carrying a token, because a
+    configuration file is committed and a token must never be. Both header conventions are
+    populated from it when a gateway is in use — Claude Code sends `x-api-key`, while some
+    gateways read `Authorization` — so one secret works either way.
+    """
+
+    base_url: str = ""
+    auth_secret: str = "ANTHROPIC_API_KEY"
+
+    def __post_init__(self) -> None:
+        if not SECRET_NAME_PATTERN.match(self.auth_secret):
+            raise ValueError(f"ai.auth_secret is not a valid secret name: {self.auth_secret!r}")
+        if self.base_url:
+            if not self.base_url.startswith(("http://", "https://")):
+                raise ValueError(f"ai.base_url must be an http(s) URL: {self.base_url!r}")
+            # It renders into a workflow as a YAML scalar; whitespace would either break
+            # the document or smuggle a second key in beside it.
+            if any(character.isspace() for character in self.base_url):
+                raise ValueError("ai.base_url must contain no whitespace")
 
 
 @dataclass(frozen=True)
@@ -499,6 +537,7 @@ class GhConfig:
     release_branch: str = "main"
     owner: str = ""
     trusted_authors: tuple[str, ...] = ()
+    ai: AiConfig = AiConfig()
     pr_automation: PrAutomationConfig = PrAutomationConfig()
     issue_automation: IssueAutomationConfig = IssueAutomationConfig()
     realign: RealignConfig = RealignConfig()
@@ -613,6 +652,10 @@ def load_config(root: Path | None = None) -> GhConfig:
         release_branch=br.get("release", "main"),
         owner=tr.get("owner", ""),
         trusted_authors=tuple(tr.get("trusted_authors", ())),
+        ai=AiConfig(
+            base_url=data.get("ai", {}).get("base_url", ""),
+            auth_secret=data.get("ai", {}).get("auth_secret", AiConfig.auth_secret),
+        ),
         pr_automation=automation,
         issue_automation=IssueAutomationConfig(
             enabled=issues.get("enabled", True),
