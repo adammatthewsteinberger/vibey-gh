@@ -77,6 +77,26 @@ def _release_assets(cfg: GhConfig) -> list[tuple[Path, str]]:
     ]
 
 
+def _strip_trailing_space(text: str) -> str:
+    """Remove trailing whitespace from every rendered line.
+
+    Substitution creates it even though no template contains any. A placeholder that
+    renders empty mid-line -- `__VIBEY_GH_DOC_SITE_REQUIREMENTS__` with the default empty
+    `site_requirements`, for instance -- leaves the space that separated it from the
+    previous argument dangling at end of line.
+
+    That is not cosmetic. `installed()` compares managed files against the template
+    byte-for-byte, and the near-universal `trailing-whitespace` pre-commit hook strips the
+    space on the adopting repository's next commit. The file then reads as out of date,
+    `check` fails, and the pre-push hook refuses the push -- a formatting hook silently
+    breaking provenance, surfacing at `git push` with no visible connection to its cause.
+    Hit on five repositories adopting 1.38.0.
+
+    Done here rather than per placeholder so no future one can reintroduce it.
+    """
+    return "\n".join(line.rstrip() for line in text.split("\n"))
+
+
 def render_workflow(source: Path, cfg: GhConfig) -> str:
     wanted = source.read_text(encoding="utf-8")
     wanted = wanted.replace("__VIBEY_GH_INTEGRATION_BRANCH__", cfg.integration_branch)
@@ -236,15 +256,17 @@ def render_workflow(source: Path, cfg: GhConfig) -> str:
             f'python -m pip install --quiet "vibey-gh=={__version__}"\n',
         )
     if source.name != "pr-automation.yml":
-        return wanted
+        return _strip_trailing_space(wanted)
     workflows = json.dumps(list(cfg.pr_automation.scan_workflows))
     schedule = (
         '  schedule:\n    - cron: "47 */6 * * *"'
         if cfg.pr_automation.retain_schedule_backstop
         else "  # schedule backstop disabled by .vibey-gh.toml"
     )
-    return wanted.replace("__VIBEY_GH_SCAN_WORKFLOWS__", workflows).replace(
-        "  # __VIBEY_GH_SCHEDULE__", schedule
+    return _strip_trailing_space(
+        wanted.replace("__VIBEY_GH_SCAN_WORKFLOWS__", workflows).replace(
+            "  # __VIBEY_GH_SCHEDULE__", schedule
+        )
     )
 
 
