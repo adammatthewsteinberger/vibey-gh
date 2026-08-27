@@ -286,6 +286,127 @@ pre code,
   background: transparent !important;
 }
 
+/* Syntax colours for a code block this stylesheet has already forced dark.
+ *
+ * The theme ships two highlight.js palettes and enables the LIGHT one by default
+ * (`#hljs-dark` carries `disabled`). Its tokens are chosen for a white page — github's
+ * light theme paints strings `#032f62`, a dark navy — while the rule above paints the
+ * background `#080c17`. The result was dark navy on near-black: a string literal was
+ * genuinely unreadable, and every code sample here has string literals in it.
+ *
+ * Overriding the tokens rather than swapping the stylesheet keeps this working whichever
+ * palette the theme has enabled, and needs no JavaScript. This file loads after both, so
+ * ordinary specificity is enough.
+ *
+ * Pygments classes are covered too: `pymdownx.highlight` renders server-side and emits
+ * `.highlight .s` rather than `.hljs-string`, so a site configured that way would
+ * otherwise keep the same unreadable defaults. */
+.hljs-string,
+.hljs-meta .hljs-string,
+.highlight .s,
+.highlight .s1,
+.highlight .s2,
+.highlight .sb,
+.highlight .sd,
+.highlight .se,
+.highlight .sh,
+.highlight .si,
+.highlight .sx,
+.highlight .sr,
+.highlight .dl {
+  color: #9ae6a0;
+}
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-literal,
+.hljs-type,
+.highlight .k,
+.highlight .kc,
+.highlight .kd,
+.highlight .kn,
+.highlight .kp,
+.highlight .kr,
+.highlight .kt,
+.highlight .ow {
+  color: #c3a6ff;
+}
+
+.hljs-number,
+.hljs-symbol,
+.hljs-bullet,
+.highlight .m,
+.highlight .mb,
+.highlight .mf,
+.highlight .mh,
+.highlight .mi,
+.highlight .mo,
+.highlight .il {
+  color: #ffb86b;
+}
+
+.hljs-title,
+.hljs-section,
+.hljs-name,
+.hljs-selector-id,
+.hljs-selector-class,
+.highlight .nc,
+.highlight .nf,
+.highlight .nn,
+.highlight .fm {
+  color: #7cc4ff;
+}
+
+.hljs-attr,
+.hljs-attribute,
+.hljs-variable,
+.hljs-template-variable,
+.highlight .na,
+.highlight .nv,
+.highlight .vc,
+.highlight .vg,
+.highlight .vi {
+  color: #8fd0ff;
+}
+
+.hljs-built_in,
+.hljs-class .hljs-title,
+.highlight .nb,
+.highlight .bp {
+  color: #6fd3c7;
+}
+
+.hljs-comment,
+.hljs-quote,
+.highlight .c,
+.highlight .c1,
+.highlight .cm,
+.highlight .cp,
+.highlight .cs,
+.highlight .ch,
+.highlight .cpf {
+  color: #8b93b0;
+  font-style: italic;
+}
+
+.hljs-meta,
+.hljs-doctag,
+.highlight .o,
+.highlight .p,
+.highlight .nt {
+  color: #d3dcf5;
+}
+
+.hljs-deletion,
+.highlight .gd {
+  color: #ff9aa8;
+}
+
+.hljs-addition,
+.highlight .gi {
+  color: #9ae6a0;
+}
+
 .feature-grid {
   display: grid;
   margin: 2rem 0 0.5rem;
