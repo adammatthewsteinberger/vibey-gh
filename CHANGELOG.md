@@ -5,6 +5,17 @@ This file follows Keep a Changelog and semantic versioning conventions.
 
 ## Unreleased
 
+- Stop shipping this project's own self-test to the repositories that install it.
+  `api-drift.yml` calls `vibey_gh.surfaces.parity()` — a statement about vibey-gh, not
+  about an adopter's product — yet it was a managed template installed everywhere *and*
+  named in the default `scan_workflows`. An adopting repository therefore received a
+  required-looking gate that tested this library, and had to work out on its own that it
+  should be excluded again; at least one did exactly that, permanently, with a comment
+  explaining why. It is now hand-authored in this repository alongside `ci.yml` and
+  `release.yml`, which already establish that repository-specific workflows are that
+  repository's to author. Adopters get neither the workflow nor the scan entry. A
+  repository that had excluded it can drop that exclusion.
+
 - Install the packages a documentation site actually declares. The published-site build
   named exactly `properdocs` and its theme, with no way to extend the list, and ProperDocs
   depends on none of the plugins a real site configures — so a repository whose

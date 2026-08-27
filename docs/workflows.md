@@ -112,13 +112,18 @@ runs the immutably pinned `github/codeql-action` initializer and analyzer agains
 Python codebase. It is one of the required `scan_workflows` entries PR automation
 aggregates before publishing the merge gate.
 
-## API drift
+## API drift — not installed, and not yours
 
-`API drift` (workflow name `API drift (Cloud Agents OpenAPI)`) runs on the same push and
-pull-request events as CodeQL, with read-only `contents: read` permission. It installs the
-package and calls `vibey_gh.surfaces.parity()` to prove every canonical capability is
-exposed through all five surfaces — MCP, API, CLI, SDK, and webhook — failing the run on
-any drift between them. It is also a required `scan_workflows` entry.
+`API drift (Cloud Agents OpenAPI)` is **this project's own self-test and is not a managed
+template**. It calls `vibey_gh.surfaces.parity()` to prove every canonical capability is
+exposed through all five surfaces — MCP, API, CLI, SDK, and webhook — which is a statement
+about vibey-gh, not about a repository that installs it.
+
+It used to ship to every adopter and sit in the default `scan_workflows`, so an adopting
+repository received a required-looking gate that tested this library rather than their own
+product, and had to work out for themselves that it should come back out. It now lives in
+this repository's own `.github/workflows/`, hand-authored, exactly as `ci.yml` and
+`release.yml` do — what is specific to one repository is that repository's to author.
 
 ## Conventional Commits
 
@@ -185,8 +190,9 @@ request against `develop`.
 
 `PR automation` is the aggregation, review, repair, and merge-gating hub. It triggers on
 `pull_request_target` (opened, reopened, synchronize, ready-for-review) against
-`develop`/`main`; on completion of `CI`, `Provenance`, `CodeQL`, `Docs`, and `API drift
-(Cloud Agents OpenAPI)`; on a six-hourly recovery schedule; and on manual dispatch.
+`develop`/`main`; on completion of every workflow named in `scan_workflows` (`CI`,
+`Provenance`, `CodeQL`, and `Docs` by default); on a six-hourly recovery schedule; and on
+manual dispatch.
 Top-level permissions are `actions: read`, `checks: read`, `contents: read`, and
 `pull-requests: read`, with individual jobs elevating further. `evaluate` resolves the PR
 and its exact head SHA and calls `vibey-gh pr-automation evaluate` to compute an aggregate
@@ -333,7 +339,7 @@ its own gate. With `contents: write`, `pull-requests: write`, and `checks: read`
 verifies that the dispatching actor holds administrator permission; that the PR is open,
 non-draft, targets `develop`, and exactly matches the dispatched head SHA; that changed
 files are confined to workflow, template, or automation-core paths; and that every non-gate
-check run on that exact SHA — including CodeQL, API drift, the Documentation contract,
+check run on that exact SHA — including CodeQL, the Documentation contract,
 Provenance, Build, and Lint — completed successfully. Only then does it perform an
 admin `--match-head-commit` squash merge into `develop`, bypassing ordinary PR automation
 review, and delete the source branch, and only when that branch is same-repository and not
