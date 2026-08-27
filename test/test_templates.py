@@ -1064,3 +1064,29 @@ def test_the_merge_train_does_not_filter_on_the_triggering_runs_conclusion():
     """
     spec = yaml.safe_load((WORKFLOWS / "merge-train.yml").read_text(encoding="utf-8"))
     assert "conclusion" not in str(spec["jobs"]["merge"].get("if", ""))
+
+
+@pytest.mark.parametrize("name", sorted(p.name for p in WORKFLOWS.glob("*.yml")))
+def test_no_rendered_workflow_carries_trailing_whitespace(name, tmp_path):
+    """Rendered, not just authored — the defect only appears after substitution.
+
+    Every template is clean in source, so checking the templates proves nothing. A
+    placeholder that renders empty mid-line leaves the space that separated it from the
+    previous argument dangling: `__VIBEY_GH_DOC_SITE_REQUIREMENTS__` did exactly that with
+    the default empty `site_requirements`, which is the default path, not an edge case.
+
+    It matters because `installed()` compares byte-for-byte and the near-universal
+    `trailing-whitespace` pre-commit hook strips that space on the adopting repository's
+    next commit — after which `check` reports the file out of date and the pre-push hook
+    refuses the push. A formatting hook silently breaking provenance. Five repositories hit
+    it while adopting 1.38.0.
+    """
+    from vibey_gh.install import render_workflow
+
+    rendered = render_workflow(WORKFLOWS / name, GhConfig(root=tmp_path))
+    offenders = [
+        (number, line)
+        for number, line in enumerate(rendered.split("\n"), 1)
+        if line != line.rstrip()
+    ]
+    assert not offenders, f"{name} renders trailing whitespace at {[n for n, _ in offenders]}"
