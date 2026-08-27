@@ -386,6 +386,33 @@ def _contrast(foreground: str, background: str) -> float:
     return (lighter + 0.05) / (darker + 0.05)
 
 
+@pytest.mark.parametrize("hook", ["pre-push", "commit-msg"])
+def test_a_repository_that_is_vibey_gh_runs_its_own_working_tree(hook):
+    """An installed copy must never be what validates the tool's own repository.
+
+    `develop` here is ahead of the last release nearly always, so a globally installed
+    vibey-gh compares this repository's managed assets against the older ones it bundles,
+    calls them out of date, and refuses the push. That is not hypothetical: installing the
+    CLI the obvious way to satisfy an adopter's hook immediately made every push from this
+    repository fail, with a provenance error that had nothing wrong behind it.
+
+    The package is dependency-free stdlib, so running the checkout needs no install and no
+    virtualenv — only that this branch is tried before `command -v`.
+    """
+    text = (TEMPLATES / hook).read_text(encoding="utf-8")
+    self_hosting = text.find("grep -qE '^name = \"vibey-gh\"' pyproject.toml")
+    installed_copy = text.find("command -v vibey-gh")
+    assert self_hosting != -1, "the self-hosting branch is gone"
+    assert installed_copy != -1
+    assert self_hosting < installed_copy, (
+        "an installed vibey-gh would shadow the working tree and judge this repository "
+        "against whatever it last released"
+    )
+    # Narrow on purpose: an adopting repository must fall straight through to its
+    # installed CLI, so the test is the package name *and* the package directory.
+    assert "[ -d vibey_gh ]" in text
+
+
 def test_code_blocks_are_legible_against_the_background_this_theme_forces():
     """Forcing a dark code background obliges this stylesheet to own the token colours.
 

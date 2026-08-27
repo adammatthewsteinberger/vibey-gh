@@ -5,6 +5,18 @@ This file follows Keep a Changelog and semantic versioning conventions.
 
 ## Unreleased
 
+- Let a repository that *is* vibey-gh run its own working tree. The hooks resolved
+  `command -v vibey-gh` first, so a globally installed copy won — and since `develop` is
+  ahead of the last release nearly always, that copy compared the repository's managed
+  assets against the older ones it bundles, called them out of date, and refused the push
+  with a provenance error that had nothing wrong behind it. Installing the CLI the obvious
+  way, to satisfy an adopting repository's hook, was enough to lock this one. The hooks now
+  detect self-hosting the same way the workflow templates already do — `name = "vibey-gh"`
+  in `pyproject.toml`, plus the package directory — and run `python3 -m vibey_gh.cli`
+  against the checkout, which needs no install and no virtualenv because the package is
+  dependency-free stdlib. An adopting repository matches neither condition and falls
+  straight through to its installed CLI, exactly as before.
+
 - Make code blocks readable on the published documentation site. The theme ships two
   highlight.js palettes and enables the *light* one by default (`#hljs-dark` carries
   `disabled`), so its token colours are chosen for a white page — while this stylesheet
