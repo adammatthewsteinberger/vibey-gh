@@ -5,6 +5,42 @@ This file follows Keep a Changelog and semantic versioning conventions.
 
 ## Unreleased
 
+- Stop the gate deadlocking on a pull request with nothing wrong with it. Two faults met.
+  The rollup counted `Evaluate current head` — the job computing the rollup, still running
+  while it counts — so the state reads "pending" from inside its own run; that survived
+  only because a later run saw the earlier evaluate completed. And `Conventional Commits`
+  gated through its `enforce` check while being absent from `scan_workflows`, which is
+  also what `pr-automation.yml` renders into its `workflow_run` trigger, so finishing
+  announced nothing. Put together: the last scan fires the final evaluation, `enforce`
+  completes after it, and no run ever looks again. The pull request sits blocked with
+  every check green, nothing failing and nothing to rerun, until the scheduled backstop
+  notices hours later. Every job this workflow publishes is now excluded from its own
+  rollup, pinned against the template so a job added later cannot start gating itself, and
+  `Conventional Commits` is a scan workflow so its completion re-triggers evaluation.
+
+- Let a repository that *is* vibey-gh run its own working tree. The hooks resolved
+  `command -v vibey-gh` first, so a globally installed copy won — and since `develop` is
+  ahead of the last release nearly always, that copy compared the repository's managed
+  assets against the older ones it bundles, called them out of date, and refused the push
+  with a provenance error that had nothing wrong behind it. Installing the CLI the obvious
+  way, to satisfy an adopting repository's hook, was enough to lock this one. The hooks now
+  detect self-hosting the same way the workflow templates already do — `name = "vibey-gh"`
+  in `pyproject.toml`, plus the package directory — and run `python3 -m vibey_gh.cli`
+  against the checkout, which needs no install and no virtualenv because the package is
+  dependency-free stdlib. An adopting repository matches neither condition and falls
+  straight through to its installed CLI, exactly as before.
+- Finish the code-block colours: give every token a legible default rather than naming
+  them one at a time. The previous pass covered strings and keywords and missed
+  `.hljs-subst`, so `$(git rev-parse HEAD)` inside a shell string stayed at 1.33:1 — in
+  the very example that tells a reader how to list their check names. `.hljs-code` and
+  `.hljs-formula` were under the line too, at 4.06:1. A catch-all now sets a readable
+  colour for any token, including ones this stylesheet has never heard of, and the palette
+  overrides the ones worth distinguishing; it precedes the palette because an attribute
+  selector and a class have equal specificity and source order decides. The contrast test
+  could not have caught this on its own — it measured the colours that were declared, and
+  the broken token had none — so a second test asserts the catch-all exists and comes
+  first.
+
 - Make code blocks readable on the published documentation site. The theme ships two
   highlight.js palettes and enables the *light* one by default (`#hljs-dark` carries
   `disabled`), so its token colours are chosen for a white page — while this stylesheet

@@ -386,6 +386,60 @@ def _contrast(foreground: str, background: str) -> float:
     return (lighter + 0.05) / (darker + 0.05)
 
 
+@pytest.mark.parametrize("hook", ["pre-push", "commit-msg"])
+def test_a_repository_that_is_vibey_gh_runs_its_own_working_tree(hook):
+    """An installed copy must never be what validates the tool's own repository.
+
+    `develop` here is ahead of the last release nearly always, so a globally installed
+    vibey-gh compares this repository's managed assets against the older ones it bundles,
+    calls them out of date, and refuses the push. That is not hypothetical: installing the
+    CLI the obvious way to satisfy an adopter's hook immediately made every push from this
+    repository fail, with a provenance error that had nothing wrong behind it.
+
+    The package is dependency-free stdlib, so running the checkout needs no install and no
+    virtualenv — only that this branch is tried before `command -v`.
+    """
+    text = (TEMPLATES / hook).read_text(encoding="utf-8")
+    self_hosting = text.find("grep -qE '^name = \"vibey-gh\"' pyproject.toml")
+    installed_copy = text.find("command -v vibey-gh")
+    assert self_hosting != -1, "the self-hosting branch is gone"
+    assert installed_copy != -1
+    assert self_hosting < installed_copy, (
+        "an installed vibey-gh would shadow the working tree and judge this repository "
+        "against whatever it last released"
+    )
+    # Narrow on purpose: an adopting repository must fall straight through to its
+    # installed CLI, so the test is the package name *and* the package directory.
+    assert "[ -d vibey_gh ]" in text
+
+
+def test_no_code_token_can_keep_a_colour_meant_for_a_white_page():
+    """The gap the contrast test alone could not close.
+
+    Measuring the colours a stylesheet declares says nothing about the tokens it never
+    mentions. The first pass at this passed green while `.hljs-subst` was still inheriting
+    github-light's near-black — so `$(git rev-parse HEAD)` sat at 1.33:1 inside the very
+    example that tells a reader how to list their check names.
+
+    A catch-all fixes the class rather than the instance: any token, including ones this
+    stylesheet has never heard of, starts legible. It has to come *before* the palette,
+    because an attribute selector and a class have equal specificity and source order is
+    what decides between them.
+    """
+    css = (Path(__file__).resolve().parent.parent / "docs/stylesheets/vibey.css").read_text(
+        encoding="utf-8"
+    )
+    catch_all = css.find('[class*="hljs-"]')
+    assert catch_all != -1, "no catch-all: an unlisted token would inherit the light theme"
+    assert ".highlight span" in css, "Pygments needs the same catch-all"
+    first_token_rule = css.find(".hljs-string,")
+    assert first_token_rule != -1
+    assert catch_all < first_token_rule, (
+        "the catch-all must precede the palette, or equal specificity lets it win and "
+        "every token collapses to one colour"
+    )
+
+
 def test_code_blocks_are_legible_against_the_background_this_theme_forces():
     """Forcing a dark code background obliges this stylesheet to own the token colours.
 
