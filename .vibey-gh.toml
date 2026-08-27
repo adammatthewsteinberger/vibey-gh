@@ -192,3 +192,16 @@ required_checks = [
   "Documentation contract",
 ]
 bypass_actors = ["RepositoryRole:5"]
+
+[yank]
+# Yank superseded releases after a publish. See docs/configuration.md: PEP 592 calls a
+# yanked release one with "a serious problem", installers still resolve it when a pin
+# demands it, and on PyPI it is not practically reversible -- so this is off by default
+# everywhere and turned on here deliberately.
+#
+# `keep = 1` leaves the release immediately below the newest one alone, so there is
+# always a rollback target that carries no warning. Set it to 0 to yank everything
+# superseded.
+pypi = true
+testpypi = true
+keep = 1

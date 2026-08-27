@@ -431,6 +431,44 @@ class GithubReleaseConfig:
 
 
 @dataclass(frozen=True)
+class YankConfig:
+    """Yank superseded releases from a package index after a successful publish.
+
+    Read the semantics before enabling this. PEP 592 defines a yanked release as one with
+    "a serious problem which should prevent it from being installed" — a distress signal,
+    not a tidiness marker. Installers still resolve a yanked version when a pin demands
+    one, so nothing is reclaimed; what changes is that everyone pinned to that version
+    starts seeing a warning about a release that is fine.
+
+    No standard alternative does what this is usually reached for. A Development Status
+    classifier is per-release metadata and published distributions are immutable, so it
+    cannot be applied retroactively. PEP 792 status markers — including `deprecated` — are
+    per-PROJECT and define no write API, so they can neither be scoped to old releases nor
+    set autonomously. Yanking is the only per-release lever that exists, which is exactly
+    why reaching for it here overstates the case.
+
+    So: off by default on both indexes, and separately switchable. TestPyPI is the
+    defensible one — a `.devN` build there is disposable by construction and has no
+    consumers to mislead. `pypi` is the one that talks to other people's builds.
+
+    The version just published is never yanked, whatever these are set to.
+    """
+
+    pypi: bool = False
+    testpypi: bool = False
+    # How many releases below the newest to leave alone, so a rollback target survives.
+    # 0 yanks everything superseded.
+    keep: int = 0
+    reason: str = "superseded by a newer release"
+
+    def __post_init__(self) -> None:
+        if self.keep < 0:
+            raise ValueError("yank.keep must not be negative")
+        if not self.reason.strip():
+            raise ValueError("yank.reason must not be empty")
+
+
+@dataclass(frozen=True)
 class RulesetConfig:
     """Declared branch-protection policy for one permanent branch.
 
@@ -632,6 +670,7 @@ class GhConfig:
     branch_sync: BranchSyncConfig = BranchSyncConfig()
     conversation: ConversationConfig = ConversationConfig()
     github_release: GithubReleaseConfig = GithubReleaseConfig()
+    yank: YankConfig = YankConfig()
     rulesets: RulesetsConfig = RulesetsConfig()
     repository_profile: RepositoryProfileConfig = RepositoryProfileConfig()
     documentation: DocumentationConfig = DocumentationConfig()
@@ -707,6 +746,7 @@ def load_config(root: Path | None = None) -> GhConfig:
     syncing = data.get("branch_sync", {})
     talking = data.get("conversation", {})
     release = data.get("github_release", {})
+    yanking = data.get("yank", {})
     rulesets_data = data.get("rulesets", {})
     profile = data.get("repository_profile", {})
     documentation = data.get("documentation", {})
@@ -792,6 +832,12 @@ def load_config(root: Path | None = None) -> GhConfig:
             close_duplicates=realigning.get("close_duplicates", True),
             delete_duplicate_branches=realigning.get("delete_duplicate_branches", True),
             notify_contributor_branches=realigning.get("notify_contributor_branches", True),
+        ),
+        yank=YankConfig(
+            pypi=yanking.get("pypi", False),
+            testpypi=yanking.get("testpypi", False),
+            keep=yanking.get("keep", 0),
+            reason=yanking.get("reason", "superseded by a newer release"),
         ),
         github_release=GithubReleaseConfig(
             enabled=release.get("enabled", True),
