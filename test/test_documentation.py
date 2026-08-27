@@ -90,7 +90,7 @@ def test_a_repository_can_require_its_own_readme_sections(tmp_path: Path):
     assert not any("## Install" in problem for problem in report.problems)
 
 
-@pytest.mark.parametrize("field", ["github_readme_min_words", "mermaid_min_edges"])
+@pytest.mark.parametrize("field", ["automation_doc_min_words", "mermaid_min_edges"])
 def test_a_negative_documentation_threshold_is_rejected(field):
     with pytest.raises(ValueError, match="must not be negative"):
         DocumentationConfig(**{field: -1})
@@ -116,16 +116,16 @@ def test_documentation_rejects_incomplete_mermaid_project_map(tmp_path: Path):
 
 def test_documentation_rejects_placeholder_github_automation_guide(tmp_path: Path):
     sections = ("## Delivery model", "## Workflow inventory", "## Failure recovery")
-    guide = tmp_path / ".github/README.md"
+    guide = tmp_path / ".github/AUTOMATION.md"
     guide.parent.mkdir()
     guide.write_text("# GitHub automation\n\nSee docs/workflows.md.\n")
     report = check(
         GhConfig(
             root=tmp_path,
             documentation=DocumentationConfig(
-                required_files=(".github/README.md",),
-                github_readme_sections=sections,
-                github_readme_min_words=500,
+                required_files=(".github/AUTOMATION.md",),
+                automation_doc_sections=sections,
+                automation_doc_min_words=500,
                 require_provenance=True,
             ),
         )
@@ -226,8 +226,8 @@ def test_this_repository_documentation_contract_is_complete():
     # passing vacuously instead of failing. These pin the declaration, not the prose.
     doc = cfg.documentation
     assert doc.require_provenance
-    assert doc.readme_sections and doc.github_readme_sections and doc.mermaid_terms
-    assert doc.github_readme_min_words >= 500
+    assert doc.readme_sections and doc.automation_doc_sections and doc.mermaid_terms
+    assert doc.automation_doc_min_words >= 500
     assert doc.mermaid_min_edges >= 20
     marketplace = json.loads((root / ".claude-plugin/marketplace.json").read_text())
     assert len(marketplace["plugins"]) >= 4
@@ -235,3 +235,30 @@ def test_this_repository_documentation_contract_is_complete():
         path = root / plugin["source"]
         assert (path / ".claude-plugin/plugin.json").is_file()
         assert list((path / "skills").glob("*/SKILL.md"))
+
+
+def test_the_required_automation_doc_is_not_a_name_github_hijacks():
+    """`.github/README.md` is not a neutral filename — it is the repository's front page.
+
+    GitHub resolves a repository's landing README as `.github/README.md` first, and the
+    root `README.md` only if that is absent. Requiring the former therefore replaced every
+    adopting repository's *product* README with maintainer-facing automation notes, on the
+    page a user lands on. Both this project and its first adopter were serving the wrong
+    document, and nothing written inside the file could change that: the name is what
+    GitHub reads.
+
+    This is the same principle issue #82 settled — an adopter documents their product, and
+    this tool does not get to reshape that — arriving through a filename instead of a
+    heading.
+    """
+    from vibey_gh.config import DEFAULT_AUTOMATION_DOC, DEFAULT_DOCUMENTATION_FILES
+
+    hijacking = {".github/README.md", ".github/readme.md"}
+    assert DEFAULT_AUTOMATION_DOC not in hijacking
+    assert not hijacking & set(DEFAULT_DOCUMENTATION_FILES), (
+        "a required file would become the repository's landing README, displacing the "
+        "adopter's own"
+    )
+    # The root README must still be required: it is the product-facing document, and the
+    # whole point is that it is the one GitHub shows.
+    assert "README.md" in DEFAULT_DOCUMENTATION_FILES

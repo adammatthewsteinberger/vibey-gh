@@ -134,12 +134,12 @@ readme_sections = [
   "## Security model", "## Commands", "## Configuration", "## Workflows",
   "## Troubleshooting", "## Contributing", "## Licence",
 ]
-github_readme_sections = [
+automation_doc_sections = [
   "## Delivery model", "## Workflow inventory", "## Exact-head PR automation",
   "## AI trust boundary", "## Credentials and settings", "## Permanent-branch safety",
   "## Failure recovery", "## Changing workflows",
 ]
-github_readme_min_words = 500
+automation_doc_min_words = 500
 mermaid_terms = [
   "flowchart", "CLI", "SDK", "API", "MCP", "Webhook", "PR Automation", "develop",
   "main", "TestPyPI", "PyPI", "GitHub Pages", "Provenance", "Realign", "Security Boundary",

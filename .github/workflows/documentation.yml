@@ -85,7 +85,7 @@ jobs:
             security boundary, branch, package, documentation, and release channel.
             and repair task, not a read-only review.
 
-            The required contract is: [".claude-plugin/marketplace.json", ".claude/settings.json", ".claude/skills/README.md", ".cursor/rules/project.mdc", ".agents/skills/README.md", ".agent/rules/project.md", ".githooks/README.md", ".github/README.md", "docs/index.md", "docs/project.mmd", "AGENTS.md", "CHANGELOG.md", "CLAUDE.md", "CODE_OF_CONDUCT.md", "CONTRIBUTING.md", "GEMINI.md", "LICENSE", "README.md", "SECURITY.md", "SUPPORT.md"].
+            The required contract is: [".claude-plugin/marketplace.json", ".claude/settings.json", ".claude/skills/README.md", ".cursor/rules/project.mdc", ".agents/skills/README.md", ".agent/rules/project.md", ".githooks/README.md", ".github/AUTOMATION.md", "docs/index.md", "docs/project.mmd", "AGENTS.md", "CHANGELOG.md", "CLAUDE.md", "CODE_OF_CONDUCT.md", "CONTRIBUTING.md", "GEMINI.md", "LICENSE", "README.md", "SECURITY.md", "SUPPORT.md"].
             Also maintain architecture, CLI/API reference, configuration, installation,
             operations, troubleshooting, testing, release, provenance, threat model,
             dependency policy, accessibility, governance, roadmap, and decision records
