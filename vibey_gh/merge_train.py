@@ -180,7 +180,10 @@ def judge(pr: dict, cfg: GhConfig) -> Verdict:
 
 _PR_FIELDS = (
     "number,title,state,isDraft,mergeable,mergeStateStatus,reviewDecision,"
-    "statusCheckRollup,author,labels,headRefOid,headRefName,baseRefName,isCrossRepository"
+    "statusCheckRollup,author,labels,headRefOid,headRefName,baseRefName,isCrossRepository,"
+    # body: so the caller can see whether the squash commit will carry the Made-With
+    # trailer, and supply one when it will not. A bot's pull request body never has it.
+    "body"
 )
 
 
@@ -255,19 +258,36 @@ def delete_head_branch(pr: dict) -> bool:
     return ok
 
 
-def merge(number: int, method: str = "squash") -> tuple[bool, bool]:
-    """(merged, bypassed). Plain merge first: it is refused while a ruleset's
+def merge(
+    number: int, method: str = "squash", squash_body: str | None = None
+) -> tuple[bool, bool, str]:
+    """(merged, bypassed, error). Plain merge first: it is refused while a ruleset's
     approving-review requirement is unmet — even for an admin's token, because bypassing
     is opt-in per call — so fall back to --admin, which succeeds only if the token really
-    carries the admin role."""
+    carries the admin role.
+
+    `error` is the failing attempt's stderr, "" on success. It used to be discarded, and
+    every failure surfaced as "the ruleset refused it" — which sent a real token-scope
+    problem on a live repository into an hour of ruleset archaeology, because the one
+    string that named the actual cause was captured and thrown away.
+
+    `squash_body` replaces the squash commit body when given. The caller uses it to
+    guarantee the Made-With trailer: a squash merge takes its body from the pull request,
+    a bot's pull request body never carries the trailer, and the provenance check then
+    rejects the very commit the train just created — observed as a promotion blocked by
+    five trailer-less dependabot commits it could do nothing about.
+    """
     # Never ask GitHub to delete the head branch. In particular, the promotion PR's head
     # is `develop`; deleting it after a develop -> main merge would destroy a permanent
     # branch even though the merge itself was correct.
     base = ["gh", "pr", "merge", str(number), f"--{method}"]
-    if subprocess.run(base, capture_output=True, text=True, check=False).returncode == 0:
-        return True, False
-    return (
-        subprocess.run(base + ["--admin"], capture_output=True, text=True, check=False).returncode
-        == 0,
-        True,
-    )
+    if squash_body is not None and method == "squash":
+        base += ["--body", squash_body]
+    first = subprocess.run(base, capture_output=True, text=True, check=False)
+    if first.returncode == 0:
+        return True, False, ""
+    second = subprocess.run(base + ["--admin"], capture_output=True, text=True, check=False)
+    if second.returncode == 0:
+        return True, True, ""
+    detail = (second.stderr or second.stdout or first.stderr or first.stdout).strip()
+    return False, True, " ".join(detail.split())[:300]

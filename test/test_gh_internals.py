@@ -305,19 +305,40 @@ def test_a_failing_gh_call_raises_with_its_stderr(fake_gh):
 
 def test_merge_prefers_a_plain_merge(fake_gh):
     script(fake_gh, {"pr merge 5 --squash": {"code": 0}})
-    assert merge_train.merge(5) == (True, False)
+    assert merge_train.merge(5) == (True, False, "")
     assert calls(fake_gh) == ["pr merge 5 --squash"]
+
+
+def test_merge_injects_a_squash_body_when_given_one(fake_gh):
+    """The trailer rides in the squash body. A bot's pull request body never carries it,
+    and without this the train manufactures the exact trailer-less commit the provenance
+    check exists to refuse — five of which once blocked a promotion outright."""
+    script(fake_gh, {"pr merge 5 --squash --body deps\n\nMade-With: x": {"code": 0}})
+    assert merge_train.merge(5, "squash", "deps\n\nMade-With: x") == (True, False, "")
+    assert calls(fake_gh)[0].startswith("pr merge 5 --squash --body")
+
+
+def test_merge_never_injects_a_body_into_a_rebase(fake_gh):
+    """A rebase preserves the branch's own commits; --body would be rejected by gh."""
+    script(fake_gh, {"pr merge 5 --rebase": {"code": 0}})
+    assert merge_train.merge(5, "rebase", "ignored") == (True, False, "")
+    assert calls(fake_gh) == ["pr merge 5 --rebase"]
 
 
 def test_merge_falls_back_to_admin_and_reports_the_bypass(fake_gh):
     script(fake_gh, {"pr merge 5 --rebase --admin": {"code": 0}})
-    assert merge_train.merge(5, "rebase") == (True, True)
+    assert merge_train.merge(5, "rebase") == (True, True, "")
     assert calls(fake_gh)[-1].endswith("--admin")
 
 
 def test_merge_reports_failure_when_even_admin_is_refused(fake_gh):
+    """The third element is the diagnosis. Discarding it once turned a token-scope
+    problem into an hour of ruleset archaeology: every failure read "the ruleset
+    refused it" while the API was naming the actual cause the whole time."""
     script(fake_gh, {})
-    assert merge_train.merge(5) == (False, True)
+    merged, bypassed, error = merge_train.merge(5)
+    assert (merged, bypassed) == (False, True)
+    assert error  # the scripted stub's own refusal text, but never empty
 
 
 @pytest.mark.parametrize(
