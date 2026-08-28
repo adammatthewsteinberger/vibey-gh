@@ -127,6 +127,10 @@ def render_workflow(source: Path, cfg: GhConfig) -> str:
         "__VIBEY_GH_FALLBACK_ENABLED__", "true" if fallback.enabled else "false"
     )
     wanted = wanted.replace(
+        "__VIBEY_GH_ISSUE_FALLBACK_ENABLED__",
+        "true" if cfg.issue_automation.fallback_enabled else "false",
+    )
+    wanted = wanted.replace(
         "__VIBEY_GH_FALLBACK_TRUSTED_ONLY__", "true" if fallback.trusted_only else "false"
     )
     wanted = wanted.replace("__VIBEY_GH_FALLBACK_RUNNER_LABEL__", fallback.runner_label)

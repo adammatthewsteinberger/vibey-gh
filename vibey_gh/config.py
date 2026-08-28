@@ -273,6 +273,10 @@ class IssueAutomationConfig:
     open_pull_request: bool = True
     draft_pull_request: bool = True
     retain_schedule_backstop: bool = True
+    # Post a bounded local-model triage comment when the paid solve produced nothing —
+    # the issue path's counterpart to [pr_automation.fallback], sharing its runner, model
+    # and limits. Off by default: it needs that self-hosted runner to exist.
+    fallback_enabled: bool = False
 
     def __post_init__(self) -> None:
         _unique_nonempty("issue_automation.trigger_labels", self.trigger_labels)
@@ -804,6 +808,7 @@ def load_config(root: Path | None = None) -> GhConfig:
             open_pull_request=issues.get("open_pull_request", True),
             draft_pull_request=issues.get("draft_pull_request", True),
             retain_schedule_backstop=issues.get("retain_schedule_backstop", True),
+            fallback_enabled=issues.get("fallback_enabled", False),
         ),
         conversation=ConversationConfig(
             enabled=talking.get("enabled", True),

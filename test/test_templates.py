@@ -1090,3 +1090,29 @@ def test_no_rendered_workflow_carries_trailing_whitespace(name, tmp_path):
         if line != line.rstrip()
     ]
     assert not offenders, f"{name} renders trailing whitespace at {[n for n, _ in offenders]}"
+
+
+def test_the_issue_triage_fallback_renders_only_when_enabled(tmp_path):
+    """The issue path's counterpart to the review fallback, with a smaller contract: it
+    posts one deduplicated analysis comment and never writes code — a local model must not
+    inherit the write access the paid solver earned. Disabled it renders `false &&`, so
+    the job exists but can never run; enabled it targets the shared fallback runner."""
+    from vibey_gh.config import GhConfig, IssueAutomationConfig
+    from vibey_gh.install import render_workflow
+
+    source = WORKFLOWS / "issue-automation.yml"
+    off = render_workflow(source, GhConfig(root=tmp_path))
+    assert "Local triage fallback" in off
+    assert "false &&" in off.split("solve-fallback:")[1].split("runs-on:")[0]
+
+    on = render_workflow(
+        source,
+        GhConfig(root=tmp_path, issue_automation=IssueAutomationConfig(fallback_enabled=True)),
+    )
+    section = on.split("solve-fallback:")[1]
+    assert "true &&" in section.split("runs-on:")[0]
+    assert "vibey-local" in section.split("permissions:")[0]
+    # The comment is deduplicated by marker, and the job never pushes code.
+    assert "vibey-gh:local-triage" in section
+    assert "issues: write" in section
+    assert "contents: write" not in section
