@@ -55,6 +55,7 @@ flowchart TB
     Bootstrap[Admin-authorized automation bootstrap]
     ReviewIncomplete["Review incomplete: no verdict, operator action required"]
     LocalReviewFallback["Local-model review fallback (self-hosted runner, no push credential, Ollama, trusted_only excludes forks)"]
+    LocalTriageFallback["Local-model triage fallback (same self-hosted runner boundary, issues: write only, one deduplicated analysis comment, never code)"]
     UntrustedIssue[Untrusted contributor issue text]
     Briefing[Bounded untrusted issue briefing]
     IssueTrust["Issue eligibility policy (author trust, labels, budget)"]
@@ -148,6 +149,8 @@ flowchart TB
   Review -->|no verdict, trusted_only excludes forks| LocalReviewFallback
   LocalReviewFallback -->|fallback found nothing blocking: gate (local fallback)| MergeTrain
   LocalReviewFallback -->|fallback also unreachable or unusable| ReviewIncomplete
+  IssueAutomation -->|paid solve produced nothing| LocalTriageFallback
+  LocalTriageFallback -->|bounded triage comment, needs_human forced true| IssueAutomation
   Trusted --> EphemeralGit
   EphemeralGit --> CredentialHelper
   Sandbox --> SafeProgress

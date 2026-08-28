@@ -20,13 +20,19 @@ thread into a bounded briefing, and leaving both the reply and any bounded file 
 trusted step. `vibey_gh.github_state` is the single implementation of durable
 marker-comment state, shared by all three.
 
-When the primary Claude review returns no verdict at all, `vibey_gh.local_review` offers an
-opt-in fallback: a smaller, locally served model (through an Ollama-compatible endpoint)
-reviews the same diff on a distinct, non-privileged self-hosted runner and reports a
-narrower verdict than the primary review's documentation-contract schema. It is a separate
+When a primary Claude path returns no verdict at all, `vibey_gh.local_review` offers two
+opt-in fallbacks through the same Ollama-compatible endpoint on the same distinct,
+non-privileged self-hosted runner. For pull requests, `local-review` reviews the diff and
+reports a narrower verdict than the primary review's documentation-contract schema. For
+issues, `local-triage` does deliberately less than the solver it backs up — a local model
+must never inherit the write access the paid solver earned — so it writes no code and
+pushes no branch: it produces one bounded, schema-constrained analysis (root cause,
+approach, likely files, risks), posted as a single deduplicated comment with `needs_human`
+forced true, while the paid solver retries on its own schedule. Both are a separate
 security boundary from every other AI path in this project — a self-hosted rather than
 GitHub-hosted runner, excluded from fork pull requests by `trusted_only` — documented in
-full in [Configuration](configuration.md) under `[pr_automation.fallback]`.
+full in [Configuration](configuration.md) under `[pr_automation.fallback]` and
+`[issue_automation]` `fallback_enabled`.
 
 See also the [threat model](threat-model.md), [workflow reference](workflows.md), and
 [configuration reference](configuration.md).
