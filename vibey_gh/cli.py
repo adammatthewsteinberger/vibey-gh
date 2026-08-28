@@ -339,6 +339,21 @@ def _report_superseded(args) -> int:
     return 0
 
 
+def _local_triage(args) -> int:
+    from vibey_gh import local_review
+
+    forwarded: list[str] = []
+    if args.issue:
+        forwarded += ["--issue", args.issue]
+    forwarded += ["--model", args.model] if args.model else []
+    forwarded += ["--base-url", args.base_url] if args.base_url else []
+    if args.max_chars is not None:
+        forwarded += ["--max-chars", str(args.max_chars)]
+    if args.timeout is not None:
+        forwarded += ["--timeout", str(args.timeout)]
+    return local_review.triage(forwarded)
+
+
 def _local_review(args) -> int:
     from vibey_gh import local_review
 
@@ -683,6 +698,17 @@ def main(argv: list[str] | None = None) -> int:
     local.add_argument("--max-chars", type=int, help="override max_diff_chars")
     local.add_argument("--timeout", type=int, help="override timeout_seconds")
     local.set_defaults(func=_local_review)
+
+    lt = sub.add_parser(
+        "local-triage",
+        help="triage an issue with a local model when the paid solver produced nothing",
+    )
+    lt.add_argument("--issue", help="path to a file with the issue text (default: stdin)")
+    lt.add_argument("--model", default="")
+    lt.add_argument("--base-url", default="")
+    lt.add_argument("--max-chars", type=int, default=None)
+    lt.add_argument("--timeout", type=int, default=None)
+    lt.set_defaults(func=_local_triage)
 
     talk = sub.add_parser("conversation", help="respond to a mention in a comment")
     talk_sub = talk.add_subparsers(dest="action", required=True)

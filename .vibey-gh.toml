@@ -56,6 +56,12 @@ runner_label = "vibey-local-gh"
 model        = "qwen2.5-coder:14b"
 trusted_only = true
 
+# 600 timed out in production on this repository's own PR #140: a ~700-line diff, the 14B
+# model cold-loading, and seven runner containers sharing the machine. The fallback failed
+# closed exactly as designed -- but a fallback that cannot finish is no fallback, and the
+# cost of a longer wait is only paid on the degraded path.
+timeout_seconds = 1800
+
 [conversation]
 enabled = true
 trigger = "@vibey-gh"
@@ -78,6 +84,10 @@ delete_duplicate_branches = true
 notify_contributor_branches = true
 
 [issue_automation]
+# The issue path's local fallback, sharing [pr_automation.fallback]'s runner and model.
+# Observed need: with credits exhausted, issue solving failed silently red — the artifact
+# read "Credit balance is too low" and the issue got nothing at all.
+fallback_enabled = true
 enabled = true
 model = "claude-sonnet-5"
 max_attempts = 2
