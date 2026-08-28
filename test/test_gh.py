@@ -604,3 +604,19 @@ def test_a_text_migration_is_not_a_release(repo):
     new, why = versioning.decide(cfg, "base")
     assert new is None
     assert "provenance" in why
+
+
+def test_seo_configuration_survives_the_loader(tmp_path):
+    """The dataclass gaining fields is not the same as the loader reading them — this
+    exact gap shipped a green render with every SEO value silently defaulted."""
+    from vibey_gh.config import load_config
+
+    (tmp_path / ".vibey-gh.toml").write_text(
+        '[documentation]\nfavicon = "🔧"\nauthor = "A"\nkeywords = ["k1", "k2"]\n'
+        'og_image = "https://x/i.png"\ntwitter_site = "@t"\ntwitter_creator = "@c"\n'
+        'theme_color = "#fff"\nlocale = "fr_FR"\n'
+    )
+    d = load_config(tmp_path).documentation
+    assert (d.favicon, d.author, d.keywords) == ("🔧", "A", ("k1", "k2"))
+    assert (d.og_image, d.twitter_site, d.twitter_creator) == ("https://x/i.png", "@t", "@c")
+    assert (d.theme_color, d.locale) == ("#fff", "fr_FR")

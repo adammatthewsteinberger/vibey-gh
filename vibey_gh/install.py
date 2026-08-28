@@ -77,6 +77,30 @@ def _release_assets(cfg: GhConfig) -> list[tuple[Path, str]]:
     ]
 
 
+def _favicon_links(spec: str) -> str:
+    """Favicon <link> tags for a spec that is either emoji or a URL/path.
+
+    One or two emoji become a crisp zero-asset SVG data URI (the same URI serves
+    apple-touch-icon so pinned tabs and home screens match); anything that looks like a
+    URL or a file path is used verbatim. Computed once at render time so static pages —
+    the channel index — carry it without any runtime step.
+    """
+    import html as _html
+    import urllib.parse as _up
+
+    spec = spec.strip()
+    if not spec:
+        return ""
+    if spec.startswith(("http://", "https://", "/")) or "." in spec.split("/")[-1]:
+        return f'<link rel="icon" href="{_html.escape(spec, quote=True)}">'
+    svg = (
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">'
+        f'<text y="0.9em" font-size="90">{_html.escape(spec)}</text></svg>'
+    )
+    uri = "data:image/svg+xml," + _up.quote(svg)
+    return f'<link rel="icon" href="{uri}"><link rel="apple-touch-icon" href="{uri}">'
+
+
 def _strip_trailing_space(text: str) -> str:
     """Remove trailing whitespace from every rendered line.
 
@@ -237,6 +261,16 @@ def render_workflow(source: Path, cfg: GhConfig) -> str:
         "__VIBEY_GH_DOC_REQUIREMENTS_FILE__", cfg.documentation.site_requirements_file
     )
     wanted = wanted.replace("__VIBEY_GH_PROPERDOCS_VERSION__", cfg.documentation.properdocs_version)
+    docs = cfg.documentation
+    wanted = wanted.replace("__VIBEY_GH_DOC_FAVICON__", docs.favicon)
+    wanted = wanted.replace("__VIBEY_GH_DOC_FAVICON_LINKS__", _favicon_links(docs.favicon))
+    wanted = wanted.replace("__VIBEY_GH_DOC_OG_IMAGE__", docs.og_image)
+    wanted = wanted.replace("__VIBEY_GH_DOC_TWITTER_SITE__", docs.twitter_site)
+    wanted = wanted.replace("__VIBEY_GH_DOC_TWITTER_CREATOR__", docs.twitter_creator)
+    wanted = wanted.replace("__VIBEY_GH_DOC_KEYWORDS__", ",".join(docs.keywords))
+    wanted = wanted.replace("__VIBEY_GH_DOC_AUTHOR__", docs.author)
+    wanted = wanted.replace("__VIBEY_GH_DOC_THEME_COLOR__", docs.theme_color)
+    wanted = wanted.replace("__VIBEY_GH_DOC_LOCALE__", docs.locale)
     wanted = wanted.replace(
         "__VIBEY_GH_DOCUMENTATION_FILES__",
         json.dumps(list(cfg.documentation.required_files)),
