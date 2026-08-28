@@ -91,6 +91,20 @@ empty findings array. That is a normal and expected outcome.
 """
 
 
+def _num_ctx(prompt_chars: int) -> int:
+    """A context window that actually fits the prompt.
+
+    Ollama loads models with a small default context (4096 tokens here). Sending a
+    60,000-character diff into that does not error: llama.cpp repeatedly shifts the
+    window instead, and generation degrades from seconds to never-finishes — observed in
+    production as the fallback timing out at 600s and then 1800s on a 717-line diff a
+    10,000-character slice of which reviewed in 17 seconds. Code tokenizes at roughly
+    3 characters per token; 2048 covers the system prompt, schema and response. Capped
+    because an enormous request should fail visibly rather than exhaust the host.
+    """
+    return min(32768, max(4096, prompt_chars // 3 + 2048))
+
+
 def build_prompt(diff: str, max_chars: int) -> str:
     truncated = False
     if len(diff) > max_chars:
@@ -106,19 +120,21 @@ def build_prompt(diff: str, max_chars: int) -> str:
 
 
 def call_ollama(base_url: str, model: str, diff: str, max_chars: int, timeout: int) -> dict:
+    payload_prompt = build_prompt(diff, max_chars)
     payload = {
         "model": model,
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": build_prompt(diff, max_chars)},
+            {"role": "user", "content": payload_prompt},
         ],
         # Constrained decoding: Ollama compiles this to a grammar and zeroes the
         # probability of any token that would break it. Malformed JSON is not reachable.
         "format": REVIEW_SCHEMA,
         "stream": False,
         # Deterministic-ish. A review that flips verdict between runs on an unchanged head
-        # is worse than useless when it gates a merge.
-        "options": {"temperature": 0},
+        # is worse than useless when it gates a merge. num_ctx because the server's default
+        # window is far smaller than the diffs this reviews; see _num_ctx.
+        "options": {"temperature": 0, "num_ctx": _num_ctx(len(payload_prompt))},
     }
     request = urllib.request.Request(
         f"{base_url.rstrip('/')}/api/chat",
@@ -237,15 +253,16 @@ def build_triage_prompt(issue_text: str, max_chars: int) -> str:
 def call_ollama_triage(
     base_url: str, model: str, issue_text: str, max_chars: int, timeout: int
 ) -> dict:
+    payload_prompt = build_triage_prompt(issue_text, max_chars)
     payload = {
         "model": model,
         "messages": [
             {"role": "system", "content": TRIAGE_SYSTEM_PROMPT},
-            {"role": "user", "content": build_triage_prompt(issue_text, max_chars)},
+            {"role": "user", "content": payload_prompt},
         ],
         "format": TRIAGE_SCHEMA,
         "stream": False,
-        "options": {"temperature": 0},
+        "options": {"temperature": 0, "num_ctx": _num_ctx(len(payload_prompt))},
     }
     request = urllib.request.Request(
         f"{base_url.rstrip('/')}/api/chat",

@@ -320,7 +320,8 @@ def test_triage_sends_the_triage_schema(monkeypatch, tmp_path):
     monkeypatch.setattr(local_review.urllib.request, "urlopen", fake_urlopen)
     assert local_review.triage(["--issue", str(issue)]) == 0
     assert sent[0]["format"] == local_review.TRIAGE_SCHEMA
-    assert sent[0]["options"] == {"temperature": 0}
+    assert sent[0]["options"]["temperature"] == 0
+    assert sent[0]["options"]["num_ctx"] >= 4096
 
 
 def test_triage_forces_needs_human_whatever_the_model_claims(monkeypatch, capsys, tmp_path):
@@ -463,3 +464,41 @@ def test_the_cli_omits_unset_triage_arguments(monkeypatch):
     monkeypatch.setattr(local_review, "triage", lambda argv: seen.update(argv=argv) or 0)
     assert cli.main(["local-triage"]) == 0
     assert seen["argv"] == []
+
+
+def test_the_context_window_scales_with_the_prompt(monkeypatch, tmp_path):
+    """The production failure this encodes: the server's default context was 4096 tokens,
+    a 60,000-character diff was sent into it, and llama.cpp context-shifted its way from
+    seconds to never-finishes — the fallback timed out at 600s and again at 1800s while a
+    10,000-character slice of the same diff reviewed in 17 seconds. num_ctx must ride
+    along, sized to the prompt, for review and triage alike."""
+    big = tmp_path / "big.diff"
+    big.write_text("+ line\n" * 5000)
+    sent = _model_returns(monkeypatch, _verdict())
+    assert local_review.review(["--diff", str(big)]) == 0
+    ctx = sent[0]["options"]["num_ctx"]
+    assert ctx > 4096
+    assert ctx == local_review._num_ctx(len(sent[0]["messages"][1]["content"]))
+
+    small = tmp_path / "small.diff"
+    small.write_text("+ one line\n")
+    sent = _model_returns(monkeypatch, _verdict())
+    assert local_review.review(["--diff", str(small)]) == 0
+    assert sent[0]["options"]["num_ctx"] == 4096  # the floor, never below the default
+
+    issue = tmp_path / "issue.md"
+    issue.write_text("# Bug\n" + "detail\n" * 8000)
+    captured: list[dict] = []
+
+    def fake_urlopen(request, timeout=None):
+        captured.append(json.loads(request.data))
+        return _Response({"message": {"content": json.dumps(_triage_verdict())}})
+
+    monkeypatch.setattr(local_review.urllib.request, "urlopen", fake_urlopen)
+    assert local_review.triage(["--issue", str(issue)]) == 0
+    assert captured[0]["options"]["num_ctx"] > 4096
+
+
+def test_the_context_window_is_capped(tmp_path):
+    """An enormous request should fail visibly rather than exhaust the host."""
+    assert local_review._num_ctx(10_000_000) == 32768
