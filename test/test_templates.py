@@ -124,7 +124,10 @@ def test_release_surfaces_google_analytics_is_generic_and_off_by_default(tmp_pat
     assert "__VIBEY_GH_DOC_GOOGLE_ANALYTICS_ID__" in text
     assert "googletagmanager.com/gtag/js" in text
     assert "__GA_SNIPPET__" in text
-    disabled = render_workflow(WORKFLOWS / "release-surfaces.yml", load_config())
+    # An explicitly-default config, NOT load_config(): that read this repository's own
+    # .vibey-gh.toml, so the assertion silently tested repo state rather than the default
+    # — and broke the day the repo legitimately configured its own analytics id.
+    disabled = render_workflow(WORKFLOWS / "release-surfaces.yml", GhConfig(root=tmp_path))
     assert "__VIBEY_GH_DOC_GOOGLE_ANALYTICS_ID__" not in disabled
     assert 'GA_ID=""' in disabled
     enabled = render_workflow(
