@@ -174,7 +174,9 @@ def test_merge_train_merges_ready_and_skips_the_rest(repo, capsys, monkeypatch):
         lambda pr, cfg: Verdict(pr["number"], "t", "owner", None if pr["number"] == 1 else "draft"),
     )
     merged: list[int] = []
-    monkeypatch.setattr(merge_train, "merge", lambda n, m: (merged.append(n), (True, True))[1])
+    monkeypatch.setattr(
+        merge_train, "merge", lambda n, m, b=None: (merged.append(n), (True, True, ""))[1]
+    )
 
     assert main(["merge-train"]) == 0
     out = capsys.readouterr().out
@@ -187,7 +189,9 @@ def test_merge_train_merges_ready_and_skips_the_rest(repo, capsys, monkeypatch):
 def test_merge_train_dry_run_merges_nothing(repo, capsys, monkeypatch):
     monkeypatch.setattr(merge_train, "open_pull_requests", lambda cfg: [{"number": 3}])
     monkeypatch.setattr(merge_train, "judge", lambda pr, cfg: Verdict(3, "t", "owner", None))
-    monkeypatch.setattr(merge_train, "merge", lambda n, m: pytest.fail("dry run must not merge"))
+    monkeypatch.setattr(
+        merge_train, "merge", lambda n, m, b=None: pytest.fail("dry run must not merge")
+    )
     assert main(["merge-train", "--dry-run"]) == 0
     assert "would merge" in capsys.readouterr().out
 
@@ -195,9 +199,34 @@ def test_merge_train_dry_run_merges_nothing(repo, capsys, monkeypatch):
 def test_merge_train_reports_a_refused_merge(repo, capsys, monkeypatch):
     monkeypatch.setattr(merge_train, "open_pull_requests", lambda cfg: [{"number": 9}])
     monkeypatch.setattr(merge_train, "judge", lambda pr, cfg: Verdict(9, "t", "owner", None))
-    monkeypatch.setattr(merge_train, "merge", lambda n, m: (False, True))
+    monkeypatch.setattr(
+        merge_train, "merge", lambda n, m, b=None: (False, True, "GraphQL: repo not granted")
+    )
     assert main(["merge-train"]) == 0
-    assert "could not be merged" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    # The API's own words, not a guess. "refused it" alone sent a token-scope problem
+    # into ruleset archaeology.
+    assert "could not be merged — GraphQL: repo not granted" in out
+
+
+def test_merge_train_supplies_the_trailer_for_a_body_that_lacks_it(repo, capsys, monkeypatch):
+    """A squash commit takes its body from the pull request, and a bot's body never has
+    the trailer — so the train supplies one, or it manufactures the exact trailer-less
+    commit provenance refuses. A body that already carries it is left alone."""
+    prs = [
+        {"number": 4, "body": "bump things"},
+        {"number": 5, "body": "done\n\n" + load_config().trailer},
+    ]
+    monkeypatch.setattr(merge_train, "open_pull_requests", lambda cfg: prs)
+    monkeypatch.setattr(merge_train, "judge", lambda pr, cfg: Verdict(pr["number"], "t", "o", None))
+    seen: dict[int, object] = {}
+    monkeypatch.setattr(
+        merge_train, "merge", lambda n, m, b=None: (seen.__setitem__(n, b), (True, False, ""))[1]
+    )
+    assert main(["merge-train"]) == 0
+    trailer = load_config().trailer
+    assert seen[4] is not None and seen[4].endswith(trailer) and "bump things" in seen[4]
+    assert seen[5] is None
 
 
 @pytest.mark.parametrize(
@@ -210,7 +239,7 @@ def test_merge_train_cleans_only_eligible_topic_branches(
     pr = {"number": 9, "headRefName": "fix/thing"}
     monkeypatch.setattr(merge_train, "open_pull_requests", lambda cfg: [pr])
     monkeypatch.setattr(merge_train, "judge", lambda pr, cfg: Verdict(9, "t", "owner", None))
-    monkeypatch.setattr(merge_train, "merge", lambda n, m: (True, False))
+    monkeypatch.setattr(merge_train, "merge", lambda n, m, b=None: (True, False, ""))
     monkeypatch.setattr(merge_train, "delete_head_branch", lambda value: deleted)
     assert main(["merge-train"]) == 0
     assert fragment in capsys.readouterr().out
@@ -343,7 +372,7 @@ def test_the_run_writes_a_markdown_summary(repo, monkeypatch, tmp_path):
             pr["number"], f"pr {pr['number']}", "owner", None if pr["number"] == 1 else "draft"
         ),
     )
-    monkeypatch.setattr(merge_train, "merge", lambda n, m: (True, False))
+    monkeypatch.setattr(merge_train, "merge", lambda n, m, b=None: (True, False, ""))
 
     out = tmp_path / "summary.md"
     assert main(["merge-train", "--summary", str(out)]) == 0
