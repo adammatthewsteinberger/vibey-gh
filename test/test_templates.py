@@ -1119,3 +1119,63 @@ def test_the_issue_triage_fallback_renders_only_when_enabled(tmp_path):
     assert "vibey-gh:local-triage" in section
     assert "issues: write" in section
     assert "contents: write" not in section
+
+
+def test_seo_metadata_is_rendered_configurably(tmp_path):
+    """The site ships complete search and social metadata with zero configuration — the
+    defaults derive from the repository (GitHub's generated OpenGraph card, repo-derived
+    keywords) — and every field is overridable from [documentation]."""
+    from vibey_gh.config import DocumentationConfig, GhConfig
+    from vibey_gh.install import _favicon_links, render_workflow
+
+    source = WORKFLOWS / "release-surfaces.yml"
+    plain = render_workflow(source, GhConfig(root=tmp_path))
+    # Defaults: emoji favicon becomes a data-URI link pair; og:image falls back to
+    # GitHub's card at runtime, so the template must carry the fallback expression.
+    assert "data:image/svg+xml," in plain
+    assert "opengraph.githubassets.com" in plain
+    assert "SEO_KEYWORDS=''" in plain
+
+    configured = render_workflow(
+        source,
+        GhConfig(
+            root=tmp_path,
+            documentation=DocumentationConfig(
+                favicon="https://example.com/icon.png",
+                og_image="https://example.com/card.png",
+                twitter_site="@vibey",
+                keywords=("alpha", "beta"),
+                author="A. Person",
+                theme_color="#123abc",
+                locale="de_DE",
+            ),
+        ),
+    )
+    assert 'href="https://example.com/icon.png"' in configured
+    assert "SEO_OG_IMAGE='https://example.com/card.png'" in configured
+    assert "SEO_TWITTER_SITE='@vibey'" in configured
+    assert "SEO_KEYWORDS='alpha,beta'" in configured
+    assert "SEO_AUTHOR='A. Person'" in configured
+    assert "SEO_THEME_COLOR='#123abc'" in configured
+    assert "SEO_LOCALE='de_DE'" in configured
+
+    # The pure helper: emoji in, matching icon+touch-icon pair out; URLs verbatim.
+    pair = _favicon_links("⚙️")
+    assert pair.count("data:image/svg+xml,") == 2 and "apple-touch-icon" in pair
+    assert _favicon_links("") == ""
+    assert _favicon_links("/img/fav.ico") == '<link rel="icon" href="/img/fav.ico">'
+
+
+def test_seo_fields_refuse_html_injection():
+    """These strings land verbatim in rendered pages and workflow YAML; the cheap
+    injections are refused at load time rather than discovered on a published site."""
+    import pytest as _pytest
+
+    from vibey_gh.config import DocumentationConfig
+
+    with _pytest.raises(ValueError, match="must not contain HTML"):
+        DocumentationConfig(author='"><script>x</script>')
+    with _pytest.raises(ValueError, match="theme_color"):
+        DocumentationConfig(theme_color="blue")
+    with _pytest.raises(ValueError, match="plain words"):
+        DocumentationConfig(keywords=("ok", "<bad>"))

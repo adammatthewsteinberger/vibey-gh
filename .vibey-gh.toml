@@ -158,6 +158,11 @@ mermaid_min_edges = 20
 # GA4 measurement id for the published docs site. Rendered into release-surfaces.yml as
 # GA_ID. The id is public by nature -- it ships in the page source of every site using it.
 google_analytics_id = "G-DV1RM8BD78"
+# SEO / LEO. The favicon is one emoji rendered as a zero-asset SVG; og_image left empty
+# deliberately, which selects GitHub's generated OpenGraph card for the repository.
+favicon = "⚙️"
+author = "Adam Matthew Steinberger"
+keywords = ["github automation", "release automation", "provenance", "merge train", "pull request gate", "ci"]
 
 # Reconciled branch rulesets. Two things here are load-bearing and were learned the hard
 # way, so they are spelled out rather than left to the defaults.
