@@ -534,7 +534,7 @@ left alone and says so.
 ```toml
 [pr_automation]
 enabled = true
-scan_workflows = ["CI", "Provenance", "CodeQL", "Docs"]
+scan_workflows = ["CI", "Provenance", "CodeQL", "Docs", "Conventional Commits"]
 ignored_checks = ["PR automation / gate", "gate", "Merge train / merge"]
 max_repair_attempts = 3
 model = "claude-sonnet-5"

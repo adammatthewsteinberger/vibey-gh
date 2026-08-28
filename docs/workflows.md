@@ -191,8 +191,8 @@ request against `develop`.
 `PR automation` is the aggregation, review, repair, and merge-gating hub. It triggers on
 `pull_request_target` (opened, reopened, synchronize, ready-for-review) against
 `develop`/`main`; on completion of every workflow named in `scan_workflows` (`CI`,
-`Provenance`, `CodeQL`, and `Docs` by default); on a six-hourly recovery schedule; and on
-manual dispatch.
+`Provenance`, `CodeQL`, `Docs`, and `Conventional Commits` by default); on a six-hourly
+recovery schedule; and on manual dispatch.
 Top-level permissions are `actions: read`, `checks: read`, `contents: read`, and
 `pull-requests: read`, with individual jobs elevating further. `evaluate` resolves the PR
 and its exact head SHA and calls `vibey-gh pr-automation evaluate` to compute an aggregate
