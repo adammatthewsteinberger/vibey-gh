@@ -1,4 +1,4 @@
-# Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), Developed by [Adam Matthew Steinberger](https://hire.adam.matthewsteinberger.com/) ([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/)).
+# Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), Developed by [Adam Matthew Steinberger](https://vibewithadam.matthewsteinberger.com/) ([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/)).
 """Tests for the `vibey-gh` command surface.
 
 The CLI is thin by design — the decisions live in the modules beside it — so these tests
@@ -818,3 +818,14 @@ def test_github_release_cli(repo, monkeypatch, capsys):
     monkeypatch.setattr(github_release, "publish", boom)
     assert main(["github-release", "--target", "abc"]) == 1
     assert "tag conflict" in capsys.readouterr().err
+
+
+def test_check_prints_superseded_headers(repo, capsys):
+    """A stale header must be NAMED, not folded into 'missing': the repair differs —
+    replacement, not insertion — and the operator should know which they are running."""
+    from vibey_gh.config import DEFAULT_SUPERSEDED_TEXTS
+
+    (repo / "src" / "old.py").write_text(f"# {DEFAULT_SUPERSEDED_TEXTS[0]}\nx = 1\n")
+    assert main(["check"]) == 1
+    err = capsys.readouterr().err
+    assert "carries a superseded fingerprint header" in err

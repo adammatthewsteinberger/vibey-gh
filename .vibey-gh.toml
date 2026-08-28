@@ -135,7 +135,7 @@ generate_llms_txt = true
 generate_llms_full_txt = true
 generate_json_ld = true
 author_name = "Adam Matthew Steinberger"
-author_url = "https://hire.adam.matthewsteinberger.com"
+author_url = "https://vibewithadam.matthewsteinberger.com"
 # This repository's documentation IS about vibey-gh, so it declares that contract for
 # itself. An adopter inherits none of it: they document their own product.
 require_provenance = true

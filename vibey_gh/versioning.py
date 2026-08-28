@@ -1,4 +1,4 @@
-# Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), Developed by [Adam Matthew Steinberger](https://hire.adam.matthewsteinberger.com/) ([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/)).
+# Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), Developed by [Adam Matthew Steinberger](https://vibewithadam.matthewsteinberger.com/) ([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/)).
 """Derive the release version from what actually changed.
 
 This has to be automatic, not remembered. A PyPI upload with `skip-existing` turns an
@@ -120,16 +120,17 @@ def _provenance_only(cfg: GhConfig, since: str, path: str) -> bool:
     """True when every changed line in `path` is a provenance header line.
 
     The fingerprint header is the one diff this tool can prove is inert: it writes the
-    header, knows its exact text, and enforces it byte-for-byte. Without this filter, the
-    act of adopting the fingerprint — or any future change to `fingerprint.text` — counts
-    as a content change and derives a minor release whose entire diff is comments.
-    Observed on a live adoption: 181 files gained the header and nothing else, and the
-    repository was bumped 0.4.1 -> 0.5.0 for it.
+    header, knows its exact text — current and superseded alike — and enforces it
+    byte-for-byte. Without this filter, adopting the fingerprint or migrating
+    `fingerprint.text` counts as a content change and derives a minor release whose entire
+    diff is comments. Observed on a live adoption: 181 files gained the header and nothing
+    else, and the repository was bumped 0.4.1 -> 0.5.0 for it. Superseded texts count so a
+    text MIGRATION (old line out, new line in) is discounted the same as a fresh stamp.
 
     Only comment forms of the header count. A header line plus any other change keeps the
     file counting, because the file then contains a real change.
     """
-    marker = cfg.text
+    markers = (cfg.text, *cfg.superseded_texts)
     diff = _git(cfg, "diff", "--unified=0", since, "HEAD", "--", path)
     saw_content_line = False
     for line in diff.splitlines():
@@ -138,7 +139,7 @@ def _provenance_only(cfg: GhConfig, since: str, path: str) -> bool:
         saw_content_line = True
         body = line[1:].strip()
         # Any comment leader is fine; what identifies the line is the header text itself.
-        if marker not in body:
+        if not any(marker in body for marker in markers):
             return False
     return saw_content_line
 
