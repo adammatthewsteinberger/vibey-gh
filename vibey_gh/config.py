@@ -600,6 +600,21 @@ class DocumentationConfig:
     require_provenance: bool = False
     provenance_files: tuple[str, ...] = ("README.md", "docs/index.md")
     google_analytics_id: str = ""
+    # --- Search & LLM optimisation for the published site. Every field is optional and
+    # generic; the defaults derive from the repository so an unconfigured site still ships
+    # complete metadata. ---
+    # One or two emoji become a zero-asset SVG favicon (plus apple-touch-icon); an http(s)
+    # URL or site-relative path is used verbatim.
+    favicon: str = "📘"
+    # Social preview image. Empty means GitHub's generated OpenGraph card for the
+    # repository, which always exists and stays current.
+    og_image: str = ""
+    twitter_site: str = ""
+    twitter_creator: str = ""
+    keywords: tuple[str, ...] = ()
+    author: str = ""
+    theme_color: str = "#080b14"
+    locale: str = "en_US"
     # What the published-site build installs. ProperDocs renders whatever the repository's
     # `properdocs.yml` declares, and a site that declares plugins or markdown extensions
     # cannot build without them — `properdocs` and its theme pull in none of that, so a
@@ -656,6 +671,24 @@ class DocumentationConfig:
         ):
             if not value.strip():
                 raise ValueError(f"documentation.{name} must not be empty")
+        # SEO fields land verbatim in rendered HTML and workflow YAML, so the cheap
+        # injections are refused at load time rather than discovered on a published page.
+        for name, value in (
+            ("favicon", self.favicon),
+            ("og_image", self.og_image),
+            ("twitter_site", self.twitter_site),
+            ("twitter_creator", self.twitter_creator),
+            ("author", self.author),
+            ("theme_color", self.theme_color),
+            ("locale", self.locale),
+        ):
+            if any(ch in value for ch in '<>"\n'):
+                raise ValueError(f"documentation.{name} must not contain HTML or quotes")
+        for word in self.keywords:
+            if any(ch in word for ch in '<>"\n,'):
+                raise ValueError("documentation.keywords entries must be plain words")
+        if self.theme_color and not re.match(r"^#[0-9a-fA-F]{3,8}$", self.theme_color):
+            raise ValueError("documentation.theme_color must be a hex colour like #080b14")
         if self.google_analytics_id and not GOOGLE_ANALYTICS_ID_PATTERN.match(
             self.google_analytics_id
         ):
@@ -923,6 +956,14 @@ def load_config(root: Path | None = None) -> GhConfig:
                 documentation.get("provenance_files", ("README.md", "docs/index.md"))
             ),
             google_analytics_id=documentation.get("google_analytics_id", ""),
+            favicon=documentation.get("favicon", "📘"),
+            og_image=documentation.get("og_image", ""),
+            twitter_site=documentation.get("twitter_site", ""),
+            twitter_creator=documentation.get("twitter_creator", ""),
+            keywords=tuple(documentation.get("keywords", ())),
+            author=documentation.get("author", ""),
+            theme_color=documentation.get("theme_color", "#080b14"),
+            locale=documentation.get("locale", "en_US"),
             site_requirements=tuple(documentation.get("site_requirements", ())),
             site_requirements_file=documentation.get(
                 "site_requirements_file", DocumentationConfig.site_requirements_file
