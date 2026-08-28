@@ -155,7 +155,9 @@ mermaid_terms = [
   "main", "TestPyPI", "PyPI", "GitHub Pages", "Provenance", "Realign", "Security Boundary",
 ]
 mermaid_min_edges = 20
-google_analytics_id = ""
+# GA4 measurement id for the published docs site. Rendered into release-surfaces.yml as
+# GA_ID. The id is public by nature -- it ships in the page source of every site using it.
+google_analytics_id = "G-DV1RM8BD78"
 
 # Reconciled branch rulesets. Two things here are load-bearing and were learned the hard
 # way, so they are spelled out rather than left to the defaults.
