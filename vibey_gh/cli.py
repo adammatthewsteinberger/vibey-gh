@@ -166,7 +166,15 @@ def _merge_train(args) -> int:
             continue
 
         method = merge_train.method_for(pr, cfg, args.method)
-        ok, bypassed = merge_train.merge(v.number, method)
+        # A squash commit takes its body from the pull request, and a bot's pull request
+        # never carries the Made-With trailer — so supply a body that does, or the
+        # provenance check rejects the very commit this train creates. A rebase preserves
+        # the branch's own commits, which the push hooks already stamped.
+        squash_body = None
+        if method == "squash" and cfg.trailer not in (pr.get("body") or ""):
+            existing = (pr.get("body") or "").strip()
+            squash_body = (existing + "\n\n" if existing else "") + cfg.trailer
+        ok, bypassed, error = merge_train.merge(v.number, method, squash_body)
         if ok:
             note = " (review requirement bypassed)" if bypassed else ""
             cleanup = ""
@@ -180,8 +188,11 @@ def _merge_train(args) -> int:
             rows.append((v.number, v.title, f"{method}-merged{note}{cleanup}"))
             merged += 1
         else:
-            print(f"  #{v.number} could not be merged — the ruleset refused it")
-            rows.append((v.number, v.title, "blocked by the ruleset"))
+            # The stderr is the diagnosis: "refused it" alone once cost an hour of
+            # ruleset archaeology when the real cause was a token missing the repository.
+            reason = error or "the ruleset refused it"
+            print(f"  #{v.number} could not be merged — {reason}")
+            rows.append((v.number, v.title, f"blocked: {reason[:120]}"))
             skipped += 1
 
     print(f"vibey-gh: merged {merged}, skipped {skipped}")

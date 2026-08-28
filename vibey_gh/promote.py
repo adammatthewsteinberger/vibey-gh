@@ -158,11 +158,15 @@ def promote(
             "-m",
             cfg.trailer,
         )
-        if _git(cfg, "push", "--quiet", "origin", integration).returncode != 0:
-            # Not a warning. An unpushed bump means the promotion publishes nothing.
+        push = _git(cfg, "push", "--quiet", "origin", integration)
+        if push.returncode != 0:
+            # Not a warning. An unpushed bump means the promotion publishes nothing. The
+            # stderr goes into the message because git names the actual refusal — hiding
+            # it once turned a token-scope problem into an afternoon of guessing.
+            detail = " ".join(((push.stderr or push.stdout) or "").split())[:300]
             raise RuntimeError(
                 f"could not push the version bump to {integration}; promoting it would "
-                "publish nothing"
+                "publish nothing" + (f" — {detail}" if detail else "")
             )
         result.say(f"bumped to {new} and pushed to {integration}")
         _git(cfg, "fetch", "--quiet", "origin", integration)
