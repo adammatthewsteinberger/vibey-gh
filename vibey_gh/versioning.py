@@ -116,6 +116,33 @@ def bump(version: str, level: str) -> str:
     return f"{major}.{minor + 1}.0" if level == "minor" else f"{major}.{minor}.{patch + 1}"
 
 
+def _provenance_only(cfg: GhConfig, since: str, path: str) -> bool:
+    """True when every changed line in `path` is a provenance header line.
+
+    The fingerprint header is the one diff this tool can prove is inert: it writes the
+    header, knows its exact text, and enforces it byte-for-byte. Without this filter, the
+    act of adopting the fingerprint — or any future change to `fingerprint.text` — counts
+    as a content change and derives a minor release whose entire diff is comments.
+    Observed on a live adoption: 181 files gained the header and nothing else, and the
+    repository was bumped 0.4.1 -> 0.5.0 for it.
+
+    Only comment forms of the header count. A header line plus any other change keeps the
+    file counting, because the file then contains a real change.
+    """
+    marker = cfg.text
+    diff = _git(cfg, "diff", "--unified=0", since, "HEAD", "--", path)
+    saw_content_line = False
+    for line in diff.splitlines():
+        if not line or line[0] not in "+-" or line.startswith(("+++", "---")):
+            continue
+        saw_content_line = True
+        body = line[1:].strip()
+        # Any comment leader is fine; what identifies the line is the header text itself.
+        if marker not in body:
+            return False
+    return saw_content_line
+
+
 def decide(cfg: GhConfig, since: str) -> tuple[str | None, str]:
     released = read_version_at(cfg, since)
     if released is None:
@@ -133,6 +160,17 @@ def decide(cfg: GhConfig, since: str) -> tuple[str | None, str]:
     ]
     if not changed:
         return None, f"no changes since {since}"
+    # Discount files whose entire diff is the provenance header before classifying, so
+    # stamping a repository (or re-stamping it after a fingerprint.text change) never
+    # manufactures a release by itself. See _provenance_only.
+    substantive = [f for f in changed if not _provenance_only(cfg, since, f)]
+    discounted = len(changed) - len(substantive)
+    changed = substantive
+    if not changed:
+        return None, (
+            f"{discounted} file(s) changed, but every changed line is the provenance "
+            "header — comments reach no installed user, so there is nothing to release"
+        )
     if any(f.startswith(p) for f in changed for p in cfg.content_paths):
         return bump(working, "minor"), "packaged content changed"
     if any(f.startswith(p) for f in changed for p in cfg.code_paths):

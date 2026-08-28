@@ -235,6 +235,56 @@ def test_version_decision_table(repo, change, expected, note):
     assert new == expected, f"{note}: got {new} ({why})"
 
 
+def test_stamping_the_fingerprint_is_not_a_release(repo):
+    """Observed on a live adoption: 181 files gained the header and nothing else, and the
+    repository was bumped 0.4.1 -> 0.5.0 for a diff made entirely of comments. The header
+    is the one change this tool can prove is inert -- it writes it, knows its exact text,
+    and enforces it byte-for-byte -- so it must never manufacture a release by itself."""
+    from vibey_gh.config import DEFAULT_TEXT
+
+    cfg = cfg_for(repo)
+    git(repo, "branch", "-q", "base")
+    for path in (repo / "content" / "thing.md", repo / "src" / "__init__.py"):
+        path.write_text(f"# {DEFAULT_TEXT}\n" + path.read_text())
+    git(repo, "add", "-A")
+    git(repo, "commit", "-qm", "stamp")
+    new, why = versioning.decide(cfg, "base")
+    assert new is None
+    assert "provenance" in why and "2 file(s)" in why
+
+
+def test_a_real_change_beside_the_header_still_counts(repo):
+    """The discount is per file and only for files whose ENTIRE diff is the header. A file
+    that gained the header and a real line contains a real change; and a header-only file
+    must not shield a genuine change elsewhere from classification."""
+    from vibey_gh.config import DEFAULT_TEXT
+
+    cfg = cfg_for(repo)
+    git(repo, "branch", "-q", "base")
+    stamped = repo / "content" / "thing.md"
+    stamped.write_text(f"# {DEFAULT_TEXT}\n" + stamped.read_text())
+    (repo / "src" / "other.py").write_text("x = 1\n")
+    git(repo, "add", "-A")
+    git(repo, "commit", "-qm", "stamp plus code")
+    new, why = versioning.decide(cfg, "base")
+    # The content file is discounted (header only); the code file is real -> patch, not
+    # the minor that counting the stamped content file would have produced.
+    assert new == "1.2.4", why
+
+
+def test_header_plus_content_in_one_file_is_still_content(repo):
+    from vibey_gh.config import DEFAULT_TEXT
+
+    cfg = cfg_for(repo)
+    git(repo, "branch", "-q", "base")
+    f = repo / "content" / "thing.md"
+    f.write_text(f"# {DEFAULT_TEXT}\nreal new words\n" + f.read_text())
+    git(repo, "add", "-A")
+    git(repo, "commit", "-qm", "stamp and change")
+    new, why = versioning.decide(cfg, "base")
+    assert new == "1.3.0", why
+
+
 def test_a_deliberate_bump_is_never_doubled(repo):
     """Someone bumped by hand in a pull request; the automation must leave it alone."""
     cfg = cfg_for(repo)
