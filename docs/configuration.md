@@ -117,6 +117,14 @@ produced no verdict, so findings are never discarded in favour of a weaker opini
 diff is passed to the model as text — repository code is never executed, and the model has
 no shell, no tools, and no network beyond the local port.
 
+Fetching that diff prefers `gh pr diff`, but GitHub's diff API refuses pull requests beyond
+roughly 300 changed files — exactly the shape of a large migration or adoption sweep, which
+would otherwise never be reviewable at all. When the API refuses, the job reconstructs the
+same merge-base diff locally instead: it fetches the base and head refs, deepening a shallow
+trusted checkout until their histories connect, and diffs one against the other. That
+reconstruction is read-only and executes no repository code, so the guarantee above holds
+either way, and `max_diff_chars` still caps what actually reaches the model.
+
 The verdict is deliberately narrower than the primary review's. Ollama constrains decoding
 to the schema, so the output *shape* is guaranteed; the *judgments* are not, and a 14B model
 will emit confident booleans it has no basis for. So it assesses only what it can ground in
