@@ -1,4 +1,4 @@
-# Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), Developed by [Adam Matthew Steinberger](https://hire.adam.matthewsteinberger.com/) ([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/)).
+# Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), Developed by [Adam Matthew Steinberger](https://vibewithadam.matthewsteinberger.com/) ([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/)).
 """Tests for the vibey-gh automation.
 
 The readiness gate and the version decision are the parts most worth testing: both were
@@ -547,3 +547,60 @@ def test_the_train_still_requires_the_gate_it_excludes_from_the_policy_set():
     verdict = merge_train.judge(_pr(statusCheckRollup=[real]), cfg)
     assert not verdict.ready
     assert "gate has not passed" in (verdict.reason or "")
+
+
+def test_a_superseded_header_is_replaced_not_stacked(repo):
+    """The 770-file incident, encoded. `--apply` used to only insert the current header,
+    so a fingerprint-text change left the old line behind underneath the new one and
+    `check` reported ok. Now the old line is recognised and REPLACED in place."""
+    from vibey_gh import fingerprints
+    from vibey_gh.config import DEFAULT_SUPERSEDED_TEXTS
+
+    cfg = cfg_for(repo)
+    src = repo / "src" / "stamped.py"
+    src.write_text(f"# {DEFAULT_SUPERSEDED_TEXTS[0]}\nx = 1\n")
+    git(repo, "add", "-A")
+    git(repo, "commit", "-qm", "old stamp")
+
+    report = fingerprints.check(cfg)
+    assert src in report.superseded_header and not report.ok
+
+    fingerprints.check(cfg, apply=True)
+    text = src.read_text()
+    assert text.startswith(cfg.header + "\n")
+    assert DEFAULT_SUPERSEDED_TEXTS[0] not in text
+    assert text.count("Made with") == 1
+    assert fingerprints.check(cfg).ok
+
+
+def test_an_already_stacked_pair_collapses_to_one(repo):
+    """A file that already suffered the stacking bug — current header above a superseded
+    one — comes out of `--apply` with exactly the current header."""
+    from vibey_gh import fingerprints
+    from vibey_gh.config import DEFAULT_SUPERSEDED_TEXTS
+
+    cfg = cfg_for(repo)
+    src = repo / "src" / "stacked.py"
+    src.write_text(f"{cfg.header}\n# {DEFAULT_SUPERSEDED_TEXTS[1]}\nx = 1\n")
+    fingerprints.check(cfg, apply=True)
+    text = src.read_text()
+    assert text == f"{cfg.header}\nx = 1\n"
+
+
+def test_a_text_migration_is_not_a_release(repo):
+    """Replacing the old header with the new one — the whole-family migration — must be
+    discounted exactly like a fresh stamp: minus-old plus-new, both provenance lines."""
+    from vibey_gh.config import DEFAULT_SUPERSEDED_TEXTS, DEFAULT_TEXT
+
+    cfg = cfg_for(repo)
+    f = repo / "content" / "thing.md"
+    f.write_text(f"# {DEFAULT_SUPERSEDED_TEXTS[0]}\nhello\n")
+    git(repo, "add", "-A")
+    git(repo, "commit", "-qm", "old stamp")
+    git(repo, "branch", "-q", "base")
+    f.write_text(f"# {DEFAULT_TEXT}\nhello\n")
+    git(repo, "add", "-A")
+    git(repo, "commit", "-qm", "migrate stamp")
+    new, why = versioning.decide(cfg, "base")
+    assert new is None
+    assert "provenance" in why

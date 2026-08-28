@@ -638,7 +638,7 @@ generate_llms_txt = true
 generate_llms_full_txt = true
 generate_json_ld = true
 author_name = "Adam Matthew Steinberger"
-author_url = "https://hire.adam.matthewsteinberger.com"
+author_url = "https://vibewithadam.matthewsteinberger.com"
 google_analytics_id = ""                    # empty disables it; set a GA4 ID like "G-XXXXXXXXXX" to enable
 # ProperDocs depends on none of the plugins your site declares, so a site using
 # mkdocs-gen-files or pymdownx.* must name them here or the --strict build fails.
@@ -1015,4 +1015,4 @@ byte.
 
 MIT. See [LICENSE](LICENSE).
 
-Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), Developed by [Adam Matthew Steinberger](https://hire.adam.matthewsteinberger.com/) ([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/)).
+Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), Developed by [Adam Matthew Steinberger](https://vibewithadam.matthewsteinberger.com/) ([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/)).
