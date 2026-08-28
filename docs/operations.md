@@ -2,7 +2,44 @@
 
 `ANTHROPIC_API_KEY` is required. Add `AUTOMERGE_TOKEN` only when the default
 `GITHUB_TOKEN` cannot satisfy branch rulesets or repository-settings writes; PyPI/TestPyPI
-use trusted publishing environments. Enable Actions write permissions, PR creation,
+use trusted publishing environments.
+
+## What `AUTOMERGE_TOKEN` must be able to do
+
+The token appears in a minority of the workflows' `GH_TOKEN` assignments — reading the
+pull request, commenting, labelling, merging, and pushing the promotion's version bump.
+For a fine-grained personal access token that means exactly:
+
+| Permission | Level |
+|---|---|
+| Contents | Read and write |
+| Pull requests | Read and write |
+| Actions | Read |
+| Metadata | Read (mandatory) |
+
+**Checks is deliberately absent, and the fine-grained token UI offers no such permission.**
+Check runs can only be created by a GitHub App, so the gate is published with
+`GITHUB_TOKEN` — which is one — and no PAT permission exists or is needed for it. The
+workflows' own `permissions:` blocks govern `GITHUB_TOKEN`, not this PAT; do not read
+`checks: read` there as a token requirement.
+
+Three failure modes worth knowing before they cost an afternoon, because each presented as
+something else in production:
+
+- **A fine-grained token expires** (a year at most) and returns as `HTTP 401: Bad
+  credentials` inside a step whose name says nothing about credentials. A classic token
+  with the single `repo` scope covers everything above and supports no expiration — the
+  trade is that it reaches every repository the account can.
+- **A fine-grained token only reaches the repositories in its own grant list.** The secret
+  being set on a repository proves nothing: two repositories out of a token's list behaved
+  identically to two inside it for reads, then failed every privileged write. The merge
+  train reported each failure as *"the ruleset refused it"* until it learned to print the
+  API's own error.
+- **The account behind the token is what bypasses rulesets.** The merge train's `--admin`
+  fallback works only if that account holds a bypass role on the ruleset; the token's
+  permissions cannot add standing its owner does not have.
+
+## Everything else in this document Enable Actions write permissions, PR creation,
 GitHub Pages via Actions, Packages, Releases, and Deployments. Use workflow dispatch for
 recovery. Inspect exact run and head SHA before retrying. Never solve a blocked release by
 deleting, force-pushing, weakening a gate, or switching production to TestPyPI.
