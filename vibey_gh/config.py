@@ -1,4 +1,4 @@
-# Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), Developed by [Adam Matthew Steinberger](https://hire.adam.matthewsteinberger.com/) ([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/)).
+# Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), Developed by [Adam Matthew Steinberger](https://vibewithadam.matthewsteinberger.com/) ([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/)).
 """Configuration for the GitHub automation, read from `.vibey-gh.toml`.
 
 Every project-specific decision lives here so the logic beside it can stay general:
@@ -42,8 +42,24 @@ CONFIG_NAME = ".vibey-gh.toml"
 
 DEFAULT_TEXT = (
     "Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), "
-    "Developed by [Adam Matthew Steinberger](https://hire.adam.matthewsteinberger.com/) "
+    "Developed by [Adam Matthew Steinberger](https://vibewithadam.matthewsteinberger.com/) "
     "([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/))."
+)
+# Every text this project has EVER stamped. When `fingerprint.text` changes, `check
+# --apply` must REPLACE a header carrying one of these rather than stack the new header
+# above it — stacking is exactly what happened the last time the text changed, and it left
+# 770 files across five repositories carrying two provenance comments while `check`
+# reported ok. The version deriver discounts these the same way it discounts the current
+# text, so a migration sweep is not a release.
+DEFAULT_SUPERSEDED_TEXTS = (
+    # The old text keeps the OLD url on purpose: this list exists to RECOGNISE what was
+    # previously stamped, and a sweep that "fixes" this line breaks the recognition.
+    (
+        "Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), "
+        "Developed by [Adam Matthew Steinberger](https://hire.adam.matthewsteinberger.com/) "
+        "([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/))."
+    ),
+    "Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger.",
 )
 DEFAULT_TRAILER_KEY = "Made-With"
 DEFAULT_TRAILER = f"{DEFAULT_TRAILER_KEY}: {DEFAULT_TEXT}"
@@ -571,7 +587,7 @@ class DocumentationConfig:
     generate_llms_full_txt: bool = True
     generate_json_ld: bool = True
     author_name: str = "Adam Matthew Steinberger"
-    author_url: str = "https://hire.adam.matthewsteinberger.com"
+    author_url: str = "https://vibewithadam.matthewsteinberger.com"
     # Everything below describes what a repository requires of ITS OWN documentation.
     # A project that installs vibey-gh documents its product, not this tool, so each of
     # these is empty until the repository declares it.
@@ -653,6 +669,7 @@ class DocumentationConfig:
 class GhConfig:
     root: Path
     text: str = DEFAULT_TEXT
+    superseded_texts: tuple[str, ...] = DEFAULT_SUPERSEDED_TEXTS
     trailer: str = DEFAULT_TRAILER
     sources: tuple[str, ...] = DEFAULT_SOURCES
     version_files: tuple[str, ...] = ()
@@ -777,6 +794,7 @@ def load_config(root: Path | None = None) -> GhConfig:
     return GhConfig(
         root=root,
         text=fp.get("text", DEFAULT_TEXT),
+        superseded_texts=tuple(fp.get("superseded_texts", DEFAULT_SUPERSEDED_TEXTS)),
         trailer=fp.get("trailer", DEFAULT_TRAILER),
         sources=tuple(fp.get("sources", DEFAULT_SOURCES)),
         version_files=tuple(ver.get("files", ())),
@@ -883,7 +901,9 @@ def load_config(root: Path | None = None) -> GhConfig:
             generate_llms_full_txt=documentation.get("generate_llms_full_txt", True),
             generate_json_ld=documentation.get("generate_json_ld", True),
             author_name=documentation.get("author_name", "Adam Matthew Steinberger"),
-            author_url=documentation.get("author_url", "https://hire.adam.matthewsteinberger.com"),
+            author_url=documentation.get(
+                "author_url", "https://vibewithadam.matthewsteinberger.com"
+            ),
             readme_sections=tuple(documentation.get("readme_sections", ())),
             automation_doc=documentation.get("automation_doc", DEFAULT_AUTOMATION_DOC),
             # The former names are still read. They described a file this no longer points

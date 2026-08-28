@@ -1,4 +1,4 @@
-# Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), Developed by [Adam Matthew Steinberger](https://hire.adam.matthewsteinberger.com/) ([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/)).
+# Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), Developed by [Adam Matthew Steinberger](https://vibewithadam.matthewsteinberger.com/) ([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/)).
 """Deterministic documentation contract checks used locally and before AI maintenance."""
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ from vibey_gh.config import GhConfig
 README_PROVENANCE = (
     "Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), "
     "Developed by [Adam Matthew Steinberger]"
-    "(https://hire.adam.matthewsteinberger.com/) "
+    "(https://vibewithadam.matthewsteinberger.com/) "
     "([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/))."
 )
 
