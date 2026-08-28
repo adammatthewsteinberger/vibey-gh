@@ -207,8 +207,26 @@ collects exact-head failed-check evidence into `diagnostics/`, runs Claude with
 the expected head — publishes one commit back to the PR branch. `resolve-conflict`
 materializes a same-repository merge conflict, lets Claude edit only the conflicting
 paths, and publishes one resolution commit. `escalate` labels and comments once when the
-repair-attempt budget is exhausted. `gate` publishes the final `PR automation / gate`
-check run for the exact head and, on success, dispatches `merge-train.yml`.
+repair-attempt budget is exhausted.
+
+`review-fallback` runs only when `[pr_automation.fallback].enabled` is set, the primary
+`review` job produced no verdict at all (not a review that ran and found something), the
+event is not a fork pull request (`trusted_only`), and the run is not a dry run. Unlike
+every other job in this workflow it targets a distinct `[self-hosted, vibey-local-gh]`
+runner rather than `ubuntu-latest`, and holds only `contents: read` — no secret, and no
+token capable of mutating the repository. It fetches the exact-head diff with `gh pr diff`,
+falling back to a local merge-base reconstruction when GitHub's diff API refuses a pull
+request beyond roughly 300 changed files, then runs `vibey-gh local-review` against an
+Ollama-compatible endpoint (`qwen2.5-coder:14b` by default) with the diff as the only input:
+no shell, no tools, and no network beyond the local inference port reach the model. See
+[Configuration](configuration.md#pr_automationfallback) for the full field reference and
+[Security](security.md) for the trust boundary this runner introduces. `gate` publishes the
+final `PR automation / gate` check run for the exact head and, on success, dispatches
+`merge-train.yml`. When the primary review returned no verdict and the fallback ran and
+found nothing blocking, the gate still succeeds but titles the check run
+`PR automation: gate (local fallback)` so the weaker signal is never mistaken for the
+primary review's; when neither produced a usable verdict, it titles the check run
+`PR automation: review incomplete` for an operator to resolve.
 
 Every `[pr_automation].scan_workflows` entry names a `workflow_run` this aggregation
 waits on, so each one must be a workflow that runs on `pull_request` or

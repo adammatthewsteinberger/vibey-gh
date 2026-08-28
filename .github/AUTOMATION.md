@@ -46,7 +46,7 @@ events. A skipped stale run is expected. A current-head failure is never bypasse
 | `provenance.yml` | Provenance | Verifies source fingerprints, Conventional Commit subjects, and the required `Made-With` trailer without rewriting permanent history. |
 | `conventional-commits.yml` | Conventional Commits | Audits commit subjects and may safely normalize a linear same-repository topic branch with an exact-head lease. |
 | `documentation.yml` | Docs | Enforces the FOSS, human, agent, plugin-marketplace, Mermaid, SEO, crawler, and LLM documentation contract. |
-| `pr-automation.yml` | PR automation | Aggregates current-head scans, runs semantic review, performs bounded repair or conflict resolution, persists lineage state, and publishes the merge gate. |
+| `pr-automation.yml` | PR automation | Aggregates current-head scans, runs semantic review (with an opt-in self-hosted local-model fallback when the primary review returns no verdict), performs bounded repair or conflict resolution, persists lineage state, and publishes the merge gate. |
 | `automation-bootstrap.yml` | Automation bootstrap | Provides an explicitly authorized one-time path for merging a workflow repair when the older base workflow cannot repair itself. |
 | `merge-train.yml` | Merge train | Squash-merges eligible PRs to `develop` and rebase-merges eligible promotion PRs to `main`. |
 | `promote-to-main.yml` | Promote | Opens or reuses the asynchronous `develop -> main` promotion PR after integration succeeds. |
@@ -184,9 +184,14 @@ structured data, robots policy, sitemaps, and LLM discovery documents according 
 2. Read the first failing trusted step and the `PR automation / gate` summary. The gate's
    title names who decided the outcome: `PR automation: ready` reports the evaluation,
    `PR automation: review findings` means the exact-head review returned actionable work,
-   and `PR automation: review incomplete` means the review returned no verdict at all —
+   `PR automation: review incomplete` means the review returned no verdict at all —
    an infrastructure or operator failure such as an exhausted API credit balance, not a
-   defect in the pull request.
+   defect in the pull request — and, only when a repository has opted into
+   `[pr_automation.fallback]`, `PR automation: gate (local fallback)` means the primary
+   review returned no verdict but a local model on a self-hosted runner reviewed the diff
+   and found nothing blocking; treat that as a weaker signal than an ordinary pass, since
+   the documentation-contract fields were not evaluated (see
+   [docs/configuration.md](../docs/configuration.md#pr_automationfallback)).
 3. For source, test, docs, or review findings, allow bounded repair to push one commit and
    rerun ordinary scans.
 4. For missing secrets, permissions, billing, registry denial, unavailable services, or

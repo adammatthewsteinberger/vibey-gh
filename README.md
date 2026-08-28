@@ -271,6 +271,9 @@ request bytes for HMAC verification; see [the CLI and adapter reference](docs/cl
 | `vibey-gh promote [--no-wait]` | Open or reuse the asynchronous `develop → main` promotion PR. |
 | `vibey-gh github-release --target SHA [--version VERSION]` | Create or reuse an immutable tag and GitHub Release for an exact production SHA. |
 | `vibey-gh realign` | Align identical `develop` and `main` trees after a rebase merge without discarding work. |
+| `vibey-gh report-superseded --index pypi\|testpypi --project NAME --version VERSION` | Report which prior releases a published version supersedes, since PyPI has no yank API; never yanks anything itself. |
+| `vibey-gh local-review [--diff FILE]` | Review a diff with a local Ollama-compatible model when the primary paid review returns no verdict at all. Opt-in fallback; see `[pr_automation.fallback]`. |
+| `vibey-gh local-triage [--issue FILE]` | Triage an issue with the same local model when the primary paid solver produces nothing. Always marks the result `needs_human`. |
 | `vibey-gh pr-automation self-heal [--pr N]` | Refill a spent repair budget, itself bounded so a permanent failure still stops. |
 | `vibey-gh conversation evaluate\|context\|reply\|record-response` | Decide, brief, answer, and budget one comment-driven interaction. |
 | `vibey-gh reconcile-branches [--dry-run]` | Rebase, close, or leave each open branch stranded by a realign rewrite. |

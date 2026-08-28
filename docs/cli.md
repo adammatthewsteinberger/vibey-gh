@@ -26,6 +26,9 @@ transport failure. Run `vibey-gh COMMAND --help` for argparse's generated refere
 | `github-release` | required `--target SHA`; optional `--version VERSION` | Create or reuse an immutable tag and GitHub Release. |
 | `promote` | `--method rebase\|squash\|merge`, `--dry-run`, `--wait` or `--no-wait`, `--summary FILE` | Open/reuse the integration-to-release PR. Event-driven `--no-wait` is the default. |
 | `realign` | none | Bring the integration branch forward after release without rewriting it. |
+| `report-superseded` | required `--index pypi\|testpypi --project NAME --version VERSION` | Report which prior releases on the index the given version supersedes. PyPI exposes no yank API, so this prints the release list and the management URL for a human to act on; it never yanks anything itself. |
+| `local-review` | `--diff FILE` or stdin; optional `--model`, `--base-url`, `--max-chars`, `--timeout` (default from `[pr_automation.fallback]`) | Review a diff with a local Ollama-compatible model when the primary paid review returned no verdict at all. Reports only `pass`, `summary`, and `findings`; never executes repository code. |
+| `local-triage` | `--issue FILE` or stdin; optional `--model`, `--base-url`, `--max-chars`, `--timeout` | Triage an issue with the same local model when the primary paid solver produced nothing. Always forces `needs_human: true`; writes no code and opens no branch. |
 | `pr-automation self-heal` | `--pr N` optional | Refill a spent repair budget, itself bounded by `branch_sync.max_self_heals`. Omit `--pr` to sweep every exhausted pull request. |
 | `conversation evaluate` | required `--subject N`; optional `--comment-id ID` | Decide whether one comment gets a response, and how far it may reach. |
 | `conversation context` | required `--subject N`; optional `--comment-id ID`, `--output FILE`, `--max-bytes N` | Render the thread as a bounded, explicitly untrusted briefing. |
