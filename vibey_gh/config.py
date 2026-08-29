@@ -632,6 +632,12 @@ class DocumentationConfig:
     site_requirements: tuple[str, ...] = ()
     site_requirements_file: str = "docs/requirements.txt"
     properdocs_version: str = "1.6.7"
+    # Funding signage (#198): opt-in per currency, empty defaults — no default address
+    # ever ships, because a payment default is one typo away from someone else's wallet.
+    funding_bitcoin: str = ""
+    funding_monero: str = ""
+    funding_ethereum: str = ""
+    funding_label: str = "Support this work"
 
     def __post_init__(self) -> None:
         _unique_nonempty("documentation.required_files", self.required_files)
@@ -648,6 +654,35 @@ class DocumentationConfig:
         ):
             if threshold < 0:
                 raise ValueError(f"documentation.{name} must not be negative")
+        # Payments are irreversible: a malformed address is a configuration ERROR,
+        # never rendered. Shape only — it catches truncation, whitespace, and a
+        # wrong-field paste; it cannot catch a valid-but-wrong address, which is why
+        # the render is verbatim-from-config and every change is a reviewed,
+        # fingerprinted commit.
+        for name, value, pattern, shape in (
+            (
+                "funding_bitcoin",
+                self.funding_bitcoin,
+                r"bc1[ac-hj-np-z02-9]{11,87}|[13][a-km-zA-HJ-NP-Z1-9]{25,34}",
+                "bech32 'bc1...' or legacy Base58",
+            ),
+            (
+                "funding_monero",
+                self.funding_monero,
+                r"[48][1-9A-HJ-NP-Za-km-z]{94}(?:[1-9A-HJ-NP-Za-km-z]{11})?",
+                "a 95- or 106-character address starting with 4 or 8",
+            ),
+            (
+                "funding_ethereum",
+                self.funding_ethereum,
+                r"0x[0-9a-fA-F]{40}",
+                "'0x' followed by 40 hex characters",
+            ),
+        ):
+            if value and not re.fullmatch(pattern, value):
+                raise ValueError(
+                    f"documentation.{name} does not look like a valid address ({shape}): {value}"
+                )
         if any(
             Path(value).is_absolute() or ".." in Path(value).parts for value in self.required_files
         ):
@@ -990,6 +1025,10 @@ def load_config(root: Path | None = None) -> GhConfig:
             properdocs_version=documentation.get(
                 "properdocs_version", DocumentationConfig.properdocs_version
             ),
+            funding_bitcoin=documentation.get("funding_bitcoin", ""),
+            funding_monero=documentation.get("funding_monero", ""),
+            funding_ethereum=documentation.get("funding_ethereum", ""),
+            funding_label=documentation.get("funding_label", "Support this work"),
         ),
     )
 
