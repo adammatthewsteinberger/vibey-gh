@@ -675,6 +675,7 @@ generate_sitemap_index = true
 generate_llms_txt = true
 generate_llms_full_txt = true
 generate_json_ld = true
+bottom_nav = true       # previous/next bar at the bottom of every published page
 author_name = "Adam Matthew Steinberger"
 author_url = "https://vibewithadam.matthewsteinberger.com"
 google_analytics_id = ""                    # empty disables it; set a GA4 ID like "G-XXXXXXXXXX" to enable

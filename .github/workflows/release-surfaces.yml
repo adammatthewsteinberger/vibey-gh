@@ -283,6 +283,7 @@ jobs:
           printf '%s\n' "$CHANNEL" > channel-site/release-channel.txt
           CHANNEL="$CHANNEL" REPOSITORY="$GITHUB_REPOSITORY" RELEASE_SHA="$RELEASE_SHA" \
           JSON_LD=true PRODUCTION_INDEX=true \
+          BOTTOM_NAV=true \
           PREVIEW_INDEX=false \
           SEO_FAVICON='⚙️' SEO_OG_IMAGE='' \
           SEO_TWITTER_SITE='' SEO_TWITTER_CREATOR='' \
@@ -348,6 +349,21 @@ jobs:
           ) if ga_id else ""
 
           title_of = re.compile(r"<title>(.*?)</title>", re.S)
+          # Bottom previous/next navigation. The theme already renders rel="prev"/rel="next"
+          # anchors in the page header with the correct targets and labels; on a phone that
+          # header is a full page-scroll away from a reader who has just FINISHED the page.
+          # Cloning those exact anchors into a bar before </body> gives the reader a way
+          # onward from where they already are, without teaching this injector anything
+          # about the nav tree — the theme stays the single authority on page order.
+          bottom_nav = os.environ.get("BOTTOM_NAV", "") == "true"
+          prev_next = re.compile(r'<a\s[^>]*rel="(?:prev|next)"[^>]*>.*?</a>', re.S)
+          bottom_nav_style = (
+              '<style>.vibey-bottom-nav{display:flex;justify-content:space-between;'
+              'gap:1rem;margin:3rem auto 1.5rem;padding-top:1rem;'
+              'border-top:1px solid rgba(128,128,128,.35)}'
+              '.vibey-bottom-nav a{max-width:48%}'
+              '.vibey-bottom-nav a.disabled{visibility:hidden}</style>\n'
+          )
           for path in pathlib.Path("channel-site").rglob("*.html"):
               text = path.read_text()
               relative = path.relative_to("channel-site").as_posix()
@@ -393,6 +409,16 @@ jobs:
                       "inLanguage": locale.replace("_", "-"),
                   }
                   metadata += '<script type="application/ld+json">' + json.dumps(record) + '</script>\n'
+              if bottom_nav and "</body>" in text:
+                  anchors = [m.group(0) for m in prev_next.finditer(text)]
+                  if anchors:
+                      metadata += bottom_nav_style
+                      bar = (
+                          '<nav class="vibey-bottom-nav" aria-label="page navigation">'
+                          + "".join(anchors[:2])
+                          + "</nav>\n"
+                      )
+                      text = text.replace("</body>", bar + "</body>")
               path.write_text(text.replace("</head>", metadata + "</head>"))
           PY
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
