@@ -313,7 +313,7 @@ def render_workflow(source: Path, cfg: GhConfig) -> str:
         return _strip_trailing_space(wanted)
     workflows = json.dumps(list(cfg.pr_automation.scan_workflows))
     schedule = (
-        '  schedule:\n    - cron: "47 */6 * * *"'
+        '  schedule:\n    - cron: "37 */2 * * *"'
         if cfg.pr_automation.retain_schedule_backstop
         else "  # schedule backstop disabled by .vibey-gh.toml"
     )

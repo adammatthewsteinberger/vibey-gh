@@ -8,6 +8,7 @@ miserable thing to debug from the other end. Cheaper to catch here.
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import re
 import shlex
@@ -195,7 +196,7 @@ def test_documentation_workflow_authors_guarded_refresh_prs():
     text = (WORKFLOWS / "documentation.yml").read_text(encoding="utf-8")
     assert "name: Docs" in text
     assert "vibey-gh check --ci" in text
-    assert "anthropics/claude-code-action@8569a83495a3f6f0c50a90e46351d3816fed1a75" in text
+    assert "anthropics/claude-code-action@a874e9ecd7bb36efdad65429c6b35815f5a08f10" in text
     assert "This is an authoring" in text
     assert "--allowedTools Read,Glob,Grep,Edit,Write" in text
     assert 'branch="vibey-gh/docs/refresh-${RUN_ID}"' in text
@@ -347,7 +348,14 @@ def test_recovery_reprobes_parked_prs_on_a_schedule_without_burning_budget():
     repair budget on nothing new. The observed alternative was tonight's: five pull
     requests parked for hours with a human re-dispatching by hand."""
     text = (WORKFLOWS / "pr-automation.yml").read_text(encoding="utf-8")
-    assert 'cron: "37 */2 * * *"' in text
+    # The cadence is injected by install.py at the __VIBEY_GH_SCHEDULE__ placeholder —
+    # never hardcoded in the template. A literal block alongside the placeholder gives
+    # a rendered repository TWO `schedule:` keys under `on:`, which fails Actions'
+    # YAML parse and silently unlists the whole workflow: no evaluation, no gate,
+    # every pull request hard-blocked. Exactly the outage vibey-gh itself hit on
+    # 2026-08-29.
+    assert "\n  schedule:" not in text, "cadence must come from the placeholder only"
+    assert "# __VIBEY_GH_SCHEDULE__" in text
     assert "if: github.event_name == 'schedule'" in text
     assert "if: github.event_name != 'schedule'" in text, "the pipeline must not run on schedule"
     flat = " ".join(text.split())
@@ -355,6 +363,36 @@ def test_recovery_reprobes_parked_prs_on_a_schedule_without_burning_budget():
     assert "burn the bounded repair budget on nothing new" in flat
     # findings-red gates fall through to `continue`, never a dispatch
     assert flat.count("gh workflow run pr-automation.yml") >= 1
+
+
+def test_rendered_pr_automation_carries_exactly_one_schedule_key(tmp_path):
+    """Render with the backstop on: exactly one `schedule:` under `on:`, at the
+    auto-heal cadence. Render with it off: none at all. Two keys is not a style
+    problem — Actions refuses to parse the file and the workflow disappears from
+    the repository, taking the required gate with it."""
+    on = render_workflow(WORKFLOWS / "pr-automation.yml", GhConfig(root=tmp_path))
+    assert on.count("\n  schedule:") == 1
+    assert 'cron: "37 */2 * * *"' in on
+    assert "47 */6" not in on
+    base = GhConfig(root=tmp_path)
+    cfg = dataclasses.replace(
+        base, pr_automation=dataclasses.replace(base.pr_automation, retain_schedule_backstop=False)
+    )
+    off = render_workflow(WORKFLOWS / "pr-automation.yml", cfg)
+    assert "\n  schedule:" not in off
+    assert "schedule backstop disabled by .vibey-gh.toml" in off
+
+
+def test_review_prompt_judges_the_living_roadmap():
+    """#211: the exact-head review owns roadmap LIVENESS — presence is the
+    deterministic contract's job. The prompt must demand an existing roadmap that
+    matches the repository's real trajectory, and must reserve 'done' for humans."""
+    text = (WORKFLOWS / "pr-automation.yml").read_text(encoding="utf-8")
+    flat = " ".join(text.split())
+    assert "Verify the living roadmap under complete" in flat
+    assert "docs/roadmap.md or ROADMAP.md" in flat
+    assert "stale against CHANGELOG.md or the release history" in flat
+    assert "A machine never declares a project done" in flat
 
 
 def test_readability_gate_judges_the_opening_and_the_audience_order():
