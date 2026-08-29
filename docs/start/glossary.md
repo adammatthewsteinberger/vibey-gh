@@ -21,3 +21,10 @@ the depth. Read it top to bottom once; after that it's a lookup table.
 
 Comfortable with these? You've graduated: [Adoption](../adoption.md) onward
 is the engineering reference, and it assumes exactly this vocabulary.
+
+---
+
+**The short version, again**: twelve words stand between you and the
+engineering docs, and now you have all twelve. **Your next step**:
+[Adoption](../adoption.md) — the full map, in the vocabulary you just
+learned.

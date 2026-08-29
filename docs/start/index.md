@@ -1,27 +1,42 @@
 # Start here
 
-You push code to GitHub, and then the chores start: wait for the tests, click
-merge, remember a version number, cut a release, fix the changelog, update the
-docs site. Miss any step and something ships wrong; do them all and you have
-spent your evening being a release robot.
+Software teams lose whole evenings to release chores — waiting on tests,
+clicking merge buttons, choosing version numbers, publishing packages, fixing
+changelogs. Miss a step and something ships broken; do them all and a person
+has spent hours being a robot. `vibey-gh` is a tool that does those chores
+automatically, and stops to ask only when a decision genuinely needs a human.
 
-`vibey-gh` is a tool that does those chores for you. You push a branch; it
-opens the pull request, waits for your tests, has an AI reviewer read the
-change, fixes small problems itself, merges when everything is green, picks the
-next version number from what actually changed, publishes the package, and
-updates the documentation site. When something genuinely needs a human — a
-missing password, a judgment call — it stops and says so instead of guessing.
+## If you have never written code — start exactly here
 
-Nothing here costs money to use and nothing gets a worse version for free
-users: it is the same tool at full capability for everyone.
+You don't need to have programmed to follow this. Four words carry the rest:
 
-## Your first thirty minutes
+- **Code** is text files of instructions that computers run. People write and
+  edit them like documents.
+- **A repository** (repo) is the folder that holds a project's code, plus its
+  entire change history — every edit, by everyone, forever.
+- **GitHub** is a website where repositories live so many people can work on
+  them together.
+- **A release** is the moment a project packages its current code and
+  publishes it so others can use it.
 
-1. [A guided first session](first-session.md) — install it on one repository
-   and watch it do one real thing, with every command copy-pasteable.
-2. [The glossary bridge](glossary.md) — every project word, defined in plain
-   language, linked to the page with the full depth.
+The chores in the first paragraph are everything between "the code is ready"
+and "the release is out." `vibey-gh` is a robot for exactly that stretch.
+Nothing about it costs money, and free users get the same tool at full
+capability — always.
 
-When those feel comfortable, [Adoption](../adoption.md) is the complete map,
-and everything after it in the navigation is the engineering reference —
-same site, more depth, in the order you'll need it.
+## Climbing from here
+
+The documentation is ordered like a career: this tier assumes nothing; the
+[guided first session](first-session.md) gets you hands-on; the
+[glossary](glossary.md) bridges you into the working vocabulary;
+[Adoption](../adoption.md) onward is the practitioner's reference, from your
+first repository to fleet-scale operation; and the scholarly tier at the end —
+[Threat model](../threat-model.md) and
+[Architecture decisions](../adr/README.md) — holds the formal treatment.
+
+---
+
+**The short version, again**: releases are chores, this robot does them, and
+it asks a human only when it must. **Your next step**: open
+[a guided first session](first-session.md) — thirty minutes, nothing
+published, nothing at risk.

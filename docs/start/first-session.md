@@ -3,6 +3,11 @@
 The goal: in under thirty minutes, install `vibey-gh` on one repository you
 own and watch it verify itself — no releases, no risk, nothing published.
 
+Never used a terminal? It is the text window where you type instructions to
+your computer and press Enter — on a Mac it's the app called **Terminal**, on
+Windows **PowerShell**. Every grey block below is one instruction: copy it,
+paste it there, press Enter. That is the whole skill this page needs.
+
 ## 1. Install the tool (2 minutes)
 
 ```bash
@@ -71,3 +76,10 @@ That is deliberate: nothing acts on your repository until you connect it.
   order, and every trap nine real adoptions found.
 - [The glossary bridge](glossary.md) — the project words you just met
   (provenance, gate, merge train...), each linked to its full story.
+
+---
+
+**The short version, again**: you installed one tool, pointed it at one
+folder of code, and watched it prove itself — nothing left your machine.
+**Your next step**: skim [the glossary bridge](glossary.md), then let
+[Adoption](../adoption.md) take you from this rehearsal to the real thing.
