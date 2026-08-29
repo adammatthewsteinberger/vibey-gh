@@ -7,7 +7,8 @@ that hand-wired path with one event-driven, auditable contract: push a branch, a
 tooling carries it through review, repair, merge, release, and documentation on its own,
 stopping only when a human decision is genuinely required.
 
-**New to the project?** Read [Adoption](adoption.md) first — it assumes nothing and
+**New to the project?** Begin at [Start here](start/index.md) — a zero-context
+welcome, a guided first session, and a glossary bridge. Then [Adoption](adoption.md) — it assumes nothing and
 walks one repository from bare to fully automated. The pages after it are the
 engineering reference; the formal material ([Threat model](threat-model.md),
 [Governance](governance.md), [Architecture decisions](adr/README.md)) comes last.
