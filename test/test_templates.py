@@ -953,6 +953,26 @@ def test_privileged_agent_cannot_mutate_git_or_execute_pr_code():
     assert "git -C target push --force" not in text
 
 
+def test_a_workflow_permission_push_rejection_is_named_and_does_not_burn_the_budget():
+    """A repair that edits `.github/workflows/**` without AUTOMERGE_TOKEN's Workflows
+    permission is always rejected at push — the failure is knowable in advance, so it
+    must be reported as an operator-actionable cause rather than a generic repair
+    failure, and it must not spend an attempt on a push that could never have landed.
+    """
+    text = (WORKFLOWS / "pr-automation.yml").read_text(encoding="utf-8")
+    assert "refusing to allow .* to create or update workflow" in text
+    assert "workflow_scope_rejected=true" in text
+    assert "AUTOMERGE_TOKEN lacks the Workflows permission" in text
+    assert "Repair could not be pushed: AUTOMERGE_TOKEN lacks the Workflows permission" in text
+    assert "steps.publish.outputs.workflow_scope_rejected == 'true'" in text
+    assert "steps.publish.outputs.workflow_scope_rejected != 'true'" in text
+    assert '{fixable: false, summary: $summary, head_sha: $head_sha}' in text
+    assert "--add-label vibey-gh:automation-blocked" in text
+    assert "workflow_scope_rejected: ${{ steps.publish.outputs.workflow_scope_rejected }}" in text
+    assert "WORKFLOW_SCOPE_REJECTED: ${{ needs.repair.outputs.workflow_scope_rejected }}" in text
+    assert 'title="PR automation: repair blocked (missing Workflows permission)"' in text
+
+
 def test_ai_state_persistence_uses_the_native_github_token():
     text = (WORKFLOWS / "pr-automation.yml").read_text(encoding="utf-8")
     assert "steps.claude.outputs.github_token" not in text

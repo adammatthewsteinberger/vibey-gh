@@ -5,6 +5,18 @@ This file follows Keep a Changelog and semantic versioning conventions.
 
 ## Unreleased
 
+- Name a repair push rejected for missing the Workflows permission instead of failing
+  generically. A repair commit that touches `.github/workflows/**` is rejected at push,
+  in full, whenever `AUTOMERGE_TOKEN`'s fine-grained PAT lacks the **Workflows**
+  repository permission — the exact shape pin-bump pull requests hit routinely, since
+  the diff under review already lives under `.github/workflows/`. The rejection used to
+  surface only as `refusing to allow a Personal Access Token to create or update
+  workflow ...` in a log nobody reads, after which the pull request stopped advancing
+  with a stale `vibey-gh:repairing` label. The repair job now recognizes that exact
+  rejection, records the block without charging the attempt against the repair budget,
+  and the `PR automation / gate` check reports `repair blocked (missing Workflows
+  permission)` naming the fix. `docs/operations.md`'s permission table now lists
+  Workflows: Read and write.
 - Let the local review fallback reach a pull request the diff API refuses. GitHub's diff
   API refuses a pull request beyond roughly 300 changed files, which is exactly the shape
   of a migration or adoption sweep — observed on a 347-file provenance sweep that could

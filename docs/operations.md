@@ -14,6 +14,7 @@ For a fine-grained personal access token that means exactly:
 |---|---|
 | Contents | Read and write |
 | Pull requests | Read and write |
+| Workflows | Read and write |
 | Actions | Read |
 | Metadata | Read (mandatory) |
 
@@ -23,7 +24,23 @@ Check runs can only be created by a GitHub App, so the gate is published with
 workflows' own `permissions:` blocks govern `GITHUB_TOKEN`, not this PAT; do not read
 `checks: read` there as a token requirement.
 
-Three failure modes worth knowing before they cost an afternoon, because each presented as
+**Workflows is easy to leave out because most of what the token does never needs it** —
+until a repair commit happens to touch a file under `.github/workflows/`. GitHub then
+rejects the *entire* push, not just the workflow hunk, with `refusing to allow a Personal
+Access Token to create or update workflow ... without \`workflow\` scope`. Pin-bump pull
+requests make this the common case rather than the rare one, because the diff under
+review already lives under `.github/workflows/`. A classic token's single `repo` scope
+already covers this; only fine-grained tokens need the permission added explicitly.
+
+There is deliberately no preflight that drops or skips workflow-file hunks before
+attempting the push: a classic token's granted scopes are visible in every API
+response's `X-OAuth-Scopes` header, but GitHub exposes no equivalent introspection for a
+fine-grained token's own permission grant, so nothing running as that token can learn in
+advance whether this specific push will be accepted. The push attempt itself is the only
+reliable test, which is why the repair job reacts to the rejection after the fact instead
+of guessing beforehand.
+
+Four failure modes worth knowing before they cost an afternoon, because each presented as
 something else in production:
 
 - **A fine-grained token expires** (a year at most) and returns as `HTTP 401: Bad
@@ -38,6 +55,13 @@ something else in production:
 - **The account behind the token is what bypasses rulesets.** The merge train's `--admin`
   fallback works only if that account holds a bypass role on the ruleset; the token's
   permissions cannot add standing its owner does not have.
+- **A repair that touches `.github/workflows/**` without the Workflows permission is
+  rejected at push, every time, no matter how correct the fix.** The `PR automation /
+  gate` check reports `repair blocked (missing Workflows permission)` and names the
+  cause directly rather than repeating the generic "completed checks are failing"
+  reason, and the attempt is not charged against the pull request's repair budget —
+  granting the permission and re-dispatching is the only fix; nothing about the repair
+  itself was wrong.
 
 ## Recovering from a review with no verdict
 

@@ -471,6 +471,7 @@ jobs:
       pull-requests: write
     outputs:
       fixable: ${{ steps.result.outputs.fixable }}
+      workflow_scope_rejected: ${{ steps.publish.outputs.workflow_scope_rejected }}
     steps:
       - name: Check out trusted automation
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -668,11 +669,57 @@ jobs:
               exit 0
             fi
             printf '%s\n' "$push_output" >&2
+            # GitHub rejects the whole push, not just the offending hunk, whenever a
+            # repair commit touches .github/workflows/** and the PAT behind
+            # AUTOMERGE_TOKEN lacks the Workflows repository permission (classic tokens:
+            # the `workflow` scope). That message names the cause once, in a log nobody
+            # reads; surfacing it here — and in the label swap that follows — is what
+            # makes it operator-actionable instead of a generic repair failure.
+            if grep -qE 'refusing to allow .* to create or update workflow' <<<"$push_output"; then
+              echo "workflow_scope_rejected=true" >> "$GITHUB_OUTPUT"
+              {
+                echo "### Repair could not be pushed: AUTOMERGE_TOKEN lacks the Workflows permission"
+                echo
+                echo "This repair commit touches a file under \`.github/workflows/\`, and GitHub"
+                echo "rejected the push because the token behind \`AUTOMERGE_TOKEN\` does not carry"
+                echo "the **Workflows** repository permission (a classic token needs the"
+                echo "\`workflow\` scope instead). See \`docs/operations.md\` for the exact"
+                echo "permission table."
+                echo
+                echo "Grant that permission and re-dispatch this pull request; this attempt is"
+                echo "not being charged against its repair budget."
+                echo
+                echo '```'
+                printf '%s\n' "$push_output"
+                echo '```'
+              } | tee -a "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
             exit 1
           fi
+      - name: Record and label a Workflows-permission push rejection
+        if: always() && steps.publish.outputs.workflow_scope_rejected == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ needs.evaluate.outputs.pr }}
+          REPO: ${{ github.repository }}
+          EXPECTED_SHA: ${{ needs.evaluate.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          if grep -qE '^name = "vibey-gh"' automation/pyproject.toml; then
+            python -m pip install --quiet -e ./automation
+          else
+            python -m pip install --quiet vibey-gh
+          fi
+          summary="the repair could not be pushed because AUTOMERGE_TOKEN lacks the Workflows permission (see docs/operations.md); grant it and re-dispatch this pull request"
+          payload=$(jq -cn --arg head_sha "$EXPECTED_SHA" --arg summary "$summary" \
+            '{fixable: false, summary: $summary, head_sha: $head_sha}')
+          vibey-gh pr-automation record-repair --pr "$PR" --input "$payload"
+          gh pr edit "$PR" --repo "$REPO" --add-label vibey-gh:automation-blocked
+          gh pr edit "$PR" --repo "$REPO" --remove-label vibey-gh:repairing || true
       - name: Persist repair state and classify operator blocks
         id: result
-        if: steps.publish.outputs.stale != 'true'
+        if: steps.publish.outputs.stale != 'true' && steps.publish.outputs.workflow_scope_rejected != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ needs.evaluate.outputs.pr }}
@@ -1125,6 +1172,7 @@ jobs:
           REVIEW_RESULT: ${{ needs.review.result }}
           FALLBACK_PASSED: ${{ needs.review-fallback.outputs.passed }}
           FALLBACK_MODEL: qwen2.5-coder:14b
+          WORKFLOW_SCOPE_REJECTED: ${{ needs.repair.outputs.workflow_scope_rejected }}
         run: |
           set -euo pipefail
           conclusion=failure
@@ -1160,6 +1208,16 @@ jobs:
                 fi
                 ;;
             esac
+          fi
+          # A repair that touched .github/workflows/** and was rejected at push time is
+          # known-doomed on every retry until an operator acts, so it must outrank
+          # whatever generic "repair" or "review" text the state machine above produced —
+          # otherwise the gate keeps repeating "completed checks are failing" while the
+          # actual, fixable cause sits unread in the repair job's own log.
+          if [ "$WORKFLOW_SCOPE_REJECTED" = true ]; then
+            conclusion=failure
+            title="PR automation: repair blocked (missing Workflows permission)"
+            summary="The repair could not be pushed because AUTOMERGE_TOKEN lacks the Workflows permission: the commit touched a file under .github/workflows/, and GitHub rejects a token push that creates or updates a workflow file without it. Grant that PAT Workflows: Read and write (see docs/operations.md) and re-dispatch this pull request; this attempt was not charged against its repair budget."
           fi
           gh api "repos/${REPO}/check-runs" --method POST \
             -f name='PR automation / gate' -f head_sha="$HEAD_SHA" \
