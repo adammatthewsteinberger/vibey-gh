@@ -410,20 +410,24 @@ def evaluate(
         )
 
     # Every author's exact head is reviewed — the documentation audit is repository-wide,
-    # and only the *scope* of the review widens for an outside author. The loop that
-    # review can start must therefore be bounded for every author too. Bounding it here,
-    # at the point another review would be dispatched, is what makes it finite: each
-    # repair publishes a new head and clears `review_sha`, so a check placed after the
-    # verdict would never be reached while heads keep advancing.
+    # and only the *scope* of the review widens for an outside author. A head that has
+    # never been reviewed always gets one, even once the repair budget is fully spent:
+    # dispatching a review costs nothing (the budget counts repairs, not reviews), and a
+    # verdict recorded for an older head must never stand in for a review of the head that
+    # exists now — that substitution is exactly what escalated a fixed pull request as
+    # unrepairable. Only a CURRENT review's own actionable findings may spend another
+    # attempt, so the budget check sits immediately before that spend, mirroring the
+    # check-failure branch above. It is still reachable and still finite: every head
+    # advance is itself produced by a repair, and repairs are capped by this same budget.
     reviewable = trusted or cfg.pr_automation.review_untrusted_authors
     if reviewable:
-        if state.attempts >= cfg.pr_automation.max_repair_attempts:
-            return result(
-                "blocked", "review repair budget is exhausted", repair_attempt=state.attempts
-            )
         if state.review_sha != head:
             return result("review", "current head requires automated review")
         if state.review_passed is not True:
+            if state.attempts >= cfg.pr_automation.max_repair_attempts:
+                return result(
+                    "blocked", "review repair budget is exhausted", repair_attempt=state.attempts
+                )
             return result(
                 "repair",
                 "automated review has actionable findings",
