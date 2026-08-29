@@ -366,6 +366,16 @@ def test_readability_gate_judges_the_opening_and_the_audience_order():
         "skips the zero-code rung, climbs out of order, thins the theory",
         "never a sales pitch",
         "essentially absent",
+        # The never-lost reader: no orientation gaps, no external lookups, and the
+        # absolute priority order — human first, AI second, business last if at all.
+        "the never-lost contract",
+        "across EVERY FORM of documentation this repository ships",
+        "docstrings, CLI --help text, error and log messages",
+        "needing their own chat, a dictionary, or a web search",
+        "defined at first use IN THAT DOCUMENT",
+        "HUMAN\n            reader is served first, always; the AI reader second".replace("\n            ", " "),
+        "never contorted for machine",
+        "industry or business needs come absolutely last, if at all",
         # The judgments cover the published site, not just README.md: the landing
         # page's first screen and the nav order are inside the contract, because the
         # site is where a beginner actually lands.
