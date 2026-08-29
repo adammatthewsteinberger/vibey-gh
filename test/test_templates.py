@@ -323,6 +323,21 @@ def test_a_workflow_scope_rejection_is_named_not_buried():
     assert text.count("GITHUB_STEP_SUMMARY") >= 1
 
 
+def test_bot_initiated_chains_may_invoke_the_ai_steps():
+    """Observed on qwenloop#13: the conflict-resolve job, reached through a
+    workflow_run chain that CI's completion initiated, was refused wholesale --
+    "Workflow initiated by non-human actor: github-actions" -- because the action
+    gates bot actors behind an explicit allowlist. Every AI call site must name the
+    platform's own actor, and ONLY that actor: "*" would extend the trust to
+    arbitrary third-party bots."""
+    for name in ("pr-automation.yml", "issue-automation.yml", "conversation.yml"):
+        text = (WORKFLOWS / name).read_text(encoding="utf-8")
+        uses = text.count("anthropics/claude-code-action@")
+        allowed = text.count('allowed_bots: "github-actions,github-actions[bot]"')
+        assert uses == allowed, f"{name}: {uses} AI call sites, {allowed} allowed_bots"
+        assert 'allowed_bots: "*"' not in text
+
+
 def test_readability_gate_judges_the_opening_and_the_audience_order():
     """The three copy-doctrine judgments: the first screens of README.md and the docs
     landing page must survive a reader with zero project context (opening_accessible)
