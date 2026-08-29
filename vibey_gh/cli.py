@@ -394,6 +394,9 @@ def _paper(args) -> int:
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(tex, encoding="utf-8")
     print(f"tex: {out}")
+    return 0
+
+
 def _book(args) -> int:
     from vibey_gh import book
 
