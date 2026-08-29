@@ -31,6 +31,7 @@ nav:
   - Support: troubleshooting.md
   - Contributing: development.md
   - Dependencies: dependencies.md
+  - Theory of operation: theory.md
   - Threat model: threat-model.md
   - Governance: governance.md
   - Accessibility: accessibility.md
