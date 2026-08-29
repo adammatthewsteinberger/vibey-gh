@@ -338,6 +338,25 @@ def test_bot_initiated_chains_may_invoke_the_ai_steps():
         assert 'allowed_bots: "*"' not in text
 
 
+def test_recovery_reprobes_parked_prs_on_a_schedule_without_burning_budget():
+    """The auto-heal engine (#206): parked pull requests — an infra-failed gate
+    (review incomplete, operator block) or no gate on the current head — get their
+    evaluation re-dispatched every two hours, so the first pass after credits return
+    simply succeeds. A gate red with REAL review findings is excluded: repair owns
+    that path, and re-probing an unchanged head every cycle would burn the bounded
+    repair budget on nothing new. The observed alternative was tonight's: five pull
+    requests parked for hours with a human re-dispatching by hand."""
+    text = (WORKFLOWS / "pr-automation.yml").read_text(encoding="utf-8")
+    assert 'cron: "37 */2 * * *"' in text
+    assert "if: github.event_name == 'schedule'" in text
+    assert "if: github.event_name != 'schedule'" in text, "the pipeline must not run on schedule"
+    flat = " ".join(text.split())
+    assert "review incomplete" in flat and "no gate on the current head" in flat
+    assert "burn the bounded repair budget on nothing new" in flat
+    # findings-red gates fall through to `continue`, never a dispatch
+    assert flat.count("gh workflow run pr-automation.yml") >= 1
+
+
 def test_readability_gate_judges_the_opening_and_the_audience_order():
     """The three copy-doctrine judgments: the first screens of README.md and the docs
     landing page must survive a reader with zero project context (opening_accessible)
