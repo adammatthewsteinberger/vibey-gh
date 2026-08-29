@@ -262,6 +262,24 @@ jobs:
           pathlib.Path(".properdocs-channel.yml").write_text(yaml.safe_dump(data, sort_keys=False))
           PY
           properdocs build --strict --config-file .properdocs-channel.yml --site-dir channel-site
+          # Search must demonstrably work at build time. A site can build --strict with a
+          # search whose assets 404 or whose index is empty, and the failure is invisible
+          # until a human types a query into a dead box — reported as exactly that.
+          python - <<'SMOKE'
+          import json
+          import pathlib
+          import sys
+
+          site = pathlib.Path("channel-site")
+          for asset in ("search/search_index.json", "search/lunr.js", "search/main.js", "search/worker.js"):
+              if not (site / asset).is_file():
+                  sys.exit(f"search smoke: {asset} missing from the built site")
+          index = json.loads((site / "search" / "search_index.json").read_text())
+          docs = index.get("docs", [])
+          if not docs:
+              sys.exit("search smoke: the index contains zero documents")
+          print(f"search smoke: {len(docs)} documents indexed, all assets present")
+          SMOKE
           printf '%s\n' "$CHANNEL" > channel-site/release-channel.txt
           CHANNEL="$CHANNEL" REPOSITORY="$GITHUB_REPOSITORY" RELEASE_SHA="$RELEASE_SHA" \
           JSON_LD=__VIBEY_GH_DOC_JSON_LD__ PRODUCTION_INDEX=__VIBEY_GH_DOC_PRODUCTION_INDEX__ \
