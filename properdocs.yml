@@ -21,6 +21,7 @@ nav:
   - Workflows: workflows.md
   - Security: security.md
   - Threat model: threat-model.md
+  - Adoption: adoption.md
   - Operations: operations.md
   - Contributing: development.md
   - Testing: testing.md
