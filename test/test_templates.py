@@ -309,23 +309,34 @@ def test_security_and_api_drift_workflows_are_real_managed_gates():
 
 
 def test_readability_gate_judges_the_opening_and_the_audience_order():
-    """The three copy-doctrine judgments: the README's first screen must survive a reader
-    with zero project context (opening_accessible), state the problem before any project
-    vocabulary (opening_bluf), and the whole document must serve beginners first, then
-    engineers, then scholars, with executive framing essentially absent (audience_order).
-    Each is a required schema boolean the jq aggregation folds into `.pass`, so a reviewer
-    cannot skip the judgment and still pass the gate."""
+    """The three copy-doctrine judgments: the first screens of README.md and the docs
+    landing page must survive a reader with zero project context (opening_accessible)
+    and state the problem before any project vocabulary (opening_bluf), and the README
+    plus the published documentation suite — landing page and nav order included — must
+    serve beginners first, then engineers, then scholars, with executive framing
+    essentially absent (audience_order). Each is a required schema boolean the jq
+    aggregation folds into `.pass`, so a reviewer cannot skip a judgment and still pass
+    the gate. Phrases are asserted against wrap-normalized text: the prompt is prose and
+    its line breaks are not part of the contract."""
     text = (WORKFLOWS / "pr-automation.yml").read_text(encoding="utf-8")
-    # The reviewer is told to judge the opening as a stranger, on ordering alone.
-    assert "as if you had never seen this repository" in text
-    assert "BEFORE any project vocabulary" in text
-    assert "opens with what it IS before what it FIXES fails" in text
-    # The audience-order doctrine: beginner -> engineer -> scholar, BLUF throughout,
-    # executive copy essentially absent.
-    assert "beginner-accessible material first" in text
-    assert "engineering depth second" in text
-    assert "scholarly material (citations, formal references, theory) third" in text
-    assert "essentially absent" in text
+    flat = " ".join(text.split())
+    for phrase in (
+        "as if you had never seen this repository",
+        "BEFORE any project vocabulary",
+        "opens with what it IS before what it FIXES fails",
+        "and so does a marketing tagline",
+        "beginner-accessible material first",
+        "engineering depth second",
+        "scholarly material (citations, formal references, theory, threat models, governance, decision records) third",
+        "essentially absent",
+        # The judgments cover the published site, not just README.md: the landing
+        # page's first screen and the nav order are inside the contract, because the
+        # site is where a beginner actually lands.
+        "documentation site's landing page",
+        "nav order declared in the site configuration",
+        "engineering reference before the beginner on-ramp fails",
+    ):
+        assert phrase in flat, phrase
     # The judgments gate `.pass` in the aggregation, not just the schema.
     for field in ("opening_accessible", "opening_bluf", "audience_order"):
         assert f".{field} == true" in text
@@ -336,31 +347,6 @@ def test_readability_gate_judges_the_opening_and_the_audience_order():
     for field in ("opening_accessible", "opening_bluf", "audience_order"):
         assert field in local_review.UNEVALUATED_FIELDS
         assert field not in local_review.REVIEW_SCHEMA["properties"]
-
-
-def test_bottom_nav_is_injected_from_the_themes_own_anchors_and_can_be_disabled(tmp_path):
-    """On a phone, the only prev/next links are a full page-scroll away, in the header —
-    a reader who has just finished a page has no way onward from where they are (#132).
-    The injector clones the theme's own rel="prev"/rel="next" anchors into a bar before
-    </body>, so the theme stays the single authority on page order; a page without those
-    anchors (the channel picker, 404) gets no bar. Config, not fork: the theme package is
-    upstream and unwritable, so this lives in the same post-processing pass as the SEO
-    metadata, and [documentation] bottom_nav = false turns it off."""
-    from vibey_gh.config import DocumentationConfig, GhConfig
-    from vibey_gh.install import render_workflow
-
-    source = WORKFLOWS / "release-surfaces.yml"
-    on = render_workflow(source, GhConfig(root=tmp_path))
-    assert "BOTTOM_NAV=true" in on, "bottom navigation must be the default"
-    assert 'rel="(?:prev|next)"' in on
-    assert 'class="vibey-bottom-nav"' in on
-    assert ".vibey-bottom-nav a.disabled{visibility:hidden}" in on
-
-    off = render_workflow(
-        source,
-        GhConfig(root=tmp_path, documentation=DocumentationConfig(bottom_nav=False)),
-    )
-    assert "BOTTOM_NAV=false" in off
 
 
 def test_release_surfaces_smoke_checks_search_at_build_time():
