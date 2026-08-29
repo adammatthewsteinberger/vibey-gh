@@ -122,6 +122,11 @@ vulnerability_alerts = true
 automated_security_fixes = true
 
 [documentation]
+# The doctrine's end results, published on the docs site itself: /book.epub (and the
+# KDP print HTML) from the built site's nav, /paper.pdf compiled from docs/paper.md.
+generate_book = true
+generate_paper = true
+
 enabled = true
 ai_maintenance = true
 model = "claude-sonnet-5"

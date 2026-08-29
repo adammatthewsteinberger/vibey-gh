@@ -586,6 +586,8 @@ class DocumentationConfig:
     generate_llms_txt: bool = True
     generate_llms_full_txt: bool = True
     generate_json_ld: bool = True
+    generate_book: bool = False
+    generate_paper: bool = False
     bottom_nav: bool = True
     author_name: str = "Adam Matthew Steinberger"
     author_url: str = "https://vibewithadam.matthewsteinberger.com"
@@ -946,6 +948,8 @@ def load_config(root: Path | None = None) -> GhConfig:
             generate_llms_txt=documentation.get("generate_llms_txt", True),
             generate_llms_full_txt=documentation.get("generate_llms_full_txt", True),
             generate_json_ld=documentation.get("generate_json_ld", True),
+            generate_book=documentation.get("generate_book", False),
+            generate_paper=documentation.get("generate_paper", False),
             bottom_nav=documentation.get("bottom_nav", True),
             author_name=documentation.get("author_name", "Adam Matthew Steinberger"),
             author_url=documentation.get(
