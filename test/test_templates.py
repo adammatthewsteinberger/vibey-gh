@@ -392,7 +392,9 @@ def test_readability_gate_judges_the_opening_and_the_audience_order():
         "docstrings, CLI --help text, error and log messages",
         "needing their own chat, a dictionary, or a web search",
         "defined at first use IN THAT DOCUMENT",
-        "HUMAN\n            reader is served first, always; the AI reader second".replace("\n            ", " "),
+        "HUMAN\n            reader is served first, always; the AI reader second".replace(
+            "\n            ", " "
+        ),
         "never contorted for machine",
         "industry or business needs come absolutely last, if at all",
         # Hyperlinks are first-class: outside material is clickable at the point of
