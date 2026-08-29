@@ -370,6 +370,32 @@ def test_readability_gate_judges_the_opening_and_the_audience_order():
         assert field not in local_review.REVIEW_SCHEMA["properties"]
 
 
+def test_examples_sufficient_requires_a_verified_example_per_exposed_surface():
+    """The examples doctrine (vibey-gh#173): `examples_sufficient` is not satisfied by a
+    single runnable example anywhere in the repository. Every platform surface the
+    repository exposes -- API, CLI, MCP, webhook, SDK, and Moltbook where published --
+    needs its own fully comprehensible, fully working example, and a reviewer may not
+    credit one surface's example as covering another's reader. "Fully working" is
+    verified against the checked-out source, not assumed from the diff."""
+    text = (WORKFLOWS / "pr-automation.yml").read_text(encoding="utf-8")
+    flat = " ".join(text.split())
+    for phrase in (
+        "Judge examples_sufficient surface by surface",
+        "API, CLI, MCP, webhook, SDK, and Moltbook where the repository publishes one",
+        'none may lean on "see the CLI section" or any other surface\'s reader',
+        "Fully comprehensible means the example alone follows the copy doctrine above",
+        "without hopping to another surface's section",
+        "Fully working means copy-paste-runnable against the current release",
+        "every command, flag, endpoint, payload shape, and import the example shows must exist exactly as written",
+        "Verify each one against target/ with Read or Glob before crediting an example as sufficient",
+        "pseudo-code, an elided placeholder that would break execution, or a reference to a removed flag or endpoint fails this judgment",
+    ):
+        assert phrase in flat, phrase
+    # The judgment gates `.pass` in the aggregation like every other required boolean.
+    assert '"examples_sufficient"' in text
+    assert ".examples_sufficient == true" in text
+
+
 def test_release_surfaces_smoke_checks_search_at_build_time():
     """A channel site can build --strict with a dead search: assets that 404 or an index
     with zero documents only surface when a human types a query into a silent box. The

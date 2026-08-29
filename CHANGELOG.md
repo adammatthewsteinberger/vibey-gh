@@ -5,6 +5,16 @@ This file follows Keep a Changelog and semantic versioning conventions.
 
 ## Unreleased
 
+- Sharpen `examples_sufficient` in the exact-head documentation review. Previously one
+  runnable example anywhere in a repository satisfied the boolean, so a repository could
+  ship a working CLI walkthrough and leave its MCP, webhook, SDK, or Moltbook readers with
+  nothing but "see the CLI section." The review prompt now requires the reviewer to name
+  every platform surface a repository exposes and verify at least one fully comprehensible,
+  fully working example for each: beginner register and zero-context readability for
+  "comprehensible," and every command, flag, endpoint, payload shape, and import checked
+  against the source, not assumed, for "working." No schema change — `examples_sufficient`
+  was already a required boolean.
+
 - Let the local review fallback reach a pull request the diff API refuses. GitHub's diff
   API refuses a pull request beyond roughly 300 changed files, which is exactly the shape
   of a migration or adoption sweep — observed on a 347-file provenance sweep that could

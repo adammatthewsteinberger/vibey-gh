@@ -316,6 +316,19 @@ jobs:
             Verify that every CLI, SDK, API, MCP, and webhook capability is documented.
             A heading, file, or keyword by itself is never proof of completeness. Flag
             vague, stale, circular, implementation-first, unexplained, or missing content.
+            Judge examples_sufficient surface by surface: identify every platform surface
+            this repository exposes -- API, CLI, MCP, webhook, SDK, and Moltbook where the
+            repository publishes one -- and require at least one fully comprehensible,
+            fully working example for each; none may lean on "see the CLI section" or any
+            other surface's reader. Fully comprehensible means the example alone follows
+            the copy doctrine above: beginner register first, BLUF, every load-bearing term
+            defined where used, so a first-time reader with zero project context can follow
+            it top to bottom without hopping to another surface's section. Fully working
+            means copy-paste-runnable against the current release: every command, flag,
+            endpoint, payload shape, and import the example shows must exist exactly as
+            written. Verify each one against target/ with Read or Glob before crediting an
+            example as sufficient; pseudo-code, an elided placeholder that would break
+            execution, or a reference to a removed flag or endpoint fails this judgment.
 
             When trusted=${{ needs.evaluate.outputs.trusted }} is false, additionally
             review correctness, security, data-loss risk, architecture boundaries, test
