@@ -15,6 +15,11 @@ This file follows Keep a Changelog and semantic versioning conventions.
   no-execution guarantee is untouched, and `max_diff_chars` still caps what reaches the
   model either way.
 
+- Add an optional `[documentation] google_site_verification` setting: the bare Search
+  Console "HTML tag" verification token, rendered as a `<meta
+  name="google-site-verification">` tag on every published documentation page and the
+  channel-picker landing page so verification survives Pages redeploys. Restricted to
+  `^[A-Za-z0-9_-]{1,128}$`, which also rejects a pasted whole `<meta>` tag.
 - Stop the required automation document from hijacking an adopter's front page. GitHub
   resolves a repository's landing README as `.github/README.md` first and the root
   `README.md` only if that is absent — so requiring `.github/README.md` replaced every

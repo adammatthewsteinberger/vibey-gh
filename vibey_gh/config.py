@@ -616,6 +616,11 @@ class DocumentationConfig:
     author: str = ""
     theme_color: str = "#080b14"
     locale: str = "en_US"
+    # Google Search Console "HTML tag" verification token — the content value of the
+    # meta tag, not the whole tag. Rendered into every published page and the channel
+    # index, which is what makes it survive redeploys; an uploaded verification FILE is
+    # wiped every time release-surfaces rebuilds the Pages root.
+    google_site_verification: str = ""
     # What the published-site build installs. ProperDocs renders whatever the repository's
     # `properdocs.yml` declares, and a site that declares plugins or markdown extensions
     # cannot build without them — `properdocs` and its theme pull in none of that, so a
@@ -690,6 +695,13 @@ class DocumentationConfig:
                 raise ValueError("documentation.keywords entries must be plain words")
         if self.theme_color and not re.match(r"^#[0-9a-fA-F]{3,8}$", self.theme_color):
             raise ValueError("documentation.theme_color must be a hex colour like #080b14")
+        if self.google_site_verification and not re.match(
+            r"^[A-Za-z0-9_-]{1,128}$", self.google_site_verification
+        ):
+            raise ValueError(
+                "documentation.google_site_verification must be the bare token from the "
+                "HTML-tag method (the content= value), not the whole tag"
+            )
         if self.google_analytics_id and not GOOGLE_ANALYTICS_ID_PATTERN.match(
             self.google_analytics_id
         ):
@@ -966,6 +978,7 @@ def load_config(root: Path | None = None) -> GhConfig:
             author=documentation.get("author", ""),
             theme_color=documentation.get("theme_color", "#080b14"),
             locale=documentation.get("locale", "en_US"),
+            google_site_verification=documentation.get("google_site_verification", ""),
             site_requirements=tuple(documentation.get("site_requirements", ())),
             site_requirements_file=documentation.get(
                 "site_requirements_file", DocumentationConfig.site_requirements_file

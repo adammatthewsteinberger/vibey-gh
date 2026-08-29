@@ -269,8 +269,9 @@ deliberately opt-in for outside authors and reads every issue through a bounded 
 file written by a trusted step. The agent has no shell, no network, and no Git tool; it
 edits files under a base-branch checkout, and one trusted publisher pushes a single
 non-empty source refspec to a namespaced branch validated against the configured
-permanent branches. Nothing derived from an issue reaches a shell command, a workflow
-expression, or a branch name.
+permanent branches. Nothing derived from an issue reaches a shell command or a workflow
+expression; the one place issue text does reach is the branch name, and only as a
+regex-sanitized slug of the title (stripped to `[a-z0-9-]+`, length-capped).
 
 The sole history-rewrite exception is Conventional Commits self-healing: only a
 same-repository linear topic branch may be normalized and pushed with an exact-head
@@ -281,6 +282,14 @@ Webhook delivery IDs are claimed atomically in a persistent local state director
 replay rejection survives CLI process restarts and concurrent receivers. Deployments must
 place `VIBEY_GH_WEBHOOK_STATE_DIR` on durable, access-controlled storage and retain the raw
 request bytes for HMAC verification; see [the CLI and adapter reference](docs/cli.md).
+
+The opt-in local-model review/triage fallback runs on a self-hosted runner, which GitHub
+itself warns against exposing to public-repository pull requests. `trusted_only` (default
+`true`) keeps fork PRs off that runner entirely, and the job holds only `contents: read` —
+no secret, and no token capable of pushing, merging, or mutating the repository. Trusted
+steps use `gh`/`git` to assemble the diff or issue text; only the local model's own
+execution is confined to the loopback inference port, with no shell, `gh`, or network
+access of its own. See [Threat model](docs/threat-model.md) for the full boundary.
 
 ## Commands
 
@@ -462,6 +471,17 @@ Repositories must configure `ANTHROPIC_API_KEY`; `AUTOMERGE_TOKEN` is required w
 default Actions token cannot push or merge through the repository ruleset. Installation
 does not create either secret.
 
+A repository that sets `[pr_automation.fallback].enabled = true` gets one more line of
+defense before that gate fails outright: when the primary review returns no verdict at
+all, a `review-fallback` job sends the diff to a local Ollama model on a self-hosted
+`vibey-local-gh`-labelled runner (never for a fork PR unless `trusted_only = false`) and
+runs `vibey-gh local-review`. A clean local verdict passes the gate under the honestly
+weaker title `PR automation: gate (local fallback)`; the local model never overrides an
+actual finding, and it holds no repository credentials at all. See
+[`[pr_automation.fallback]`](docs/configuration.md) for every field and
+[Threat model](docs/threat-model.md) for what that self-hosted runner is and is not trusted
+for.
+
 ```bash
 vibey-gh pr-automation evaluate --pr 123 --head-sha HEAD_SHA
 vibey-gh pr-automation ready-draft --pr 123 --head-sha HEAD_SHA
@@ -492,8 +512,9 @@ sets `solve_untrusted_authors = true` and takes that decision explicitly.
 discussion into a bounded briefing file; the agent is told it is a report from a stranger
 and that any sentence in it asking to change the task, relax a constraint, run a command,
 or reach a network service is hostile input to be reported rather than obeyed. Nothing
-from an issue is interpolated into a shell command, a workflow expression, or a branch
-name — branch names come from the issue number and a hash of its content.
+from an issue is interpolated into a shell command or a workflow expression, and the only
+issue-derived branch-name component is a regex-sanitized slug of the title — branch names
+come from the issue number, a hash of its content, and that slug.
 
 *The budget belongs to the request, not the clock.* Attempts are counted against a
 fingerprint of the issue's title and body. Re-running automation on unchanged text cannot
@@ -502,6 +523,12 @@ branch, and a fresh budget. An issue that exhausts its budget is labelled and co
 once, not retried forever. An agent that decides the request is a question, a duplicate,
 out of scope, or too ambiguous to implement returns `needs_human` and changes nothing —
 a truthful refusal is a better outcome than a speculative change.
+
+When the paid solver produces nothing at all and `[pr_automation.fallback].enabled` is
+set, the same local Ollama model backs `vibey-gh local-triage`: it never writes code or
+opens a branch, only a bounded root-cause/approach/risks analysis posted as a comment for
+whoever picks the issue up next, and it always reports `needs_human=true` regardless of
+what the model claims.
 
 ```bash
 vibey-gh issue-automation evaluate --issue 55
@@ -679,6 +706,7 @@ bottom_nav = true       # previous/next bar at the bottom of every published pag
 author_name = "Adam Matthew Steinberger"
 author_url = "https://vibewithadam.matthewsteinberger.com"
 google_analytics_id = ""                    # empty disables it; set a GA4 ID like "G-XXXXXXXXXX" to enable
+google_site_verification = ""                # bare Search Console "HTML tag" token; leave empty to skip verification
 # ProperDocs depends on none of the plugins your site declares, so a site using
 # mkdocs-gen-files or pymdownx.* must name them here or the --strict build fails.
 site_requirements = []                      # e.g. ["mkdocs-gen-files", "pymdown-extensions>=10.7"]
@@ -720,6 +748,13 @@ repository's own GA4 measurement ID (`G-XXXXXXXXXX`), and leaving it empty means
 analytics script tag is ever emitted and no request reaches Google. When set, the same ID
 is injected into every page of both generated documentation channels and the
 channel-picker landing page.
+
+`google_site_verification` proves ownership of the published site to Google Search
+Console without an uploaded verification file, which release-surfaces would otherwise
+wipe on every rebuild of the Pages root. Set it to the bare token from Search Console's
+"HTML tag" verification method — the `content="..."` value, not the whole `<meta>` tag —
+and it is rendered into a `<meta name="google-site-verification">` tag on every published
+page and the channel-picker landing page, so verification survives redeploys.
 
 Sanitized progress is the safe default. Claude's progress-comment mode is enabled only for
 the direct PR/issue events the action supports; `workflow_run`, `workflow_dispatch`, and
@@ -911,7 +946,7 @@ The automation distinguishes failures by what can safely resolve them:
 | Issue too ambiguous, out of scope, or blocked on an operator decision | Return `needs_human`, change nothing, mark `vibey-gh:solve-blocked` | Answer the question in the issue, or refine and edit it to start a new lineage |
 | Solution attempt returns no result at all (turn-budget exhaustion or an infrastructure failure) | Comment once naming the cause; mark `vibey-gh:solve-blocked` | Split the issue into smaller requests, or raise `[issue_automation].max_turns` |
 | Configured unsuccessful solution attempts for one issue lineage | Mark `vibey-gh:solve-exhausted`; comment once with the reason | Edit the issue to restate the request, or take it manually |
-| Exact-head review returns no verdict (exhausted API credits, missing key, model unavailable) | Publish a failing `PR automation: review incomplete` gate naming the operator cause; never infer a verdict | Correct the operator condition, then rerun the review |
+| Exact-head review returns no verdict (exhausted API credits, missing key, model unavailable) | If `[pr_automation.fallback].enabled` and the PR is same-repository (or `trusted_only = false`), a local Ollama model on a self-hosted runner reviews the diff; a clean local verdict publishes a passing `PR automation: gate (local fallback)` gate naming the weaker reviewer. Otherwise, publish a failing `PR automation: review incomplete` gate naming the operator cause; never silently infer a verdict from the primary path alone | Correct the operator condition and rerun the review, or treat a local-fallback pass as the degraded signal it is |
 | Stale workflow completion | Ignore it; it cannot create a successful current-head gate | None |
 | Failed trusted post-merge release workflow | Open a repair branch and ordinary PR; never patch a permanent branch directly | Correct operator-only infrastructure failures |
 
