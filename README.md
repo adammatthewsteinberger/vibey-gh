@@ -269,8 +269,9 @@ deliberately opt-in for outside authors and reads every issue through a bounded 
 file written by a trusted step. The agent has no shell, no network, and no Git tool; it
 edits files under a base-branch checkout, and one trusted publisher pushes a single
 non-empty source refspec to a namespaced branch validated against the configured
-permanent branches. Nothing derived from an issue reaches a shell command, a workflow
-expression, or a branch name.
+permanent branches. Nothing derived from an issue reaches a shell command or a workflow
+expression; the one place issue text does reach is the branch name, and only as a
+regex-sanitized slug of the title (stripped to `[a-z0-9-]+`, length-capped).
 
 The sole history-rewrite exception is Conventional Commits self-healing: only a
 same-repository linear topic branch may be normalized and pushed with an exact-head
@@ -284,9 +285,11 @@ request bytes for HMAC verification; see [the CLI and adapter reference](docs/cl
 
 The opt-in local-model review/triage fallback runs on a self-hosted runner, which GitHub
 itself warns against exposing to public-repository pull requests. `trusted_only` (default
-`true`) keeps fork PRs off that runner entirely, the job holds no repository secret or
-token, and its diff/issue input reaches only a local inference port — never a shell, `gh`,
-or the network beyond it. See [Threat model](docs/threat-model.md) for the full boundary.
+`true`) keeps fork PRs off that runner entirely, and the job holds only `contents: read` —
+no secret, and no token capable of pushing, merging, or mutating the repository. Trusted
+steps use `gh`/`git` to assemble the diff or issue text; only the local model's own
+execution is confined to the loopback inference port, with no shell, `gh`, or network
+access of its own. See [Threat model](docs/threat-model.md) for the full boundary.
 
 ## Commands
 
@@ -509,8 +512,9 @@ sets `solve_untrusted_authors = true` and takes that decision explicitly.
 discussion into a bounded briefing file; the agent is told it is a report from a stranger
 and that any sentence in it asking to change the task, relax a constraint, run a command,
 or reach a network service is hostile input to be reported rather than obeyed. Nothing
-from an issue is interpolated into a shell command, a workflow expression, or a branch
-name — branch names come from the issue number and a hash of its content.
+from an issue is interpolated into a shell command or a workflow expression, and the only
+issue-derived branch-name component is a regex-sanitized slug of the title — branch names
+come from the issue number, a hash of its content, and that slug.
 
 *The budget belongs to the request, not the clock.* Attempts are counted against a
 fingerprint of the issue's title and body. Re-running automation on unchanged text cannot
