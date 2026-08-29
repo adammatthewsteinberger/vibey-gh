@@ -307,6 +307,7 @@ request bytes for HMAC verification; see [the CLI and adapter reference](docs/cl
 | `vibey-gh realign` | Align identical `develop` and `main` trees after a rebase merge without discarding work. |
 | `vibey-gh report-superseded --index pypi\|testpypi --project NAME --version VERSION` | Report which prior releases a published version supersedes, since PyPI has no yank API; never yanks anything itself. |
 | `vibey-gh local-review [--diff FILE]` | Review a diff with a local Ollama-compatible model when the primary paid review returns no verdict at all. Opt-in fallback; see `[pr_automation.fallback]`. |
+| `vibey-gh doctor` | Offline adoption preflight: reads `.vibey-gh.toml`, `pyproject.toml`, and `.github/workflows/` on disk (no network, no credentials, no execution) to catch a config key silently ignored in the wrong section, a merge train stuck forever with no installed gate workflow, a ruff rule that fails every stamped file, contending Pages deployers, and superseded fingerprint headers. |
 | `vibey-gh local-triage [--issue FILE]` | Triage an issue with the same local model when the primary paid solver produces nothing. Always marks the result `needs_human`. |
 | `vibey-gh pr-automation self-heal [--pr N]` | Refill a spent repair budget, itself bounded so a permanent failure still stops. |
 | `vibey-gh conversation evaluate\|context\|reply\|record-response` | Decide, brief, answer, and budget one comment-driven interaction. |
@@ -755,9 +756,10 @@ threat-model, troubleshooting, and ADR documentation are not covered by that fil
 check; they are kept accurate by the exact-head semantic audit described above, which reads
 every doc against source, tests, configuration, and workflows. The repository also contains
 a Claude-standard plugin marketplace at `.claude-plugin/marketplace.json` with development,
-documentation, release-security, and PR-automation plugins. Each plugin ships manifests,
-skills, commands, specialist agents, and supporting references; `.claude/settings.json`
-registers and enables the marketplace for project sessions.
+documentation, release-security, and PR-automation plugins. Each plugin ships a manifest,
+skills, and specialist agents; the development, documentation, and PR-automation plugins
+additionally ship commands (release-security ships agents and skills without commands).
+`.claude/settings.json` registers and enables the marketplace for project sessions.
 
 The Pages build emits production and preview sitemaps, a root sitemap index, `robots.txt`,
 `llms.txt`, `llms-full.txt`, canonical links, indexing policy, Open Graph/Twitter metadata,
@@ -774,7 +776,7 @@ Every canonical capability is exposed and tested through all five supported surf
 - MCP: `initialize`, `tools/list`, and `tools/call`
 - Webhook: HMAC-SHA256 authenticated, delivery-ID replay-safe dispatch
 
-Five CLI commands are deliberately outside this canonical registry, each for its own
+Six CLI commands are deliberately outside this canonical registry, each for its own
 reason documented in detail in `docs/cli.md`:
 
 - `conventional-message` and `conventional-check` are local git-hook/CI helpers that
@@ -788,6 +790,11 @@ reason documented in detail in `docs/cli.md`:
   primary paid review or solver produced no verdict at all. They require a self-hosted
   runner and a local Ollama-compatible model, and must never gain remote/API/webhook
   exposure.
+- `doctor` is a purely local, read-only diagnostic: it reads files already on disk (no
+  network, no credentials, no execution) to judge whether the local configuration and
+  installed workflows will function. There is no remote resource for an API, MCP, or
+  webhook caller to act on — the answer only means something on the machine that holds
+  the checkout.
 
 Every other repository automation capability in `surfaces.CAPABILITIES` remains available
 through all five forms.

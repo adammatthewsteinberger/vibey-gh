@@ -356,6 +356,27 @@ def _report_superseded(args) -> int:
     return 0
 
 
+def _doctor(args) -> int:
+    from vibey_gh import doctor
+
+    findings = doctor.diagnose(root=None)
+    for f in findings:
+        print(
+            f"  {f.severity}: {f.message}", file=sys.stderr if f.severity == "error" else sys.stdout
+        )
+    errors = sum(1 for f in findings if f.severity == "error")
+    if errors:
+        print(
+            f"vibey-gh doctor: {errors} problem(s) that will break the automation", file=sys.stderr
+        )
+        return 1
+    if findings:
+        print(f"vibey-gh doctor: no blockers; {len(findings)} warning(s)")
+    else:
+        print("vibey-gh doctor: the automation should function")
+    return 0
+
+
 def _local_triage(args) -> int:
     from vibey_gh import local_review
 
@@ -715,6 +736,12 @@ def main(argv: list[str] | None = None) -> int:
     local.add_argument("--max-chars", type=int, help="override max_diff_chars")
     local.add_argument("--timeout", type=int, help="override timeout_seconds")
     local.set_defaults(func=_local_review)
+
+    doc = sub.add_parser(
+        "doctor",
+        help="will the automation actually work? — the adoption preflight, offline",
+    )
+    doc.set_defaults(func=_doctor)
 
     lt = sub.add_parser(
         "local-triage",
