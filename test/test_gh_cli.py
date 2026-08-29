@@ -829,3 +829,67 @@ def test_check_prints_superseded_headers(repo, capsys):
     assert main(["check"]) == 1
     err = capsys.readouterr().err
     assert "carries a superseded fingerprint header" in err
+
+
+def test_report_superseded_governance_range_triggers_article_v4(repo, capsys, monkeypatch):
+    """A release range touching the constitution supersedes everything (Article V.4):
+    the banner names the law, and the per-index switch plus the retention window are
+    both overridden — the fixture's config never enables yank reporting at all."""
+    from vibey_gh import yank
+
+    base = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, capture_output=True, text=True, check=True
+    ).stdout.strip()
+    (repo / "docs").mkdir()
+    (repo / "docs" / "constitution.md").write_text("amended\n")
+    subprocess.run(["git", "add", "-A"], cwd=repo, capture_output=True, check=True)
+    subprocess.run(["git", "commit", "-qm", "ratify"], cwd=repo, capture_output=True, check=True)
+    monkeypatch.setattr(
+        yank, "released_versions", lambda index, project, timeout=30: ["1.0.0", "1.1.0", "1.2.0"]
+    )
+    assert (
+        main(
+            [
+                "report-superseded",
+                "--index",
+                "pypi",
+                "--project",
+                "pkg",
+                "--version",
+                "1.2.0",
+                "--governance-since",
+                base,
+            ]
+        )
+        == 0
+    )
+    out = capsys.readouterr().out
+    assert "RATIFIED GOVERNANCE CHANGE" in out
+    assert "1.1.0" in out and "1.0.0" in out
+    assert "1.2.0" not in out.split("superseded by")[-1].split("Yank at")[0].replace(
+        "1.2.0:", ""
+    )  # the published version is the subject line, never a listed target
+
+
+def test_report_superseded_unreadable_governance_range_is_loud_never_fatal(repo, capsys):
+    """An unreadable range must not silently waive Article V.4 — and must not fail the
+    release either: the publish already happened."""
+    assert (
+        main(
+            [
+                "report-superseded",
+                "--index",
+                "pypi",
+                "--project",
+                "pkg",
+                "--version",
+                "1.2.0",
+                "--governance-since",
+                "no-such-ref",
+            ]
+        )
+        == 0
+    )
+    err = capsys.readouterr().err
+    assert "could not read the governance range" in err
+    assert "Article V.4 was NOT evaluated" in err
