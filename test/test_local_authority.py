@@ -190,3 +190,17 @@ def test_the_cli_refuses_an_empty_fleet(tmp_path, capsys):
     code = cli.main(["local-authority", "--root", str(tmp_path / "empty"), "--once"])
     assert code == 1
     assert "no repositories" in capsys.readouterr().err
+
+
+def test_a_passing_provenance_check_falls_through_to_the_push(tmp_path, monkeypatch):
+    work, _origin = _fleet_repo(tmp_path, "twelve-b")
+    real_run = subprocess.run
+
+    def fake_run(cmd, **kw):
+        if cmd[:2] == ["vibey-gh", "check"]:
+            return subprocess.CompletedProcess(cmd, 0, "ok", "")
+        return real_run(cmd, **kw)
+
+    monkeypatch.setattr(local_authority.subprocess, "run", fake_run)
+    outcome = local_authority.sync_repo(work, check=True)
+    assert outcome.action == "pushed" and outcome.ahead == 1

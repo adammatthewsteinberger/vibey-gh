@@ -199,3 +199,36 @@ def test_the_cli_reports_an_actionable_error(tmp_path, capsys):
     )
     assert code == 1
     assert "no chapters" in capsys.readouterr().err
+
+
+def test_parser_edges_nested_strips_startend_voids_and_charrefs():
+    """The extractor's less-traveled branches, orphaned when two green PRs squashed
+    into one red develop: nested chrome subtrees (a form inside a nav), self-closing
+    tags both inside capture and inside a strip, a non-strip end tag while stripping,
+    void end tags, and entity/character references in prose."""
+    page = (
+        "<main>"
+        "<nav>skip <form>deeper</form> <em>styled-skip</em> <img src='x'/> still-skipped</nav>"
+        "<p>keep &amp; &#8594; <br/> this</p>"
+        "</main>"
+    )
+    body = book.extract_main(page)
+    assert "keep &amp; &#8594;" in body
+    assert "<br/>" in body
+    assert "skip" not in body and "deeper" not in body
+
+
+def test_parser_ignores_content_after_capture_and_stray_end_tags():
+    page = "<div><main><p>inside</p></main><p>after</p></div><em>tail</em>"
+    body = book.extract_main(page)
+    assert "inside" in body and "after" not in body and "tail" not in body
+    # a stray end tag arriving before any capture begins is ignored
+    assert "x" in book.extract_main("</div><article>x</article>")
+
+
+def test_parser_handles_end_of_void_and_unclosed_capture():
+    # explicit </br> end tags are void — never decrement capture depth
+    body = book.extract_main("<main><p>a</p></br><p>b</p></main>")
+    assert "a" in body and "b" in body
+    # capture that never closes ends at EOF with what it gathered
+    assert "tail-content" in book.extract_main("<main><p>tail-content</p>")
