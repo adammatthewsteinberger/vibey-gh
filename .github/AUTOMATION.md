@@ -55,6 +55,7 @@ events. A skipped stale run is expected. A current-head failure is never bypasse
 | `release-surfaces.yml` | Release surfaces | Publishes OCI package artifacts and the persistent Production and Preview ProperDocs sites. |
 | `repository-profile.yml` | Repository profile | Reconciles description, homepage, topics, collaboration settings, merge policy, security settings, branch rulesets, and observable release surfaces. |
 | `release-repair.yml` | Release repair | Reviews trusted post-merge failures and returns fixable changes through a guarded PR instead of patching a permanent branch directly. |
+| `api-drift.yml` | API drift (Cloud Agents OpenAPI) | This repository's own five-surface (MCP, API, CLI, SDK, webhook) capability-parity self-test; hand-authored like `ci.yml`, not a managed template adopters receive. See [docs/workflows.md](../docs/workflows.md#api-drift--not-installed-and-not-yours). |
 
 Workflow `name:` values are event contracts. Renaming `CI`, `Release`, `Docs`, `CodeQL`,
 `Provenance`, or `Docs` without updating configured scans and `workflow_run` lists can

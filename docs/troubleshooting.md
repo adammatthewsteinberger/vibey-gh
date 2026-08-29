@@ -1,5 +1,12 @@
 # Troubleshooting
 
+- Run `vibey-gh doctor` first, before any of the entries below. It is the offline adoption
+  preflight (see [CLI reference](cli.md) and [Adoption](adoption.md)): it reads
+  `.vibey-gh.toml`, `pyproject.toml`, and `.github/workflows/` and catches a config key
+  silently landing in the wrong section, a merge train stuck forever because
+  `pr_automation.enabled` has no installed gate workflow, a ruff `E501` select that fails
+  every stamped file, two workflows contending over GitHub Pages, and a superseded
+  fingerprint header — several of the specific symptoms described below.
 - A skipped automation gate usually means evaluation occurred while checks were pending;
   dispatch the exact-head evaluation after scans finish.
 - A merge blocked only by self-review may use the documented ruleset fallback only after
