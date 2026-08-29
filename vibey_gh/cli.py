@@ -335,9 +335,40 @@ def _realign(args) -> int:
 
 
 def _report_superseded(args) -> int:
+    import subprocess
+
     from vibey_gh import yank
 
-    report = yank.report_superseded(load_config(), args.index, args.project, args.version)
+    cfg = load_config()
+    changed: list[str] | None = None
+    if args.governance_since:
+        # The ratifying merge is one push; its range names what it changed. An unreadable
+        # range is reported loudly rather than silently waiving Article V.4 — but it never
+        # fails the release: the publish already happened, and the amendment is enforced
+        # by the review and the humans as well as by this bookkeeping.
+        run = subprocess.run(
+            ["git", "diff", "--name-only", f"{args.governance_since}...HEAD"],
+            capture_output=True,
+            text=True,
+            cwd=cfg.root,
+            check=False,
+        )
+        if run.returncode == 0:
+            changed = [line for line in run.stdout.splitlines() if line.strip()]
+        else:
+            print(
+                "vibey-gh: could not read the governance range "
+                f"{args.governance_since!r}: {run.stderr.strip()} — Article V.4 was NOT "
+                "evaluated for this release; check it by hand",
+                file=sys.stderr,
+            )
+    report = yank.report_superseded(cfg, args.index, args.project, args.version, changed)
+    if report.governance:
+        print(
+            "vibey-gh: RATIFIED GOVERNANCE CHANGE — Article V.4 of the Constitution: no"
+            " artifact circulates under superseded law. Every previous release is named"
+            " below, zero exceptions, retention window overridden."
+        )
     for problem in report.problems:
         print(f"vibey-gh: {problem}", file=sys.stderr)
     if report.skipped:
@@ -792,6 +823,15 @@ def main(argv: list[str] | None = None) -> int:
     y.add_argument("--index", choices=["pypi", "testpypi"], required=True)
     y.add_argument("--project", required=True, help="the distribution name on the index")
     y.add_argument("--version", required=True, help="the version just published; never listed")
+    y.add_argument(
+        "--governance-since",
+        default="",
+        help=(
+            "git ref opening the release range; if the range touches a governance file"
+            " (constitution, commandments, bill of rights, standing subdoctrines), every"
+            " previous release is reported superseded — Article V.4, zero exceptions"
+        ),
+    )
     y.set_defaults(func=_report_superseded)
 
     local = sub.add_parser(
