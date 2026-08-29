@@ -308,6 +308,21 @@ def test_security_and_api_drift_workflows_are_real_managed_gates():
     assert re.search(r'case "\$REVIEW_PASSED" in\n\s+true\)\n\s+conclusion=success\n', text)
 
 
+def test_a_workflow_scope_rejection_is_named_not_buried():
+    """Observed on three pin-bump PRs at once: the repair committed cleanly, the push
+    was rejected because the automation token lacked the Workflows permission, and the
+    only trace was one line in a log nobody reads while the PR silently stopped
+    advancing (#172). The template must warn before the doomed push and, on the
+    rejection, say the operator-actionable sentence in the error and the job summary."""
+    text = (WORKFLOWS / "pr-automation.yml").read_text(encoding="utf-8")
+    assert "this repair edits .github/workflows/**" in text
+    assert "Workflows (read-write) permission" in text
+    assert "the repair itself succeeded" in text
+    assert "grep -q '^\\.github/workflows/'" in text
+    # the summary line reaches the operator surface, not just stderr
+    assert text.count("GITHUB_STEP_SUMMARY") >= 1
+
+
 def test_readability_gate_judges_the_opening_and_the_audience_order():
     """The three copy-doctrine judgments: the first screens of README.md and the docs
     landing page must survive a reader with zero project context (opening_accessible)
@@ -335,6 +350,12 @@ def test_readability_gate_judges_the_opening_and_the_audience_order():
         "documentation site's landing page",
         "nav order declared in the site configuration",
         "engineering reference before the beginner on-ramp fails",
+        # The examples doctrine: every exposed platform surface gets at least one
+        # fully working, fully comprehensible example, verified against the source.
+        "Judge examples_sufficient against every platform surface",
+        "API, CLI, MCP, webhook, SDK, and Moltbook where present",
+        "copy-paste-runnable against this exact head",
+        "example naming anything that does not exist fails this judgment",
     ):
         assert phrase in flat, phrase
     # The judgments gate `.pass` in the aggregation, not just the schema.

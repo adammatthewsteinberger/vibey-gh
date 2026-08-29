@@ -314,6 +314,7 @@ access of its own. See [Threat model](docs/threat-model.md) for the full boundar
 | `vibey-gh promote [--no-wait]` | Open or reuse the asynchronous `develop → main` promotion PR. |
 | `vibey-gh github-release --target SHA [--version VERSION]` | Create or reuse an immutable tag and GitHub Release for an exact production SHA. |
 | `vibey-gh realign` | Align identical `develop` and `main` trees after a rebase merge without discarding work. |
+| `vibey-gh book --site-dir site --title T --author A` | Export the built docs site as an EPUB 3.0 plus a KDP print-ready HTML — the docs as a publishable book, chapters in nav order. |
 | `vibey-gh report-superseded --index pypi\|testpypi --project NAME --version VERSION` | Report which prior releases a published version supersedes, since PyPI has no yank API; never yanks anything itself. |
 | `vibey-gh local-review [--diff FILE]` | Review a diff with a local Ollama-compatible model when the primary paid review returns no verdict at all. Opt-in fallback; see `[pr_automation.fallback]`. |
 | `vibey-gh doctor` | Offline adoption preflight: reads `.vibey-gh.toml`, `pyproject.toml`, and `.github/workflows/` on disk (no network, no credentials, no execution) to catch a config key silently ignored in the wrong section, a merge train stuck forever with no installed gate workflow, a ruff rule that fails every stamped file, contending Pages deployers, and superseded fingerprint headers. |
@@ -812,7 +813,7 @@ Every canonical capability is exposed and tested through all five supported surf
 - MCP: `initialize`, `tools/list`, and `tools/call`
 - Webhook: HMAC-SHA256 authenticated, delivery-ID replay-safe dispatch
 
-Six CLI commands are deliberately outside this canonical registry, each for its own
+Seven CLI commands are deliberately outside this canonical registry, each for its own
 reason documented in detail in `docs/cli.md`:
 
 - `conventional-message` and `conventional-check` are local git-hook/CI helpers that
@@ -831,6 +832,10 @@ reason documented in detail in `docs/cli.md`:
   installed workflows will function. There is no remote resource for an API, MCP, or
   webhook caller to act on — the answer only means something on the machine that holds
   the checkout.
+- `book` only reads an already-built local site directory and a local site configuration
+  and writes local files (an EPUB and a print-ready HTML). There is no remote resource for
+  an API, MCP, or webhook caller to act on, and exposing it remotely would mean shipping a
+  built site's bytes through a surface with no such contract today.
 
 Every other repository automation capability in `surfaces.CAPABILITIES` remains available
 through all five forms.
@@ -917,14 +922,16 @@ trusted_authors = ["your-login", "dependabot[bot]"]
 | Branch sync | Brings open branches forward on every merge; daily, refills a bounded number of spent repair budgets. |
 | Conversation | Answers `@vibey-gh` in a comment, and may make the change when a trusted author asks on a PR. |
 | Conventional Commits | Normalizes guarded same-repository topic history and republishes it with an exact-head lease. |
-| CI\* / Provenance / Docs | Validate code, history, human docs, agent docs, plugins, and interfaces. |
+| CI\* / Provenance / CodeQL / Docs | Validate code, history, security, human docs, agent docs, plugins, and interfaces. |
 | PR automation | Aggregates exact-head scans; reviews, repairs, resolves conflicts, and gates. |
 | Merge train | Squash-merges into `develop` and rebase-merges promotions into `main`. |
+| Promote | Opens or reuses the `develop` → `main` promotion PR once the merge train advances `develop`. |
 | Release\* | Publishes `develop` dev builds to TestPyPI and `main` releases to PyPI. |
 | GitHub Release | Tags the exact production commit and generates release notes. |
 | Release surfaces | Publishes GHCR artifacts and Production/Preview ProperDocs sites. |
 | Repository profile | Enforces repository metadata, policy settings, security, and public surfaces. |
 | Release repair | Returns trusted post-merge fixes through an ordinary guarded PR. |
+| Automation bootstrap | Manual, admin-gated escape hatch that merges a fix to broken privileged workflow code when a PR cannot repair its own gate. |
 
 \* `CI` and `Release` are not rendered by `vibey-gh install`; see
 [What gets installed](#what-gets-installed) for the exact name and behavior contract

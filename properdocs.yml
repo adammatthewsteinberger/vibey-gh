@@ -32,9 +32,9 @@ nav:
   - Contributing: development.md
   - Dependencies: dependencies.md
   - Theory of operation: theory.md
+  - Accessibility: accessibility.md
   - Threat model: threat-model.md
   - Governance: governance.md
-  - Accessibility: accessibility.md
   - Architecture decisions: adr/README.md
   - Roadmap: roadmap.md
 strict: true

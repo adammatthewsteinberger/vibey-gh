@@ -377,6 +377,32 @@ def _doctor(args) -> int:
     return 0
 
 
+def _book(args) -> int:
+    from vibey_gh import book
+
+    meta = {
+        "title": args.title,
+        "author": args.author,
+        "subtitle": args.subtitle,
+        "publisher": args.publisher,
+        "description": args.description,
+        "language": args.language,
+    }
+    try:
+        written = book.build_book(
+            site_dir=Path(args.site_dir),
+            config_text=Path(args.config_file).read_text(encoding="utf-8"),
+            output_dir=Path(args.output_dir),
+            meta={k: v for k, v in meta.items() if v},
+        )
+    except (book.BookError, OSError) as error:
+        print(f"vibey-gh book: {error}", file=sys.stderr)
+        return 1
+    for kind, path in written.items():
+        print(f"{kind}: {path}")
+    return 0
+
+
 def _local_triage(args) -> int:
     from vibey_gh import local_review
 
@@ -742,6 +768,25 @@ def main(argv: list[str] | None = None) -> int:
         help="will the automation actually work? — the adoption preflight, offline",
     )
     doc.set_defaults(func=_doctor)
+
+    bk = sub.add_parser(
+        "book",
+        help="export the built docs site as an EPUB and a KDP print-ready HTML",
+    )
+    bk.add_argument("--site-dir", required=True, help="the built site directory")
+    bk.add_argument(
+        "--config-file",
+        default="properdocs.yml",
+        help="site configuration whose nav orders the chapters",
+    )
+    bk.add_argument("--output-dir", default="book", help="where book files are written")
+    bk.add_argument("--title", required=True)
+    bk.add_argument("--author", required=True)
+    bk.add_argument("--subtitle", default="")
+    bk.add_argument("--publisher", default="")
+    bk.add_argument("--description", default="")
+    bk.add_argument("--language", default="en")
+    bk.set_defaults(func=_book)
 
     lt = sub.add_parser(
         "local-triage",
