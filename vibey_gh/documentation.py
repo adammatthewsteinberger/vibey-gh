@@ -63,6 +63,18 @@ def check(cfg: GhConfig) -> DocumentationReport:
                     problems.append(f"{source} has no skills")
         except json.JSONDecodeError:
             problems.append(".claude-plugin/marketplace.json is invalid JSON")
+    if cfg.documentation.require_roadmap:
+        roadmaps = ("docs/roadmap.md", "ROADMAP.md")
+        if not any(
+            (cfg.root / rel).is_file() and (cfg.root / rel).read_text(encoding="utf-8").strip()
+            for rel in roadmaps
+        ):
+            problems.append(
+                "no living roadmap: docs/roadmap.md or ROADMAP.md must exist and be non-empty"
+                " until the project's goal is reached and its humans declare it done"
+                " (set documentation.require_roadmap = false to silence the deterministic"
+                " check; the exact-head review still judges liveness)"
+            )
     # Everything below is what THIS repository asks of its own documentation. A project
     # that installs vibey-gh documents its own product, not this tool's internals, so each
     # requirement is empty until the repository declares it in `.vibey-gh.toml`.
