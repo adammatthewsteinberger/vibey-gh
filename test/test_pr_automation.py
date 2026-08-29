@@ -284,13 +284,27 @@ def test_the_review_loop_is_bounded_for_a_trusted_author_too(tmp_path):
     findings = pa.evaluate(green, config, expected_sha="abc", stored=verdict)
     assert findings.state == "repair" and findings.repair_attempt == 2
 
-    spent = pa.AutomationState("abc", "abc", attempts=2)
+    # A head that has never been reviewed always gets one, even with the budget spent: a
+    # repair that already fixed every finding must not be escalated on a superseded verdict
+    # from the head it replaced (issue #161). Dispatching the review costs no attempt.
+    spent_but_unreviewed = pa.AutomationState("abc", "abc", attempts=2)
+    fresh_review = pa.evaluate(green, config, expected_sha="abc", stored=spent_but_unreviewed)
+    assert fresh_review.state == "review"
+
+    # Only a CURRENT review's own actionable findings, with the budget spent, is exhaustion.
+    spent = pa.AutomationState("abc", "abc", attempts=2, review_sha="abc", review_passed=False)
     blocked = pa.evaluate(green, config, expected_sha="abc", stored=spent)
     assert blocked.state == "blocked"
     assert "review repair budget is exhausted" in blocked.reason
 
     passed = pa.AutomationState("abc", "abc", attempts=1, review_sha="abc", review_passed=True)
     assert pa.evaluate(green, config, expected_sha="abc", stored=passed).state == "ready"
+
+    # Even with the budget fully spent, a current, passing review still reaches ready.
+    spent_and_passed = pa.AutomationState(
+        "abc", "abc", attempts=2, review_sha="abc", review_passed=True
+    )
+    assert pa.evaluate(green, config, expected_sha="abc", stored=spent_and_passed).state == "ready"
 
 
 def test_an_outside_author_with_review_disabled_still_reaches_ready(tmp_path):
