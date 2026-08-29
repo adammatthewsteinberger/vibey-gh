@@ -830,6 +830,7 @@ def test_check_prints_superseded_headers(repo, capsys):
     err = capsys.readouterr().err
     assert "carries a superseded fingerprint header" in err
 
+
 def test_report_superseded_governance_range_triggers_article_v4(repo, capsys, monkeypatch):
     """A release range touching the constitution supersedes everything (Article V.4):
     the banner names the law, and the per-index switch plus the retention window are
@@ -842,9 +843,7 @@ def test_report_superseded_governance_range_triggers_article_v4(repo, capsys, mo
     (repo / "docs").mkdir()
     (repo / "docs" / "constitution.md").write_text("amended\n")
     subprocess.run(["git", "add", "-A"], cwd=repo, capture_output=True, check=True)
-    subprocess.run(
-        ["git", "commit", "-qm", "ratify"], cwd=repo, capture_output=True, check=True
-    )
+    subprocess.run(["git", "commit", "-qm", "ratify"], cwd=repo, capture_output=True, check=True)
     monkeypatch.setattr(
         yank, "released_versions", lambda index, project, timeout=30: ["1.0.0", "1.1.0", "1.2.0"]
     )
@@ -894,4 +893,3 @@ def test_report_superseded_unreadable_governance_range_is_loud_never_fatal(repo,
     err = capsys.readouterr().err
     assert "could not read the governance range" in err
     assert "Article V.4 was NOT evaluated" in err
-
