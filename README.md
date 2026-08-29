@@ -1,8 +1,26 @@
 # vibey-gh
 
-Release automation for a GitHub repository: provenance fingerprints, derived version
-bumps, exact-head AI review and repair, a merge train, dual-channel releases, comprehensive
-documentation maintenance, and post-release branch realignment.
+Shipping a change safely through review, merge, versioning, and release usually means
+hand-wiring a dozen GitHub Actions steps — and they drift out of sync, silently skip a
+check, or let a stale result approve code that has since changed. `vibey-gh` replaces that
+hand-wired path with one event-driven, auditable contract: push a branch, and the tooling
+carries it through review, repair, merge, release, and documentation on its own, stopping
+only when a human decision is genuinely required.
+
+Three ideas make that safe to run unattended:
+
+- **Exact-head evaluation.** Every decision — a passing check, an AI review, a merge — is
+  tied to the exact current commit SHA. A result computed for an older commit can never
+  wave through a newer one, even if nothing else about the pull request changed.
+- **The merge train.** One automated process merges a pull request only once its exact
+  current head is green, conflict-free, and approved, so merges happen one at a time in a
+  controlled sequence instead of racing each other.
+- **Dual-channel releases.** Two independent publishing channels — a `develop`-based
+  preview channel (TestPyPI, preview docs) and a `main`-based production channel (PyPI,
+  production docs) — so a preview build can never be mistaken for a production one.
+
+Around that sits provenance fingerprinting, derived version bumps, comprehensive
+documentation maintenance, and post-release branch realignment — all covered below.
 
 **No dependencies.** Everything is stdlib. This runs in every CI job of every repository
 that adopts it, so a dependency it grows is a dependency all of them grow.
@@ -14,6 +32,7 @@ that adopts it, so a dependency it grows is a dependency all of them grow.
 
 ## Start here
 
+- **New to the project?** Start with [The mental model](#the-mental-model).
 - **Evaluating the project?** Read [Why vibey-gh](#why-vibey-gh), then
   [What happens after a push](#what-happens-after-a-push).
 - **Installing it?** Follow [Requirements](#requirements), [Quick start](#quick-start),
@@ -42,6 +61,21 @@ It is deliberately opinionated about four invariants:
    merge into `develop` and `main`; no managed path emits a deletion refspec for either.
 4. **Untrusted work is data in privileged jobs.** Source and logs may be inspected or
    edited, but contributor-controlled commands are not executed beside write credentials.
+
+## The mental model
+
+Think of `vibey-gh` as an assembly line for your repository's changes. You push code to a
+branch; the tooling then handles the parts that would otherwise mean babysitting an Actions
+tab or manually clicking "merge": it opens a pull request, waits for your tests to pass,
+has an AI reviewer look for problems, attempts one bounded automatic fix if something is
+wrong, merges the result once everything checks out, derives a new version number,
+publishes the package, and updates the documentation site — all tied to the exact commit
+that was actually reviewed, so nothing is ever approved based on a stale result. If a step
+needs a human — a missing secret, a failing external service, a request too ambiguous to
+act on — the automation stops and says so instead of guessing.
+
+The rest of this document assumes no prior familiarity with those steps. Later sections
+build on this picture as they introduce project-specific terms and configuration.
 
 ## Why vibey-gh
 
