@@ -366,6 +366,21 @@ def test_readability_gate_judges_the_opening_and_the_audience_order():
         "skips the zero-code rung, climbs out of order, thins the theory",
         "never a sales pitch",
         "essentially absent",
+        # The never-lost reader: no orientation gaps, no external lookups, and the
+        # absolute priority order — human first, AI second, business last if at all.
+        "the never-lost contract",
+        "across EVERY FORM of documentation this repository ships",
+        "docstrings, CLI --help text, error and log messages",
+        "needing their own chat, a dictionary, or a web search",
+        "defined at first use IN THAT DOCUMENT",
+        "HUMAN\n            reader is served first, always; the AI reader second".replace("\n            ", " "),
+        "never contorted for machine",
+        "industry or business needs come absolutely last, if at all",
+        # Hyperlinks are first-class: outside material is clickable at the point of
+        # reference, never only from a distant references section.
+        "Hyperlinks are a first-class citizen",
+        "ALONGSIDE the referencing copy",
+        "not only in a references section",
         # The judgments cover the published site, not just README.md: the landing
         # page's first screen and the nav order are inside the contract, because the
         # site is where a beginner actually lands.
@@ -427,6 +442,55 @@ def test_the_site_publishes_its_own_book_and_paper_when_enabled(tmp_path):
     assert "tectonic%400.15.0" in on
     assert "875fbbc9ab48560d7776088c608e0beee49197b57ab4a2f6c5385b2c661c842f" in on
     assert on.index("sha256sum -c") < on.index("tar -xzf /tmp/tectonic.tar.gz")
+
+
+def test_funding_signage_is_opt_in_validated_and_verbatim(tmp_path):
+    """#198: an opt-in contribution line beside the footer provenance. Off by default —
+    no default address ever ships, because a payment default is one typo away from
+    someone else's wallet. Shape-validated at config load per currency; rendered
+    verbatim from reviewed config as text with a copy affordance, never a
+    payment-processor link."""
+    import pytest as _pytest
+
+    from vibey_gh.config import DocumentationConfig, GhConfig
+    from vibey_gh.install import render_workflow
+
+    source = WORKFLOWS / "release-surfaces.yml"
+    off = render_workflow(source, GhConfig(root=tmp_path))
+    assert "FUNDING_BITCOIN=''" in off and "FUNDING_MONERO=''" in off
+    assert "FUNDING_ETHEREUM=''" in off
+
+    on = render_workflow(
+        source,
+        GhConfig(
+            root=tmp_path,
+            documentation=DocumentationConfig(
+                funding_bitcoin="bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4",
+                funding_ethereum="0x" + "ab" * 20,
+                funding_label="Fuel the work",
+            ),
+        ),
+    )
+    assert "FUNDING_BITCOIN='bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4'" in on
+    assert "FUNDING_LABEL='Fuel the work'" in on
+    assert 'class="vibey-funding"' in on
+    assert "navigator.clipboard.writeText" in on
+
+    # Malformed addresses are configuration ERRORS, never rendered.
+    for field, bad in (
+        ("funding_bitcoin", "bc1-notanaddress"),
+        ("funding_monero", "4short"),
+        ("funding_ethereum", "0x1234"),
+    ):
+        with _pytest.raises(ValueError, match=field):
+            DocumentationConfig(**{field: bad})
+
+    # Real-shaped addresses for every currency pass validation.
+    DocumentationConfig(
+        funding_bitcoin="1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa",
+        funding_monero="4" + "A" * 94,
+        funding_ethereum="0x" + "0" * 40,
+    )
 
 
 def test_release_surfaces_smoke_checks_search_at_build_time():

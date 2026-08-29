@@ -73,9 +73,20 @@ def test_extraction_takes_main_strips_chrome_and_closes_voids():
     assert "<br/>" in body, "a bare <br> is a hard error on a Kindle"
 
 
-def test_extraction_falls_back_to_article_and_fails_on_neither():
+def test_extraction_falls_back_to_article_then_role_main_and_fails_on_none():
     assert "x" in book.extract_main("<article>x</article>")
-    with pytest.raises(book.BookError, match="no <main> or <article>"):
+    # The anchor the ProperDocs theme actually emits, discovered when the first
+    # dogfooded deploy refused every page: a Bootstrap column carrying role="main",
+    # with arbitrarily nested divs no regex can balance.
+    themed = (
+        '<body><div class="row"><div class="col-md-3"><nav>side</nav></div>'
+        '<div class="col-md-9" role="main"><div class="inner"><h1>T</h1>'
+        "<p>content</p></div></div></div><footer>f</footer></body>"
+    )
+    body = book.extract_main(themed)
+    assert "<h1>T</h1>" in body and "content" in body
+    assert "footer" not in body and "side" not in body
+    with pytest.raises(book.BookError, match="role"):
         book.extract_main("<body>nothing</body>")
 
 
