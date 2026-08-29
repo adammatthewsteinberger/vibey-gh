@@ -50,7 +50,6 @@ the diff; a clean local verdict passes the gate as `PR automation: gate (local f
 rather than blocking it. That title always names the weaker reviewer — treat it as a
 signal to still fix the primary path's root cause, not as a fully reviewed pass.
 
-## Everything else in this document Enable Actions write permissions, PR creation,
 ## Everything else
 
 Enable Actions write permissions, PR creation,
