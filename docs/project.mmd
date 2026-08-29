@@ -39,6 +39,7 @@ flowchart TB
     Realign[Realign released branches]
     Reconcile["Stranded-branch reconciliation (vibey_gh.reconcile)"]
     Rulesets["Branch ruleset reconciliation (vibey_gh.rulesets)"]
+    Doctor["Offline adoption preflight (vibey_gh.doctor)"]
   end
 
   subgraph Security["Security Boundary"]
@@ -219,6 +220,8 @@ flowchart TB
   Guard --> Fingerprints
   CLI --> Debugging
   Debugging --> Fingerprints
+  CLI --> Doctor
+  Doctor --> Config
   Develop -->|push| BranchSync
   BranchSync --> Reconcile
   Reconcile -->|rebase or delete: force-with-lease and exact-ref guards| Guard
