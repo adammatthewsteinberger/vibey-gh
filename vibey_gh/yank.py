@@ -75,9 +75,7 @@ def governance_changed(patterns: tuple[str, ...], changed: list[str]) -> bool:
     Pure on purpose: the caller supplies the changed-file list (git is its problem), so
     the rule itself is testable byte-for-byte and never depends on repository state.
     """
-    return any(
-        fnmatch.fnmatch(path, pattern) for path in changed for pattern in patterns
-    )
+    return any(fnmatch.fnmatch(path, pattern) for path in changed for pattern in patterns)
 
 
 def released_versions(index: str, project: str, timeout: int = 30) -> list[str]:

@@ -260,6 +260,7 @@ def test_the_index_still_has_no_yank_api(url):
     assert status("file_upload") == "403", "a recognised action should reach authentication"
     assert status("yank") == "405", "if this is no longer 405, PyPI may have shipped a yank API"
 
+
 def test_governance_paths_match_the_founding_documents_by_default():
     patterns = YankConfig().governance_paths
     for path in (
@@ -317,4 +318,3 @@ def test_governance_paths_load_from_toml(tmp_path):
     assert cfg.yank.governance_paths == ("LAW.md",)
     assert yank.governance_changed(cfg.yank.governance_paths, ["LAW.md"])
     assert not yank.governance_changed(cfg.yank.governance_paths, ["docs/constitution.md"])
-
