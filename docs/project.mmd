@@ -40,6 +40,16 @@ flowchart TB
     Reconcile["Stranded-branch reconciliation (vibey_gh.reconcile)"]
     Rulesets["Branch ruleset reconciliation (vibey_gh.rulesets)"]
     Doctor["Offline adoption preflight (vibey_gh.doctor)"]
+    LocalFallback["Local-model fallback (vibey_gh.local_review): local-review + local-triage"]
+    Yank["Yank/supersede reporting (vibey_gh.yank, report-superseded)"]
+  end
+
+  subgraph PluginMarketplace["Claude plugin marketplace (.claude-plugin/marketplace.json)"]
+    ClaudeSettings["Marketplace registration (.claude/settings.json)"]
+    DevPlugin["vibey-gh-development plugin (architecture-reviewer agent, verify command, testing/architecture skills)"]
+    DocsPlugin["vibey-gh-documentation plugin (documentation-auditor agent, refresh-docs command, foss-documentation/llm-discovery skills)"]
+    SecurityPlugin["vibey-gh-release-security plugin (release-auditor agent, release-safety/threat-model skills, no commands)"]
+    PRPlugin["vibey-gh-pr-automation plugin (pr-reviewer agent, evaluate-pr command, conflict-resolution/pr-repair skills)"]
   end
 
   subgraph Security["Security Boundary"]
@@ -190,6 +200,7 @@ flowchart TB
   PublishRelease --> TestPyPI
   PublishRelease --> PyPI
   PublishRelease --> Release
+  PublishRelease --> Yank
   Main --> Realign
   Realign --> Develop
   Realign --> Guard
@@ -241,3 +252,12 @@ flowchart TB
   ConversationReply --> Guard
   Conversation --> GithubState
   Conversation --> Trusted
+  Maintainer -->|installs the marketplace for a project session| ClaudeSettings
+  ClaudeSettings --> DevPlugin
+  ClaudeSettings --> DocsPlugin
+  ClaudeSettings --> SecurityPlugin
+  ClaudeSettings --> PRPlugin
+  DevPlugin -.->|backs architecture and testing review| CI
+  DocsPlugin -.->|backs the documentation contract audit| Documentation
+  SecurityPlugin -.->|backs release and provenance auditing| PublishRelease
+  PRPlugin -.->|backs PR review, repair, and conflict resolution| PRAutomation

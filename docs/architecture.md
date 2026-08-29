@@ -34,5 +34,15 @@ GitHub-hosted runner, excluded from fork pull requests by `trusted_only` — doc
 full in [Configuration](configuration.md) under `[pr_automation.fallback]` and
 `[issue_automation]` `fallback_enabled`.
 
+The repository also ships a Claude-standard plugin marketplace
+(`.claude-plugin/marketplace.json`), registered and enabled for project sessions by
+`.claude/settings.json`. Its four plugins — `vibey-gh-development`, `vibey-gh-documentation`,
+`vibey-gh-release-security`, and `vibey-gh-pr-automation` — each carry a manifest, skills, and
+a specialist agent that back the corresponding automation surface (development/testing review,
+the documentation contract audit, release and provenance auditing, and PR review/repair/conflict
+resolution respectively); the development, documentation, and PR-automation plugins additionally
+ship slash commands. This is a separate, human-invoked surface: nothing in it runs
+automatically in a CI job.
+
 See also the [threat model](threat-model.md), [workflow reference](workflows.md), and
 [configuration reference](configuration.md).

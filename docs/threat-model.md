@@ -76,9 +76,11 @@ default-branch workflow code. The controls are authority, shape, and budget. Aut
 which refuses an outside author's issue until a maintainer applies the configured label.
 Shape: issue text reaches the model only through a bounded briefing file written by a
 trusted step, labelled as an untrusted report, with the model holding no `Bash`, `gh`,
-`Agent`, or Git tool; branch names derive from the issue number and a SHA-256 of its
-content, and a trusted publisher independently re-validates the namespace, the
-permanent-branch denylist, and the update-only refspec before pushing. Budget: attempts are
+`Agent`, or Git tool; branch names derive from the issue number, a SHA-256 of its content,
+and a regex-sanitized slug of the title (stripped to `[a-z0-9-]+`, length-capped, so no
+issue text can escape into a shell command or workflow expression), and a trusted publisher
+independently re-validates the namespace, the permanent-branch denylist, and the
+update-only refspec before pushing. Budget: attempts are
 counted per content fingerprint, so a redispatch cannot spend the budget twice and a
 resource-exhaustion attempt through repeated events is bounded by `max_attempts`. The
 resulting pull request receives ordinary review, repair, and merge-train treatment; nothing
