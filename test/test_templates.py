@@ -285,6 +285,9 @@ def test_security_and_api_drift_workflows_are_real_managed_gates():
         "complete",
         "accurate",
         "human_readable",
+        "opening_accessible",
+        "opening_bluf",
+        "audience_order",
         "architecture_diagram_complete",
         "all_capabilities_documented",
         "all_commands_documented",
@@ -303,6 +306,56 @@ def test_security_and_api_drift_workflows_are_real_managed_gates():
     # Only an explicit `true` verdict may pass the gate; every other value, including
     # the empty string a failed review job leaves behind, fails closed.
     assert re.search(r'case "\$REVIEW_PASSED" in\n\s+true\)\n\s+conclusion=success\n', text)
+
+
+def test_readability_gate_judges_the_opening_and_the_audience_order():
+    """The three copy-doctrine judgments: the README's first screen must survive a reader
+    with zero project context (opening_accessible), state the problem before any project
+    vocabulary (opening_bluf), and the whole document must serve beginners first, then
+    engineers, then scholars, with executive framing essentially absent (audience_order).
+    Each is a required schema boolean the jq aggregation folds into `.pass`, so a reviewer
+    cannot skip the judgment and still pass the gate."""
+    text = (WORKFLOWS / "pr-automation.yml").read_text(encoding="utf-8")
+    # The reviewer is told to judge the opening as a stranger, on ordering alone.
+    assert "as if you had never seen this repository" in text
+    assert "BEFORE any project vocabulary" in text
+    assert "opens with what it IS before what it FIXES fails" in text
+    # The audience-order doctrine: beginner -> engineer -> scholar, BLUF throughout,
+    # executive copy essentially absent.
+    assert "beginner-accessible material first" in text
+    assert "engineering depth second" in text
+    assert "scholarly material (citations, formal references, theory) third" in text
+    assert "essentially absent" in text
+    # The judgments gate `.pass` in the aggregation, not just the schema.
+    for field in ("opening_accessible", "opening_bluf", "audience_order"):
+        assert f".{field} == true" in text
+    # The local fallback never asserts them: a diff-only model has no basis to certify a
+    # README's opening, so they are reported unevaluated instead.
+    from vibey_gh import local_review
+
+    for field in ("opening_accessible", "opening_bluf", "audience_order"):
+        assert field in local_review.UNEVALUATED_FIELDS
+        assert field not in local_review.REVIEW_SCHEMA["properties"]
+
+
+def test_release_surfaces_smoke_checks_search_at_build_time():
+    """A channel site can build --strict with a dead search: assets that 404 or an index
+    with zero documents only surface when a human types a query into a silent box. The
+    build step must therefore prove the index parses and is non-empty, and that every
+    search asset landed, before the site is uploaded."""
+    text = (WORKFLOWS / "release-surfaces.yml").read_text(encoding="utf-8")
+    smoke = text.index("search smoke:")
+    build = text.index("properdocs build --strict --config-file .properdocs-channel.yml")
+    assert build < smoke, "the smoke test must run against the built channel site"
+    for asset in (
+        "search/search_index.json",
+        "search/lunr.js",
+        "search/main.js",
+        "search/worker.js",
+    ):
+        assert asset in text
+    assert "the index contains zero documents" in text
+    assert "documents indexed, all assets present" in text
 
 
 def test_branch_intake_reopens_a_reused_branch_name_without_duplicating_open_prs():
