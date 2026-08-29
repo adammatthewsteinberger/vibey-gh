@@ -355,9 +355,16 @@ def test_readability_gate_judges_the_opening_and_the_audience_order():
         "BEFORE any project vocabulary",
         "opens with what it IS before what it FIXES fails",
         "and so does a marketing tagline",
-        "beginner-accessible material first",
-        "engineering depth second",
-        "scholarly material (citations, formal references, theory, threat models, governance, decision records) third",
+        # The document arc: BLUF, zero-code beginner, the engineering ladder,
+        # maximal-density theory, BLUF reprise + call to action.
+        "NEVER written a single line of code",
+        "the floor is zero programming context",
+        "junior, mid, senior, staff, senior staff, principal, senior staff principal, CTO",
+        "Ivy-league coursework register",
+        "proofs or proof sketches, citations",
+        "restatement of the BLUF followed by a call to action",
+        "skips the zero-code rung, climbs out of order, thins the theory",
+        "never a sales pitch",
         "essentially absent",
         # The judgments cover the published site, not just README.md: the landing
         # page's first screen and the nav order are inside the contract, because the
