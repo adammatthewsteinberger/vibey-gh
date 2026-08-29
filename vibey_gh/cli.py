@@ -377,6 +377,26 @@ def _doctor(args) -> int:
     return 0
 
 
+def _paper(args) -> int:
+    from vibey_gh import paper
+
+    try:
+        tex = paper.render_paper(
+            Path(args.source).read_text(encoding="utf-8"),
+            author=args.author,
+            journal=args.journal,
+            keywords=args.keywords,
+        )
+    except (paper.PaperError, OSError) as error:
+        print(f"vibey-gh paper: {error}", file=sys.stderr)
+        return 1
+    out = Path(args.output)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(tex, encoding="utf-8")
+    print(f"tex: {out}")
+    return 0
+
+
 def _local_triage(args) -> int:
     from vibey_gh import local_review
 
@@ -742,6 +762,17 @@ def main(argv: list[str] | None = None) -> int:
         help="will the automation actually work? — the adoption preflight, offline",
     )
     doc.set_defaults(func=_doctor)
+
+    pp = sub.add_parser(
+        "paper",
+        help="render docs/paper.md as a journal-class LaTeX document (IEEEtran)",
+    )
+    pp.add_argument("--source", default="docs/paper.md")
+    pp.add_argument("--output", default="paper/paper.tex")
+    pp.add_argument("--author", required=True)
+    pp.add_argument("--journal", action="store_true", help="journal layout instead of conference")
+    pp.add_argument("--keywords", default="")
+    pp.set_defaults(func=_paper)
 
     lt = sub.add_parser(
         "local-triage",
