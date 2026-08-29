@@ -314,6 +314,7 @@ access of its own. See [Threat model](docs/threat-model.md) for the full boundar
 | `vibey-gh promote [--no-wait]` | Open or reuse the asynchronous `develop → main` promotion PR. |
 | `vibey-gh github-release --target SHA [--version VERSION]` | Create or reuse an immutable tag and GitHub Release for an exact production SHA. |
 | `vibey-gh realign` | Align identical `develop` and `main` trees after a rebase merge without discarding work. |
+| `vibey-gh book --site-dir site --title T --author A` | Export the built docs site as an EPUB 3.0 plus a KDP print-ready HTML — the docs as a publishable book, chapters in nav order. |
 | `vibey-gh report-superseded --index pypi\|testpypi --project NAME --version VERSION` | Report which prior releases a published version supersedes, since PyPI has no yank API; never yanks anything itself. |
 | `vibey-gh local-review [--diff FILE]` | Review a diff with a local Ollama-compatible model when the primary paid review returns no verdict at all. Opt-in fallback; see `[pr_automation.fallback]`. |
 | `vibey-gh doctor` | Offline adoption preflight: reads `.vibey-gh.toml`, `pyproject.toml`, and `.github/workflows/` on disk (no network, no credentials, no execution) to catch a config key silently ignored in the wrong section, a merge train stuck forever with no installed gate workflow, a ruff rule that fails every stamped file, contending Pages deployers, and superseded fingerprint headers. |
