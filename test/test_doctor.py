@@ -10,7 +10,7 @@ from pathlib import Path
 
 from vibey_gh import doctor
 from vibey_gh.cli import main
-from vibey_gh.config import DEFAULT_SUPERSEDED_TEXTS
+from vibey_gh.config import DEFAULT_SUPERSEDED_TEXTS, GhConfig
 
 
 def _repo(tmp_path: Path, toml: str = "") -> Path:
@@ -110,3 +110,14 @@ def test_the_cli_reports_warnings_without_failing(tmp_path, capsys, monkeypatch)
     monkeypatch.chdir(tmp_path)
     assert main(["doctor"]) == 0
     assert "no blockers; 1 warning(s)" in capsys.readouterr().out
+
+
+def test_edge_branches_are_covered(tmp_path):
+    """No config file at all; a line-length that fits the header; no workflows dir."""
+    # no .vibey-gh.toml -> unknown-key check has nothing to read
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.ruff]\nline-length = 400\n[tool.ruff.lint]\nselect = ["E"]\n'
+    )
+    findings = doctor.diagnose(cfg=GhConfig(root=tmp_path))
+    # header fits inside 400 chars -> no E501 finding; no workflows dir -> no contention
+    assert findings == [] or all("E501" not in f.message for f in findings)
