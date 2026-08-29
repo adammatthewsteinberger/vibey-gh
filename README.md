@@ -756,9 +756,10 @@ threat-model, troubleshooting, and ADR documentation are not covered by that fil
 check; they are kept accurate by the exact-head semantic audit described above, which reads
 every doc against source, tests, configuration, and workflows. The repository also contains
 a Claude-standard plugin marketplace at `.claude-plugin/marketplace.json` with development,
-documentation, release-security, and PR-automation plugins. Each plugin ships manifests,
-skills, commands, specialist agents, and supporting references; `.claude/settings.json`
-registers and enables the marketplace for project sessions.
+documentation, release-security, and PR-automation plugins. Each plugin ships a manifest,
+skills, and specialist agents; the development, documentation, and PR-automation plugins
+additionally ship commands (release-security ships agents and skills without commands).
+`.claude/settings.json` registers and enables the marketplace for project sessions.
 
 The Pages build emits production and preview sitemaps, a root sitemap index, `robots.txt`,
 `llms.txt`, `llms-full.txt`, canonical links, indexing policy, Open Graph/Twitter metadata,

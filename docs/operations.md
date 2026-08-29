@@ -39,7 +39,9 @@ something else in production:
   fallback works only if that account holds a bypass role on the ruleset; the token's
   permissions cannot add standing its owner does not have.
 
-## Everything else in this document Enable Actions write permissions, PR creation,
+## Everything else
+
+Enable Actions write permissions, PR creation,
 GitHub Pages via Actions, Packages, Releases, and Deployments. Use workflow dispatch for
 recovery. Inspect exact run and head SHA before retrying. Never solve a blocked release by
 deleting, force-pushing, weakening a gate, or switching production to TestPyPI.
