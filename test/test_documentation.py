@@ -172,6 +172,37 @@ def test_documentation_rejects_malformed_google_analytics_ids(value: str):
         DocumentationConfig(google_analytics_id=value)
 
 
+def test_the_living_roadmap_is_part_of_the_contract(tmp_path: Path):
+    """The living-roadmap doctrine (vibey-gh#211): a project keeps an active roadmap
+    until its goal is reached AND its humans declare it done. The deterministic
+    contract enforces presence — docs/roadmap.md or ROADMAP.md, non-empty — and the
+    exact-head review judges liveness. Opting out silences only the presence check."""
+    cfg = GhConfig(root=tmp_path, documentation=DocumentationConfig(required_files=()))
+    assert any("no living roadmap" in problem for problem in check(cfg).problems)
+
+    (tmp_path / "ROADMAP.md").write_text("# Goal\nShip it, then the humans decide.")
+    assert check(cfg).ok
+
+    (tmp_path / "ROADMAP.md").write_text("   \n")
+    assert any("no living roadmap" in problem for problem in check(cfg).problems)
+
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs/roadmap.md").write_text("# Goal\nAlive at the canonical path.")
+    assert check(cfg).ok
+
+
+def test_the_roadmap_requirement_can_be_declined_deliberately(tmp_path: Path):
+    policy = DocumentationConfig(required_files=(), require_roadmap=False)
+    assert check(GhConfig(root=tmp_path, documentation=policy)).ok
+
+
+def test_require_roadmap_loads_from_toml(tmp_path: Path):
+    (tmp_path / ".vibey-gh.toml").write_text("[documentation]\nrequire_roadmap = false\n")
+    assert load_config(tmp_path).documentation.require_roadmap is False
+    (tmp_path / ".vibey-gh.toml").write_text("[documentation]\n")
+    assert load_config(tmp_path).documentation.require_roadmap is True
+
+
 def test_documentation_validates_complete_marketplace_shape(tmp_path: Path):
     marketplace = tmp_path / ".claude-plugin/marketplace.json"
     marketplace.parent.mkdir()

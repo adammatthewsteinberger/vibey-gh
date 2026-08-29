@@ -367,6 +367,14 @@ jobs:
             beginner-first BLUF standard. A surface with no example of its own, a
             pseudo-code example, or an example naming anything that does not exist
             fails this judgment.
+            Verify the living roadmap under complete: docs/roadmap.md or ROADMAP.md
+            must exist, state the project's goal, and match the repository's actual
+            trajectory. Goals already shipped but still listed as future, milestones
+            stale against CHANGELOG.md or the release history, or a claim that the
+            project is finished without a human's recorded sign-off are each a
+            blocking finding. A machine never declares a project done — only its
+            humans do; when roadmap truth is unclear, return a finding that asks
+            them rather than assuming either way.
             Verify that every CLI, SDK, API, MCP, and webhook capability is documented.
             A heading, file, or keyword by itself is never proof of completeness. Flag
             vague, stale, circular, implementation-first, unexplained, or missing content.

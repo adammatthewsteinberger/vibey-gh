@@ -383,6 +383,18 @@ def test_rendered_pr_automation_carries_exactly_one_schedule_key(tmp_path):
     assert "schedule backstop disabled by .vibey-gh.toml" in off
 
 
+def test_review_prompt_judges_the_living_roadmap():
+    """#211: the exact-head review owns roadmap LIVENESS — presence is the
+    deterministic contract's job. The prompt must demand an existing roadmap that
+    matches the repository's real trajectory, and must reserve 'done' for humans."""
+    text = (WORKFLOWS / "pr-automation.yml").read_text(encoding="utf-8")
+    flat = " ".join(text.split())
+    assert "Verify the living roadmap under complete" in flat
+    assert "docs/roadmap.md or ROADMAP.md" in flat
+    assert "stale against CHANGELOG.md or the release history" in flat
+    assert "A machine never declares a project done" in flat
+
+
 def test_readability_gate_judges_the_opening_and_the_audience_order():
     """The three copy-doctrine judgments: the first screens of README.md and the docs
     landing page must survive a reader with zero project context (opening_accessible)

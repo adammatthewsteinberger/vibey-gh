@@ -577,6 +577,11 @@ class DocumentationConfig:
     ai_maintenance: bool = True
     model: str = "claude-sonnet-5"
     required_files: tuple[str, ...] = DEFAULT_DOCUMENTATION_FILES
+    # The living roadmap (doctrine, vibey-gh#211): every project keeps an active roadmap
+    # until its goal is reached AND its humans declare it done. The contract accepts
+    # either docs/roadmap.md or ROADMAP.md. Opting out here silences only the
+    # deterministic check — the exact-head review still judges roadmap liveness.
+    require_roadmap: bool = True
     production_label: str = "Production"
     preview_label: str = "Preview"
     production_indexing: bool = True
@@ -974,6 +979,7 @@ def load_config(root: Path | None = None) -> GhConfig:
             ai_maintenance=documentation.get("ai_maintenance", True),
             model=documentation.get("model", "claude-sonnet-5"),
             required_files=tuple(documentation.get("required_files", DEFAULT_DOCUMENTATION_FILES)),
+            require_roadmap=documentation.get("require_roadmap", True),
             production_label=documentation.get("production_label", "Production"),
             preview_label=documentation.get("preview_label", "Preview"),
             production_indexing=documentation.get("production_indexing", True),
