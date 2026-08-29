@@ -280,6 +280,34 @@ jobs:
               sys.exit("search smoke: the index contains zero documents")
           print(f"search smoke: {len(docs)} documents indexed, all assets present")
           SMOKE
+          # The documentation as artifacts on the site itself: the doctrine's end
+          # results are a KDP-shaped book and a journal-shaped paper, and a reader
+          # should download them from the docs they mirror — not hunt a release page.
+          if [ "true" = "true" ]; then
+            AUTHOR='Adam Matthew Steinberger'
+            vibey-gh book --site-dir channel-site --config-file .properdocs-channel.yml \
+              --output-dir book-out \
+              --title "${GITHUB_REPOSITORY#*/} — The Documentation" \
+              --author "${AUTHOR:-${GITHUB_REPOSITORY%%/*}}"
+            cp book-out/book.epub channel-site/book.epub
+            cp book-out/book-print.html channel-site/book-print.html
+            echo "book: published book.epub and book-print.html on the channel site"
+          fi
+          if [ "true" = "true" ] && [ -f docs/paper.md ] \
+              && vibey-gh paper --help >/dev/null 2>&1; then
+            AUTHOR='Adam Matthew Steinberger'
+            vibey-gh paper --author "${AUTHOR:-${GITHUB_REPOSITORY%%/*}}" \
+              --output paper-out/paper.tex
+            # Tectonic: one pinned, checksummed binary — a full TeX Live would cost
+            # minutes per deploy for one PDF.
+            curl -sL -o /tmp/tectonic.tar.gz \
+              "https://github.com/tectonic-typesetting/tectonic/releases/download/tectonic%400.15.0/tectonic-0.15.0-x86_64-unknown-linux-gnu.tar.gz"
+            echo "875fbbc9ab48560d7776088c608e0beee49197b57ab4a2f6c5385b2c661c842f  /tmp/tectonic.tar.gz" | sha256sum -c -
+            tar -xzf /tmp/tectonic.tar.gz -C /tmp
+            (cd paper-out && /tmp/tectonic paper.tex)
+            cp paper-out/paper.pdf channel-site/paper.pdf
+            echo "paper: published paper.pdf on the channel site"
+          fi
           printf '%s\n' "$CHANNEL" > channel-site/release-channel.txt
           CHANNEL="$CHANNEL" REPOSITORY="$GITHUB_REPOSITORY" RELEASE_SHA="$RELEASE_SHA" \
           JSON_LD=true PRODUCTION_INDEX=true \

@@ -377,6 +377,35 @@ def test_readability_gate_judges_the_opening_and_the_audience_order():
         assert field not in local_review.REVIEW_SCHEMA["properties"]
 
 
+def test_the_site_publishes_its_own_book_and_paper_when_enabled(tmp_path):
+    """The doctrine's end results belong on the docs site itself — a reader downloads
+    /book.epub and /paper.pdf from the documentation they mirror, not from a release
+    page. Off by default; the TeX engine is one pinned, checksummed binary because a
+    full TeX Live costs minutes per deploy for one PDF."""
+    from vibey_gh.config import DocumentationConfig, GhConfig
+    from vibey_gh.install import render_workflow
+
+    source = WORKFLOWS / "release-surfaces.yml"
+    off = render_workflow(source, GhConfig(root=tmp_path))
+    assert '[ "false" = "true" ]' in off or "__VIBEY_GH_DOC_BOOK__" not in off
+
+    on = render_workflow(
+        source,
+        GhConfig(
+            root=tmp_path,
+            documentation=DocumentationConfig(generate_book=True, generate_paper=True),
+        ),
+    )
+    assert "vibey-gh book --site-dir channel-site" in on
+    assert "cp book-out/book.epub channel-site/book.epub" in on
+    assert "vibey-gh paper --author" in on
+    assert "cp paper-out/paper.pdf channel-site/paper.pdf" in on
+    # The engine is pinned by version AND checksum, and verification precedes use.
+    assert "tectonic%400.15.0" in on
+    assert "875fbbc9ab48560d7776088c608e0beee49197b57ab4a2f6c5385b2c661c842f" in on
+    assert on.index("sha256sum -c") < on.index("tar -xzf /tmp/tectonic.tar.gz")
+
+
 def test_release_surfaces_smoke_checks_search_at_build_time():
     """A channel site can build --strict with a dead search: assets that 404 or an index
     with zero documents only surface when a human types a query into a silent box. The
