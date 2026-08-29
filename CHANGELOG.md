@@ -5,6 +5,12 @@ This file follows Keep a Changelog and semantic versioning conventions.
 
 ## Unreleased
 
+- Add `vibey-gh book --site-dir site --title T --author A`, which exports the already-built
+  documentation site as a book: a valid EPUB 3.0 package with Dublin Core metadata, and a
+  print-ready HTML sized to the standard 6in x 9in KDP paperback trim. Chapters come from
+  the site's own nav, in nav order, so the copy doctrine's tier ordering carries into the
+  book unchanged. Stdlib-only, like the rest of the package.
+
 - Let the local review fallback reach a pull request the diff API refuses. GitHub's diff
   API refuses a pull request beyond roughly 300 changed files, which is exactly the shape
   of a migration or adoption sweep — observed on a 347-file provenance sweep that could

@@ -315,6 +315,7 @@ access of its own. See [Threat model](docs/threat-model.md) for the full boundar
 | `vibey-gh github-release --target SHA [--version VERSION]` | Create or reuse an immutable tag and GitHub Release for an exact production SHA. |
 | `vibey-gh realign` | Align identical `develop` and `main` trees after a rebase merge without discarding work. |
 | `vibey-gh paper --author NAME` | Render docs/paper.md — the repository's journal-grade research paper — as an IEEEtran LaTeX document, one TeX compile away from a submission-shaped PDF. |
+| `vibey-gh book --site-dir site --title T --author A` | Export the built docs site as an EPUB 3.0 plus a KDP print-ready HTML — the docs as a publishable book, chapters in nav order. |
 | `vibey-gh report-superseded --index pypi\|testpypi --project NAME --version VERSION` | Report which prior releases a published version supersedes, since PyPI has no yank API; never yanks anything itself. |
 | `vibey-gh local-review [--diff FILE]` | Review a diff with a local Ollama-compatible model when the primary paid review returns no verdict at all. Opt-in fallback; see `[pr_automation.fallback]`. |
 | `vibey-gh doctor` | Offline adoption preflight: reads `.vibey-gh.toml`, `pyproject.toml`, and `.github/workflows/` on disk (no network, no credentials, no execution) to catch a config key silently ignored in the wrong section, a merge train stuck forever with no installed gate workflow, a ruff rule that fails every stamped file, contending Pages deployers, and superseded fingerprint headers. |
@@ -813,7 +814,7 @@ Every canonical capability is exposed and tested through all five supported surf
 - MCP: `initialize`, `tools/list`, and `tools/call`
 - Webhook: HMAC-SHA256 authenticated, delivery-ID replay-safe dispatch
 
-Six CLI commands are deliberately outside this canonical registry, each for its own
+Seven CLI commands are deliberately outside this canonical registry, each for its own
 reason documented in detail in `docs/cli.md`:
 
 - `conventional-message` and `conventional-check` are local git-hook/CI helpers that
@@ -832,6 +833,10 @@ reason documented in detail in `docs/cli.md`:
   installed workflows will function. There is no remote resource for an API, MCP, or
   webhook caller to act on — the answer only means something on the machine that holds
   the checkout.
+- `book` only reads an already-built local site directory and a local site configuration
+  and writes local files (an EPUB and a print-ready HTML). There is no remote resource for
+  an API, MCP, or webhook caller to act on, and exposing it remotely would mean shipping a
+  built site's bytes through a surface with no such contract today.
 
 Every other repository automation capability in `surfaces.CAPABILITIES` remains available
 through all five forms.
