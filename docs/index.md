@@ -1,8 +1,16 @@
-# Ship with confidence.
+# vibey-gh
 
-<p class="hero-copy">Event-driven pull-request repair, review, merge, promotion,
-versioning, provenance, and release automation—built to carry good code all the way to
-production.</p>
+Shipping a change safely through review, merge, versioning, and release usually means
+hand-wiring a dozen GitHub Actions steps — and they drift out of sync, silently skip a
+check, or let a stale result approve code that has since changed. `vibey-gh` replaces
+that hand-wired path with one event-driven, auditable contract: push a branch, and the
+tooling carries it through review, repair, merge, release, and documentation on its own,
+stopping only when a human decision is genuinely required.
+
+**New to the project?** Read [Adoption](adoption.md) first — it assumes nothing and
+walks one repository from bare to fully automated. The pages after it are the
+engineering reference; the formal material ([Threat model](threat-model.md),
+[Governance](governance.md), [Architecture decisions](adr/README.md)) comes last.
 
 <div class="feature-grid" markdown>
 

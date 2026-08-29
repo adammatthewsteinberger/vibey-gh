@@ -13,23 +13,27 @@ extra_javascript:
 markdown_extensions:
   - attr_list
   - md_in_html
+# Nav order is doctrine, not taste: beginner material first (a reader with zero
+# context must be able to walk the top of the nav in order), the engineering
+# reference second, and scholarly/formal material (threat model, governance,
+# decision records) last. Executive framing has no tier.
 nav:
   - Home: index.md
+  - Adoption: adoption.md
   - Architecture: architecture.md
   - Configuration: configuration.md
   - CLI: cli.md
   - Workflows: workflows.md
-  - Security: security.md
-  - Threat model: threat-model.md
-  - Adoption: adoption.md
   - Operations: operations.md
-  - Contributing: development.md
+  - Security: security.md
   - Testing: testing.md
   - Releases: releases.md
   - Support: troubleshooting.md
+  - Contributing: development.md
+  - Dependencies: dependencies.md
+  - Threat model: threat-model.md
   - Governance: governance.md
   - Accessibility: accessibility.md
-  - Dependencies: dependencies.md
-  - Roadmap: roadmap.md
   - Architecture decisions: adr/README.md
+  - Roadmap: roadmap.md
 strict: true
