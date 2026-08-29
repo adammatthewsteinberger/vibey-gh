@@ -345,6 +345,8 @@ jobs:
           SEO_FAVICON='⚙️' SEO_OG_IMAGE='' \
           SEO_TWITTER_SITE='' SEO_TWITTER_CREATOR='' \
           SEO_KEYWORDS='github automation,release automation,provenance,merge train,pull request gate,ci' SEO_AUTHOR='Adam Matthew Steinberger' \
+          FUNDING_BITCOIN='' FUNDING_MONERO='' \
+          FUNDING_ETHEREUM='' FUNDING_LABEL='Support this work' \
           SEO_THEME_COLOR='#080b14' SEO_LOCALE='en_US' \
           SEO_SITE_VERIFICATION='' \
           python - <<'PY'
@@ -415,6 +417,35 @@ jobs:
           # onward from where they already are, without teaching this injector anything
           # about the nav tree — the theme stays the single authority on page order.
           bottom_nav = os.environ.get("BOTTOM_NAV", "") == "true"
+          # Funding signage (#198): opt-in per currency, rendered VERBATIM from
+          # reviewed config beside the provenance line — text with a copy affordance,
+          # never a payment-processor link. Addresses were shape-validated at config
+          # load; this only renders what that validation admitted.
+          funding = [
+              (label, os.environ.get(key, "").strip())
+              for label, key in (
+                  ("Bitcoin", "FUNDING_BITCOIN"),
+                  ("Monero", "FUNDING_MONERO"),
+                  ("Ethereum", "FUNDING_ETHEREUM"),
+              )
+              if os.environ.get(key, "").strip()
+          ]
+          funding_label = os.environ.get("FUNDING_LABEL", "Support this work").strip()
+          funding_html = ""
+          if funding:
+              rows = "".join(
+                  '<span class="vibey-funding-row"><strong>' + html.escape(c) + ":"
+                  '</strong> <code>' + html.escape(a) + "</code>"
+                  '<button type="button" onclick="navigator.clipboard.writeText(\'' + a + '\')"'
+                  ' title="Copy the ' + html.escape(c) + ' address">copy</button></span>'
+                  for c, a in funding
+              )
+              funding_html = (
+                  '<footer class="vibey-funding" style="text-align:center;font-size:.85em;'
+                  "opacity:.8;margin:2rem auto 1rem;display:flex;flex-wrap:wrap;gap:.75rem;"
+                  'justify-content:center;align-items:center">'
+                  "<span>" + html.escape(funding_label) + "</span>" + rows + "</footer>\n"
+              )
           prev_next = re.compile(r'<a\s[^>]*rel="(?:prev|next)"[^>]*>.*?</a>', re.S)
           bottom_nav_style = (
               '<style>.vibey-bottom-nav{display:flex;justify-content:space-between;'
@@ -479,6 +510,8 @@ jobs:
                           + "</nav>\n"
                       )
                       text = text.replace("</body>", bar + "</body>")
+              if funding_html and "</body>" in text:
+                  text = text.replace("</body>", funding_html + "</body>")
               path.write_text(text.replace("</head>", metadata + "</head>"))
           PY
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

@@ -429,6 +429,55 @@ def test_the_site_publishes_its_own_book_and_paper_when_enabled(tmp_path):
     assert on.index("sha256sum -c") < on.index("tar -xzf /tmp/tectonic.tar.gz")
 
 
+def test_funding_signage_is_opt_in_validated_and_verbatim(tmp_path):
+    """#198: an opt-in contribution line beside the footer provenance. Off by default —
+    no default address ever ships, because a payment default is one typo away from
+    someone else's wallet. Shape-validated at config load per currency; rendered
+    verbatim from reviewed config as text with a copy affordance, never a
+    payment-processor link."""
+    import pytest as _pytest
+
+    from vibey_gh.config import DocumentationConfig, GhConfig
+    from vibey_gh.install import render_workflow
+
+    source = WORKFLOWS / "release-surfaces.yml"
+    off = render_workflow(source, GhConfig(root=tmp_path))
+    assert "FUNDING_BITCOIN=''" in off and "FUNDING_MONERO=''" in off
+    assert "FUNDING_ETHEREUM=''" in off
+
+    on = render_workflow(
+        source,
+        GhConfig(
+            root=tmp_path,
+            documentation=DocumentationConfig(
+                funding_bitcoin="bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4",
+                funding_ethereum="0x" + "ab" * 20,
+                funding_label="Fuel the work",
+            ),
+        ),
+    )
+    assert "FUNDING_BITCOIN='bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4'" in on
+    assert "FUNDING_LABEL='Fuel the work'" in on
+    assert 'class="vibey-funding"' in on
+    assert "navigator.clipboard.writeText" in on
+
+    # Malformed addresses are configuration ERRORS, never rendered.
+    for field, bad in (
+        ("funding_bitcoin", "bc1-notanaddress"),
+        ("funding_monero", "4short"),
+        ("funding_ethereum", "0x1234"),
+    ):
+        with _pytest.raises(ValueError, match=field):
+            DocumentationConfig(**{field: bad})
+
+    # Real-shaped addresses for every currency pass validation.
+    DocumentationConfig(
+        funding_bitcoin="1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa",
+        funding_monero="4" + "A" * 94,
+        funding_ethereum="0x" + "0" * 40,
+    )
+
+
 def test_release_surfaces_smoke_checks_search_at_build_time():
     """A channel site can build --strict with a dead search: assets that 404 or an index
     with zero documents only surface when a human types a query into a silent box. The
