@@ -84,6 +84,15 @@ migration path, the deprecation from which nothing returns.
    every machine action reconstructible.
 3. Where enforcement tooling itself fails, the no-guarantees doctrine governs:
    confirmed, healed around, and never allowed to park the humans' work.
+4. **No artifact circulates under superseded law.** Any RATIFIED change — ratified
+   specifically, never a draft or proposal — to the doctrine canon, the Ten
+   Commandments, the Bill of Rights, or this Constitution immediately yanks all
+   previous versions of the code. Always. Zero exceptions. Every prior release on
+   every index is superseded the moment the ratifying merge lands: the release
+   machinery names each version to be yanked, unconditionally and without a
+   retention window, and where an index offers no yank API the demand falls to the
+   maintainer as their immediate next act — the platform's limitation assigns the
+   executor, it never softens the rule.
 
 ---
 
