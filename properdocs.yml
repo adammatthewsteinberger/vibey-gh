@@ -35,6 +35,7 @@ nav:
   - Support: troubleshooting.md
   - Contributing: development.md
   - Dependencies: dependencies.md
+  - Theory of operation: theory.md
   - Accessibility: accessibility.md
   - Research paper: paper.md
   - Roadmap: roadmap.md
