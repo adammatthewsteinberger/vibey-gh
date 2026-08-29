@@ -85,15 +85,9 @@ jobs:
         with: { python-version: "3.12" }
       - name: Report superseded releases on testpypi
         run: |
+          set -euo pipefail
           python -m pip install --quiet -e .
           vibey-gh report-superseded \
-            --index testpypi \
-            --project vibey-gh \
-            --version "$(vibey-gh version --dev)" >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-          python -m pip install --quiet -e .
-          vibey-gh yank-superseded \
             --index testpypi \
             --project vibey-gh \
             --version "$(vibey-gh version --dev)" >> "$GITHUB_STEP_SUMMARY"
@@ -120,15 +114,9 @@ jobs:
         with: { python-version: "3.12" }
       - name: Report superseded releases on pypi
         run: |
+          set -euo pipefail
           python -m pip install --quiet -e .
           vibey-gh report-superseded \
-            --index pypi \
-            --project vibey-gh \
-            --version "$(vibey-gh version)" >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-          python -m pip install --quiet -e .
-          vibey-gh yank-superseded \
             --index pypi \
             --project vibey-gh \
             --version "$(vibey-gh version)" >> "$GITHUB_STEP_SUMMARY"

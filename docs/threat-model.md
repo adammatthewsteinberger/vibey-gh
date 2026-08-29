@@ -130,6 +130,23 @@ review but never deletes a permanent branch. This trades the semantic review ste
 administrator's explicit authorization plus the same independent deterministic gates,
 scoped to the one case those gates cannot otherwise unblock.
 
+The opt-in local-model review fallback introduces a distinct asset and a distinct
+boundary: a repository-provided `[self-hosted, vibey-local-gh]` runner, rather than a
+GitHub-hosted one, that GitHub itself warns should almost never serve a public repository
+because any accountholder can open a pull request against it. The `trusted_only` setting
+(on by default) is what removes that exposure — it excludes fork pull requests from
+`review-fallback` entirely, so only a same-repository head, whose author GitHub has
+already authorized, ever reaches that runner. The job runs only when the primary Claude
+review produced no verdict at all, never when a review ran and returned findings, and it
+holds `contents: read` and nothing else: no secret, and no token capable of pushing,
+merging, or mutating the repository, so compromising that runner cannot itself authorize a
+merge. The diff still reaches a model as text; the local model has no shell, no tools, and
+no network beyond the loopback inference port, matching the no-execution rule the primary
+review follows. Because a small local model's judgments are unreliable even though Ollama's
+schema-constrained decoding guarantees the response shape, the fallback's verdict omits the
+documentation-contract fields and the gate names the result `PR automation: gate (local
+fallback)`, so a degraded signal can never silently stand in for the primary review's.
+
 The AI action's Git-discovery requirement is isolated from source and persisted credentials.
 During model execution, workspace-root `.git` points only to an ephemeral empty repository.
 Its clean `origin` satisfies action initialization, while a nonmatching actor sentinel selects

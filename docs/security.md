@@ -93,6 +93,24 @@ including CodeQL, API drift, documentation, provenance, build, and lint — comp
 successfully before the `--match-head-commit` merge runs. It never deletes a permanent
 branch. See [Threat model](threat-model.md) for the full rationale.
 
+The local-model review fallback (`[pr_automation.fallback]`, `vibey_gh.local_review`, the
+`local-review`/`local-triage` CLI commands) is a distinct security boundary from every
+other AI path in this project: it runs on a repository-provided
+`[self-hosted, vibey-local-gh]` runner rather than a GitHub-hosted one, only when the
+primary Claude review returned no verdict at all. GitHub's own guidance is that
+self-hosted runners should almost never serve a public repository, because any contributor
+can open a pull request against one; `trusted_only` (default on) removes that risk by
+excluding fork pull requests from the fallback entirely, leaving them to fail closed to
+`PR automation: review incomplete` like any other unresolved review. The `review-fallback`
+job holds only `contents: read` — no secret and no token capable of mutating the
+repository — and the diff reaches a locally served Ollama-compatible model as text; the
+model has no shell, no tools, and no network beyond the local inference port. Ollama's
+`format` parameter constrains decoding to the response schema, so the output shape is
+guaranteed, but a small local model's judgments are not: the fallback verdict omits the
+documentation-contract fields the primary review certifies, and the gate names the result
+`PR automation: gate (local fallback)` so it is never mistaken for a full review. See
+[Configuration](configuration.md#pr_automationfallback) for the field reference.
+
 Webhook receivers must use a strong `VIBEY_GH_WEBHOOK_SECRET`, verify HMAC over the exact
 raw body, and place `VIBEY_GH_WEBHOOK_STATE_DIR` on access-controlled durable storage.
 Accepted IDs use atomic mode-0600 marker creation, preventing replay across restarts and

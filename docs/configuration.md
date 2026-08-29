@@ -75,7 +75,7 @@ expression is refused at load time.
 | Field | Type / default | Meaning |
 |---|---|---|
 | `enabled` | boolean / `true` | Enable event-driven evaluation, review, repair, and gating. |
-| `scan_workflows` | string list / CI, Provenance, CodeQL, Docs | Workflow names that trigger evaluation. Every name must be a workflow with a `pull_request` or `pull_request_target` trigger — one that only runs on `push` can never complete for a pull request, so `state` never leaves `pending`, the gate never publishes, and — made a required check — no pull request can ever merge. `vibey-gh check` fails on any named workflow that exists but cannot fire for a pull request; a name absent from `.github/workflows/` is not an error. |
+| `scan_workflows` | string list / CI, Provenance, CodeQL, Docs, Conventional Commits | Workflow names that trigger evaluation. Every name must be a workflow with a `pull_request` or `pull_request_target` trigger — one that only runs on `push` can never complete for a pull request, so `state` never leaves `pending`, the gate never publishes, and — made a required check — no pull request can ever merge. `vibey-gh check` fails on any named workflow that exists but cannot fire for a pull request; a name absent from `.github/workflows/` is not an error. |
 | `ignored_checks` | string list / orchestration checks | Checks excluded from the ordinary rollup. Own checks are always ignored. |
 | `max_repair_attempts` | integer / `3` (1–10) | Repair budget per contributor lineage. |
 | `model` | string / `claude-sonnet-5` | Review and repair model. |
@@ -116,6 +116,14 @@ It never overrides a review that actually ran: the job requires the primary to h
 produced no verdict, so findings are never discarded in favour of a weaker opinion. The
 diff is passed to the model as text — repository code is never executed, and the model has
 no shell, no tools, and no network beyond the local port.
+
+Fetching that diff prefers `gh pr diff`, but GitHub's diff API refuses pull requests beyond
+roughly 300 changed files — exactly the shape of a large migration or adoption sweep, which
+would otherwise never be reviewable at all. When the API refuses, the job reconstructs the
+same merge-base diff locally instead: it fetches the base and head refs, deepening a shallow
+trusted checkout until their histories connect, and diffs one against the other. That
+reconstruction is read-only and executes no repository code, so the guarantee above holds
+either way, and `max_diff_chars` still caps what actually reaches the model.
 
 The verdict is deliberately narrower than the primary review's. Ollama constrains decoding
 to the schema, so the output *shape* is guaranteed; the *judgments* are not, and a 14B model
@@ -201,6 +209,7 @@ closed, because anyone with a GitHub account can open an issue.
 | `open_pull_request` | boolean / `true` | Open a linked pull request after publishing the branch. |
 | `draft_pull_request` | boolean / `true` | Open that pull request as a draft, letting PR automation promote it when its exact head is green. |
 | `retain_schedule_backstop` | boolean / `true` | Retain the scheduled recovery sweep beside the event triggers. |
+| `fallback_enabled` | boolean / `false` | Post a bounded local-model triage comment when the paid solve produced nothing — the issue path's counterpart to `[pr_automation.fallback]`, sharing its runner, model, and limits. The triage writes no code, deduplicates itself to one comment per issue, and forces `needs_human` true whatever the model claims. Off by default because it needs that self-hosted runner to exist. |
 
 An issue's attempt budget is keyed to a SHA-256 fingerprint of its title and body, so
 re-running automation on unchanged text cannot spend the budget twice and editing the issue
@@ -378,6 +387,14 @@ a workflow run applies it.
 | `author_name` | string / `Adam Matthew Steinberger` | Reserved documentation-provenance author label. Parsed and validated (non-empty), but not yet emitted into any generated asset. |
 | `author_url` | URL / `https://vibewithadam.matthewsteinberger.com` | Reserved documentation-provenance author destination. Same current scope as `author_name`. |
 | `google_analytics_id` | string / empty (disabled) | GA4 measurement ID (`G-<alphanumeric>`) injected into every page of both generated documentation channels and the channel-picker page. Empty disables Google Analytics entirely: no script tag is emitted and no request ever reaches Google. |
+| `favicon` | string / `📘` | One or two emoji render as a zero-asset SVG favicon (plus a matching `apple-touch-icon`). A value that starts with `http://`, `https://`, or `/`, or whose last path segment contains a `.`, is instead used verbatim as a `<link rel="icon">` URL. Empty omits the favicon link. |
+| `og_image` | URL / empty | Social preview image rendered into the Open Graph and Twitter Card meta tags on every generated page. Empty falls back to GitHub's own generated OpenGraph card for the release commit, which always exists and stays current. |
+| `twitter_site` | string / empty | `@handle` rendered as the `twitter:site` meta tag. Empty omits the tag. |
+| `twitter_creator` | string / empty | `@handle` rendered as the `twitter:creator` meta tag. Empty omits the tag. |
+| `keywords` | string list / empty | Rendered as the page's `<meta name="keywords">` and, when `generate_json_ld` is enabled, the JSON-LD `keywords` property. Empty falls back to `[name, owner, "documentation", "release notes", "changelog"]`. Entries must not contain `<`, `>`, `"`, a comma, or a newline. |
+| `author` | string / empty | Rendered as the page's `<meta name="author">` and, when `generate_json_ld` is enabled, the JSON-LD `author.name`. Empty falls back to the repository owner. Distinct from `author_name`/`author_url` below, which are not yet emitted anywhere. |
+| `theme_color` | hex colour / `#080b14` | Rendered as `<meta name="theme-color">` when non-empty. Must match `^#[0-9a-fA-F]{3,8}$`. |
+| `locale` | string / `en_US` | Rendered as `og:locale` and, when `generate_json_ld` is enabled, the JSON-LD `inLanguage` (with `_` replaced by `-`). |
 | `site_requirements` | string list / empty | Extra packages installed before the published site is built, as PEP 508 requirement specifiers. Each is shell-quoted, so `"mkdocs-material[imaging] >= 9.5"` stays one argument. |
 | `site_requirements_file` | path / `docs/requirements.txt` | Installed with `pip install -r` when the file exists. Absent, the step is skipped; empty disables the hook entirely. |
 | `properdocs_version` | string / `1.6.7` | The `properdocs` and `properdocs-theme-mkdocs` version the site build pins. |
@@ -405,10 +422,18 @@ unaffected. This cannot have a useful default: which packages a site needs follo
 that site's own configuration.
 
 `author_name` and `author_url` exist for a planned author credit in the generated
-Pages sites and are exercised by config parsing, validation, and tests today. The
-`release-surfaces.yml` JSON-LD record currently emits only `@context`, `@type`,
-`name`, `codeRepository`, `url`, and `version` — no author field — so setting these
-two keys has no visible effect on a generated site yet.
+Pages sites and are exercised by config parsing, validation, and tests today, but
+`release-surfaces.yml` never reads either one, so setting these two keys has no
+visible effect on a generated site yet. This is unrelated to `author` above: that
+field is already wired into the rendered `<meta name="author">` tag and the JSON-LD
+`author.name` property.
+
+`favicon`, `og_image`, `twitter_site`, `twitter_creator`, `keywords`, `author`,
+`theme_color`, and `locale` land verbatim in rendered HTML and workflow YAML, so
+each is validated at load time rather than discovered on a published page: none
+of the string-valued fields may contain `<`, `>`, `"`, or a newline, `keywords`
+entries additionally reject commas, and `theme_color` must match a hex colour
+pattern.
 
 Run `vibey-gh install`, review and commit generated assets, then run
 `vibey-gh check --ci`. Identity and Pages URLs are derived at runtime.

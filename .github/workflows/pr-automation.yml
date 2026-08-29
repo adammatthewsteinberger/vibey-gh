@@ -1010,7 +1010,27 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           PR: ${{ needs.evaluate.outputs.pr }}
-        run: gh pr diff "$PR" --repo "$REPO" > "${RUNNER_TEMP}/pr.diff"
+        run: |
+          set -euo pipefail
+          if gh pr diff "$PR" --repo "$REPO" > "${RUNNER_TEMP}/pr.diff" 2>"${RUNNER_TEMP}/diff-err"; then
+            exit 0
+          fi
+          # GitHub's diff API refuses pull requests beyond roughly 300 files, which is
+          # exactly the shape of a migration or adoption sweep — observed on a 347-file
+          # provenance sweep that could therefore never be reviewed at all. Construct the
+          # same merge-base diff locally instead: fetching refs and diffing is read-only
+          # and executes no repository code, so the no-execution rule is untouched, and
+          # --max-chars still caps what actually reaches the model.
+          echo "gh pr diff failed ($(head -c 120 "${RUNNER_TEMP}/diff-err")); reconstructing locally"
+          base_sha=$(gh pr view "$PR" --repo "$REPO" --json baseRefOid -q .baseRefOid)
+          head_sha=$(gh pr view "$PR" --repo "$REPO" --json headRefOid -q .headRefOid)
+          git -C automation fetch --quiet origin "$base_sha" "$head_sha"
+          if ! merge_base=$(git -C automation merge-base "$base_sha" "$head_sha" 2>/dev/null); then
+            # The trusted checkout is shallow; deepen until the histories connect.
+            git -C automation fetch --quiet --unshallow origin 2>/dev/null ||               git -C automation fetch --quiet --deepen=2000 origin
+            merge_base=$(git -C automation merge-base "$base_sha" "$head_sha")
+          fi
+          git -C automation diff "$merge_base" "$head_sha" > "${RUNNER_TEMP}/pr.diff"
       - name: Review with the local model
         id: result
         run: |
