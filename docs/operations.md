@@ -59,6 +59,20 @@ the diff; a clean local verdict passes the gate as `PR automation: gate (local f
 rather than blocking it. That title always names the weaker reviewer — treat it as a
 signal to still fix the primary path's root cause, not as a fully reviewed pass.
 
+## Local-authority mode — when the paid lane is capped
+
+When API credits are exhausted, evaluations fail rather than review, and the operator's
+machine becomes the source of truth (#206). `vibey-gh local-authority` keeps remotes
+tracking green local state: each pass pushes any clean, check-passing local branch that
+is ahead of its upstream, with an explicit pre-fetch `--force-with-lease` so remote work
+this machine has not integrated always refuses the push. Run it as a login daemon
+(launchd/systemd) pointing at `vibey-gh local-authority` with no `--once`; reviews meanwhile
+come from `vibey-gh local-review` verdicts recorded on the pull request.
+
+Recovery is automatic by design: every evaluation tries the paid lane first, so the
+human's only act is adding credits — the next evaluation simply succeeds, and this loop
+idles (nothing-ahead is a no-op).
+
 ## Everything else
 
 Enable Actions write permissions, PR creation,
