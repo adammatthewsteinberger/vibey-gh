@@ -33,6 +33,7 @@ nav:
   - Dependencies: dependencies.md
   - Theory of operation: theory.md
   - Accessibility: accessibility.md
+  - Research paper: paper.md
   - Threat model: threat-model.md
   - Governance: governance.md
   - Architecture decisions: adr/README.md
