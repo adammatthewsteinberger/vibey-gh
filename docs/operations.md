@@ -14,8 +14,17 @@ For a fine-grained personal access token that means exactly:
 |---|---|
 | Contents | Read and write |
 | Pull requests | Read and write |
+| Workflows | Read and write |
 | Actions | Read |
 | Metadata | Read (mandatory) |
+
+**Workflows is not optional.** GitHub refuses any push that creates or updates a file
+under `.github/workflows/` from a token without it — `! [remote rejected] ... (refusing
+to allow a Personal Access Token to create or update workflow ... without workflow
+scope)` — and an automated repair is *more* likely than a human to touch a workflow,
+because workflow drift is exactly what reviews flag on tooling pull requests. Without
+this permission the repair commits cleanly, the push is rejected, and the pull request
+silently stops advancing (#172).
 
 **Checks is deliberately absent, and the fine-grained token UI offers no such permission.**
 Check runs can only be created by a GitHub App, so the gate is published with

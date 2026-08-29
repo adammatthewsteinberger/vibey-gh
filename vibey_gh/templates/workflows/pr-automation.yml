@@ -644,6 +644,12 @@ jobs:
           git -C target config user.name 'vibey[bot]'
           git -C target config user.email 'adam@matthewsteinberger.com'
           git -C target add -A
+          # A push that touches .github/workflows/** requires the Workflows permission
+          # on the pushing token. Say so BEFORE the attempt is spent: the rejection
+          # otherwise surfaces as a generic repair failure in a log nobody reads.
+          if git -C target diff --cached --name-only | grep -q '^\.github/workflows/'; then
+            echo "::warning::this repair edits .github/workflows/** — the push requires the Workflows (read-write) permission on the automation token; if it is rejected, grant that permission and re-run"
+          fi
           git -C target commit -m "fix: repair PR #${{ needs.evaluate.outputs.pr }} (attempt ${{ needs.evaluate.outputs.repair_attempt }})" \
             -m "Made-With: Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), Developed by [Adam Matthew Steinberger](https://vibewithadam.matthewsteinberger.com/) ([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/))."
           gh auth setup-git
@@ -659,6 +665,10 @@ jobs:
               exit 0
             fi
             printf '%s\n' "$push_output" >&2
+            if printf '%s' "$push_output" | grep -q 'without `workflow` scope\|without .workflow. scope'; then
+              echo "::error::the repair could not be pushed because the automation token lacks the Workflows (read-write) permission — grant it on the fine-grained PAT and re-run; the repair itself succeeded"
+              echo "The repair could not be pushed: the automation token lacks the **Workflows (read-write)** permission required to update files under .github/workflows/. Grant it on the fine-grained PAT and re-run — the repair itself succeeded." >> "$GITHUB_STEP_SUMMARY"
+            fi
             exit 1
           fi
       - name: Persist repair state and classify operator blocks
@@ -882,6 +892,10 @@ jobs:
               exit 0
             fi
             printf '%s\n' "$push_output" >&2
+            if printf '%s' "$push_output" | grep -q 'without `workflow` scope\|without .workflow. scope'; then
+              echo "::error::the repair could not be pushed because the automation token lacks the Workflows (read-write) permission — grant it on the fine-grained PAT and re-run; the repair itself succeeded"
+              echo "The repair could not be pushed: the automation token lacks the **Workflows (read-write)** permission required to update files under .github/workflows/. Grant it on the fine-grained PAT and re-run — the repair itself succeeded." >> "$GITHUB_STEP_SUMMARY"
+            fi
             exit 1
           fi
           if grep -qE '^name = "vibey-gh"' automation/pyproject.toml; then
