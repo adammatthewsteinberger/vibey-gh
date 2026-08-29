@@ -238,6 +238,11 @@ jobs:
           # A nonmatching sentinel activates the action's token-free credential-helper
           # path without authorizing any non-write actor.
           allowed_non_write_users: "__vibey_gh_no_nonwrite_users__"
+          # Our own event chains are bot-initiated: a workflow_run fired by CI
+          # completing arrives as github-actions, and the action refuses bot
+          # actors unless they are named. Named, not "*": only the platform's
+          # own actor is trusted, never arbitrary third-party bots.
+          allowed_bots: "github-actions,github-actions[bot]"
           track_progress: ${{ true && (github.event_name == 'pull_request' || github.event_name == 'issues' || github.event_name == 'issue_comment' || github.event_name == 'pull_request_review_comment' || github.event_name == 'pull_request_review') }}
           show_full_output: ${{ inputs.full_claude_output && github.event_name == 'workflow_dispatch' && github.event.repository.visibility == 'private' && false }}
           additional_permissions: |
@@ -546,6 +551,11 @@ jobs:
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           allowed_non_write_users: "__vibey_gh_no_nonwrite_users__"
+          # Our own event chains are bot-initiated: a workflow_run fired by CI
+          # completing arrives as github-actions, and the action refuses bot
+          # actors unless they are named. Named, not "*": only the platform's
+          # own actor is trusted, never arbitrary third-party bots.
+          allowed_bots: "github-actions,github-actions[bot]"
           track_progress: ${{ true && (github.event_name == 'pull_request' || github.event_name == 'issues' || github.event_name == 'issue_comment' || github.event_name == 'pull_request_review_comment' || github.event_name == 'pull_request_review') }}
           show_full_output: ${{ inputs.full_claude_output && github.event_name == 'workflow_dispatch' && github.event.repository.visibility == 'private' && false }}
           additional_permissions: |
@@ -822,6 +832,11 @@ jobs:
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           allowed_non_write_users: "__vibey_gh_no_nonwrite_users__"
+          # Our own event chains are bot-initiated: a workflow_run fired by CI
+          # completing arrives as github-actions, and the action refuses bot
+          # actors unless they are named. Named, not "*": only the platform's
+          # own actor is trusted, never arbitrary third-party bots.
+          allowed_bots: "github-actions,github-actions[bot]"
           track_progress: ${{ true && (github.event_name == 'pull_request' || github.event_name == 'issues' || github.event_name == 'issue_comment' || github.event_name == 'pull_request_review_comment' || github.event_name == 'pull_request_review') }}
           show_full_output: ${{ inputs.full_claude_output && github.event_name == 'workflow_dispatch' && github.event.repository.visibility == 'private' && false }}
           plugin_marketplaces: |
