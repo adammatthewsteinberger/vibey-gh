@@ -304,7 +304,15 @@ jobs:
             industry framing (ROI, market positioning, business-value pitches) must be
             essentially absent: its presence anywhere before the beginner and
             engineering material, or as more than an incidental aside, fails this
-            judgment.
+            judgment. Judge examples_sufficient against every platform surface the
+            repository exposes — API, CLI, MCP, webhook, SDK, and Moltbook where
+            present: each exposed surface needs at least one FULLY WORKING and FULLY
+            COMPREHENSIBLE example — copy-paste-runnable against this exact head, with
+            every command, flag, endpoint, payload shape, and import verified to exist
+            in the source, and readable by a first-time reader under the same
+            beginner-first BLUF standard. A surface with no example of its own, a
+            pseudo-code example, or an example naming anything that does not exist
+            fails this judgment.
             Verify that every CLI, SDK, API, MCP, and webhook capability is documented.
             A heading, file, or keyword by itself is never proof of completeness. Flag
             vague, stale, circular, implementation-first, unexplained, or missing content.
