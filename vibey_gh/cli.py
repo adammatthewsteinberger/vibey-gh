@@ -423,6 +423,28 @@ def _book(args) -> int:
     return 0
 
 
+def _local_authority(args) -> int:
+    from vibey_gh import local_authority
+
+    paths = (
+        [Path(p) for p in args.repos]
+        if args.repos
+        else local_authority.discover(Path(args.root).expanduser())
+    )
+    if not paths:
+        print("vibey-gh local-authority: no repositories found", file=sys.stderr)
+        return 1
+    protected = tuple(b for b in (args.protected or "").split(",") if b)
+    local_authority.run(
+        paths,
+        interval=args.interval,
+        once=args.once,
+        protected=protected,
+        check=not args.no_check,
+    )
+    return 0
+
+
 def _local_triage(args) -> int:
     from vibey_gh import local_review
 
@@ -788,6 +810,24 @@ def main(argv: list[str] | None = None) -> int:
         help="will the automation actually work? — the adoption preflight, offline",
     )
     doc.set_defaults(func=_doctor)
+
+    la = sub.add_parser(
+        "local-authority",
+        help="keep remotes tracking green local branches — the capped-lane sync loop",
+    )
+    la.add_argument("--repos", nargs="*", help="explicit repository paths (default: scan --root)")
+    la.add_argument(
+        "--root", default="~/git", help="scanned for work trees carrying .vibey-gh.toml"
+    )
+    la.add_argument("--interval", type=int, default=120, help="seconds between passes")
+    la.add_argument("--once", action="store_true", help="one pass, then exit")
+    la.add_argument(
+        "--protected",
+        default="",
+        help="comma-separated branches never pushed (default: each repo's own integration and release branches)",
+    )
+    la.add_argument("--no-check", action="store_true", help="skip the per-repo provenance check")
+    la.set_defaults(func=_local_authority)
 
     pp = sub.add_parser(
         "paper",

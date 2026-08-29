@@ -41,5 +41,8 @@ nav:
   - Roadmap: roadmap.md
   - Threat model: threat-model.md
   - Governance: governance.md
+  - The Constitution: constitution.md
+  - The Ten Commandments: commandments.md
+  - Bill of Rights: bill-of-rights.md
   - Architecture decisions: adr/README.md
 strict: true
