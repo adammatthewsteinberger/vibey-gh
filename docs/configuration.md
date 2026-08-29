@@ -235,8 +235,8 @@ Every entry in `required_files` is required: having one never excuses another.
 | `automation_doc_min_words` | integer / `0` | Minimum length for `automation_doc`; `0` disables. Also read from the former name `github_readme_min_words`. |
 | `mermaid_terms` | string list / empty | Surfaces that must appear in `docs/project.mmd`. |
 | `mermaid_min_edges` | integer / `0` | Minimum `-->` edges in that diagram; `0` disables. |
-| `require_provenance` | boolean / `false` | Require the Vibey provenance sentence in `provenance_files`. |
-| `provenance_files` | string list / `README.md`, `docs/index.md` | Where that sentence is required, when it is. |
+| `require_provenance` | boolean / `false` | Require the Vibey provenance sentence. |
+| `provenance_files` | string list / `README.md`, `docs/index.md` | Files checked for the sentence with a loose substring match (must merely contain "Made with" somewhere), skipped if the file does not exist. Independently of this list, `require_provenance` also forces an exact-suffix check — the file must end with the sentence verbatim — on `README.md` and on `automation_doc`, whether or not either appears here. |
 
 This repository declares the full contract for itself in its own `.vibey-gh.toml`, which is
 both the dogfooding rule the rest of the tool follows and the reason its own requirements
