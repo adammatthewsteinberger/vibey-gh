@@ -338,6 +338,31 @@ def test_readability_gate_judges_the_opening_and_the_audience_order():
         assert field not in local_review.REVIEW_SCHEMA["properties"]
 
 
+def test_bottom_nav_is_injected_from_the_themes_own_anchors_and_can_be_disabled(tmp_path):
+    """On a phone, the only prev/next links are a full page-scroll away, in the header —
+    a reader who has just finished a page has no way onward from where they are (#132).
+    The injector clones the theme's own rel="prev"/rel="next" anchors into a bar before
+    </body>, so the theme stays the single authority on page order; a page without those
+    anchors (the channel picker, 404) gets no bar. Config, not fork: the theme package is
+    upstream and unwritable, so this lives in the same post-processing pass as the SEO
+    metadata, and [documentation] bottom_nav = false turns it off."""
+    from vibey_gh.config import DocumentationConfig, GhConfig
+    from vibey_gh.install import render_workflow
+
+    source = WORKFLOWS / "release-surfaces.yml"
+    on = render_workflow(source, GhConfig(root=tmp_path))
+    assert "BOTTOM_NAV=true" in on, "bottom navigation must be the default"
+    assert 'rel="(?:prev|next)"' in on
+    assert 'class="vibey-bottom-nav"' in on
+    assert ".vibey-bottom-nav a.disabled{visibility:hidden}" in on
+
+    off = render_workflow(
+        source,
+        GhConfig(root=tmp_path, documentation=DocumentationConfig(bottom_nav=False)),
+    )
+    assert "BOTTOM_NAV=false" in off
+
+
 def test_release_surfaces_smoke_checks_search_at_build_time():
     """A channel site can build --strict with a dead search: assets that 404 or an index
     with zero documents only surface when a human types a query into a silent box. The

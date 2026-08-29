@@ -359,8 +359,8 @@ its own gate. With `contents: write`, `pull-requests: write`, and `checks: read`
 verifies that the dispatching actor holds administrator permission; that the PR is open,
 non-draft, targets `develop`, and exactly matches the dispatched head SHA; that changed
 files are confined to workflow, template, or automation-core paths; and that every non-gate
-check run on that exact SHA — including CodeQL, the Documentation contract,
-Provenance, Build, and Lint — completed successfully. Only then does it perform an
+check run on that exact SHA — including CodeQL, the API-drift parity check,
+the Documentation contract, Provenance, Build, and Lint — completed successfully. Only then does it perform an
 admin `--match-head-commit` squash merge into `develop`, bypassing ordinary PR automation
 review, and delete the source branch, and only when that branch is same-repository and not
 a configured or literal permanent branch. See [Security](security.md) and

@@ -290,6 +290,7 @@ def render_workflow(source: Path, cfg: GhConfig) -> str:
         ("__VIBEY_GH_DOC_LLMS__", cfg.documentation.generate_llms_txt),
         ("__VIBEY_GH_DOC_LLMS_FULL__", cfg.documentation.generate_llms_full_txt),
         ("__VIBEY_GH_DOC_JSON_LD__", cfg.documentation.generate_json_ld),
+        ("__VIBEY_GH_DOC_BOTTOM_NAV__", cfg.documentation.bottom_nav),
         ("__VIBEY_GH_DOC_PRODUCTION_INDEX__", cfg.documentation.production_indexing),
         ("__VIBEY_GH_DOC_PREVIEW_INDEX__", cfg.documentation.preview_indexing),
     ):

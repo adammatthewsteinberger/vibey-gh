@@ -586,6 +586,7 @@ class DocumentationConfig:
     generate_llms_txt: bool = True
     generate_llms_full_txt: bool = True
     generate_json_ld: bool = True
+    bottom_nav: bool = True
     author_name: str = "Adam Matthew Steinberger"
     author_url: str = "https://vibewithadam.matthewsteinberger.com"
     # Everything below describes what a repository requires of ITS OWN documentation.
@@ -945,6 +946,7 @@ def load_config(root: Path | None = None) -> GhConfig:
             generate_llms_txt=documentation.get("generate_llms_txt", True),
             generate_llms_full_txt=documentation.get("generate_llms_full_txt", True),
             generate_json_ld=documentation.get("generate_json_ld", True),
+            bottom_nav=documentation.get("bottom_nav", True),
             author_name=documentation.get("author_name", "Adam Matthew Steinberger"),
             author_url=documentation.get(
                 "author_url", "https://vibewithadam.matthewsteinberger.com"
