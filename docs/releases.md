@@ -23,3 +23,13 @@ commit as that intentional no-op rather than a failure. Set `[github_release]
 require_new_version = true` on a repository whose release branch should carry a new version
 on every push, so a tag that would otherwise move is reported as the mistake it is. See
 `docs/configuration.md`.
+
+## Superseded releases
+
+After each publish, `vibey-gh report-superseded` runs against the index that was just
+published to and writes a job-summary list of every release the new version supersedes,
+honouring `[yank] keep` and linking the project's release-management page. It reports
+rather than yanks because **PyPI exposes no yank API** — the upload endpoint answers
+`405` for a yank action and the web route is CSRF-protected — so the analysis is
+automated and the click stays human. The configuration lives in
+[`[yank]`](configuration.md#yank); both indexes default off.

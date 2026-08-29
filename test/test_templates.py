@@ -1179,3 +1179,21 @@ def test_seo_fields_refuse_html_injection():
         DocumentationConfig(theme_color="blue")
     with _pytest.raises(ValueError, match="plain words"):
         DocumentationConfig(keywords=("ok", "<bad>"))
+
+
+def test_the_fallback_reconstructs_a_diff_the_api_refuses(tmp_path):
+    """GitHub's diff API refuses pull requests beyond roughly 300 files — exactly the
+    shape of a migration sweep, observed on a 347-file provenance sweep that could
+    therefore never be reviewed at all. The fallback must reconstruct the same merge-base
+    diff from fetched refs: read-only, no repository code executed, and --max-chars still
+    caps what reaches the model."""
+    from vibey_gh.install import render_workflow
+
+    text = render_workflow(WORKFLOWS / "pr-automation.yml", GhConfig(root=tmp_path))
+    section = text.split("Fetch the exact-head diff")[1].split("Review with the local model")[0]
+    assert "gh pr diff" in section
+    assert "reconstructing locally" in section
+    assert "merge-base" in section
+    # Shallow trusted checkouts must deepen until the histories connect, never guess.
+    assert "--unshallow" in section
+    assert 'git -C automation diff "$merge_base" "$head_sha"' in section

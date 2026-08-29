@@ -271,6 +271,9 @@ request bytes for HMAC verification; see [the CLI and adapter reference](docs/cl
 | `vibey-gh promote [--no-wait]` | Open or reuse the asynchronous `develop → main` promotion PR. |
 | `vibey-gh github-release --target SHA [--version VERSION]` | Create or reuse an immutable tag and GitHub Release for an exact production SHA. |
 | `vibey-gh realign` | Align identical `develop` and `main` trees after a rebase merge without discarding work. |
+| `vibey-gh report-superseded --index pypi\|testpypi --project NAME --version VERSION` | Report which prior releases a published version supersedes, since PyPI has no yank API; never yanks anything itself. |
+| `vibey-gh local-review [--diff FILE]` | Review a diff with a local Ollama-compatible model when the primary paid review returns no verdict at all. Opt-in fallback; see `[pr_automation.fallback]`. |
+| `vibey-gh local-triage [--issue FILE]` | Triage an issue with the same local model when the primary paid solver produces nothing. Always marks the result `needs_human`. |
 | `vibey-gh pr-automation self-heal [--pr N]` | Refill a spent repair budget, itself bounded so a permanent failure still stops. |
 | `vibey-gh conversation evaluate\|context\|reply\|record-response` | Decide, brief, answer, and budget one comment-driven interaction. |
 | `vibey-gh reconcile-branches [--dry-run]` | Rebase, close, or leave each open branch stranded by a realign rewrite. |
@@ -531,7 +534,7 @@ left alone and says so.
 ```toml
 [pr_automation]
 enabled = true
-scan_workflows = ["CI", "Provenance", "CodeQL", "Docs"]
+scan_workflows = ["CI", "Provenance", "CodeQL", "Docs", "Conventional Commits"]
 ignored_checks = ["PR automation / gate", "gate", "Merge train / merge"]
 max_repair_attempts = 3
 model = "claude-sonnet-5"
@@ -737,11 +740,23 @@ Every canonical capability is exposed and tested through all five supported surf
 - MCP: `initialize`, `tools/list`, and `tools/call`
 - Webhook: HMAC-SHA256 authenticated, delivery-ID replay-safe dispatch
 
-The two Conventional Commit commands are deliberately outside this canonical registry:
-they are local git-hook/CI helpers that consume stdin, commit-message files, or revision
-ranges. Exposing those host-specific mutation primitives through a remote API, MCP tool, or
-webhook would expand privilege without adding an automation capability. Every repository
-automation capability in `surfaces.CAPABILITIES` remains available through all five forms.
+Five CLI commands are deliberately outside this canonical registry, each for its own
+reason documented in detail in `docs/cli.md`:
+
+- `conventional-message` and `conventional-check` are local git-hook/CI helpers that
+  consume stdin, commit-message files, or revision ranges. Exposing those host-specific
+  mutation primitives through a remote API, MCP tool, or webhook would expand privilege
+  without adding an automation capability.
+- `report-superseded` is a read-only reporting helper: it prints which prior releases an
+  index supersedes and a management URL for a human to act on, since PyPI exposes no yank
+  API. It never mutates anything, so there is nothing for a remote surface to invoke.
+- `local-review` and `local-triage` are local-model fallbacks that only run when the
+  primary paid review or solver produced no verdict at all. They require a self-hosted
+  runner and a local Ollama-compatible model, and must never gain remote/API/webhook
+  exposure.
+
+Every other repository automation capability in `surfaces.CAPABILITIES` remains available
+through all five forms.
 
 The parity contract enumerates every capability from one registry, invokes every adapter,
 and fails CI if any surface is absent or divergent. Because `Docs` is a configured scan,

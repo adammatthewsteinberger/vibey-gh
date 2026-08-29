@@ -5,6 +5,16 @@ This file follows Keep a Changelog and semantic versioning conventions.
 
 ## Unreleased
 
+- Let the local review fallback reach a pull request the diff API refuses. GitHub's diff
+  API refuses a pull request beyond roughly 300 changed files, which is exactly the shape
+  of a migration or adoption sweep — observed on a 347-file provenance sweep that could
+  therefore never be reviewed at all, paid or local. The fallback job now reconstructs the
+  same merge-base diff itself when `gh pr diff` fails: it fetches the base and head refs,
+  deepens a shallow trusted checkout until their histories connect, and diffs one against
+  the other. That reconstruction is read-only and executes no repository code, so the
+  no-execution guarantee is untouched, and `max_diff_chars` still caps what reaches the
+  model either way.
+
 - Stop the required automation document from hijacking an adopter's front page. GitHub
   resolves a repository's landing README as `.github/README.md` first and the root
   `README.md` only if that is absent — so requiring `.github/README.md` replaced every
