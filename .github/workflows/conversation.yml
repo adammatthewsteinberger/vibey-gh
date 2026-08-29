@@ -182,6 +182,11 @@ jobs:
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           allowed_non_write_users: "__vibey_gh_no_nonwrite_users__"
+          # Our own event chains are bot-initiated: a workflow_run fired by CI
+          # completing arrives as github-actions, and the action refuses bot
+          # actors unless they are named. Named, not "*": only the platform's
+          # own actor is trusted, never arbitrary third-party bots.
+          allowed_bots: "github-actions,github-actions[bot]"
           track_progress: ${{ true && (github.event_name == 'issue_comment' || github.event_name == 'pull_request_review_comment') }}
           plugin_marketplaces: |
             https://github.com/adammatthewsteinberger/vibey-skills.git
