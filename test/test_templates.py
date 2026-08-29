@@ -416,6 +416,11 @@ def test_the_site_publishes_its_own_book_and_paper_when_enabled(tmp_path):
     # holds only ProperDocs, and the first dogfooded deploy failed with exit 127.
     assert on.index("pip install --quiet -e .") < on.index("vibey-gh book --site-dir")
     assert "cp book-out/book.epub channel-site/book.epub" in on
+    # The finished KDP interior: one headless-Chromium print of the 6x9 print HTML.
+    # Soft-fails to the print HTML rather than killing a docs deploy over one artifact.
+    assert '--print-to-pdf="$PWD/book-out/book.pdf"' in on
+    assert "--no-pdf-header-footer" in on
+    assert "book.pdf was not produced" in on
     assert "vibey-gh paper --author" in on
     assert "cp paper-out/paper.pdf channel-site/paper.pdf" in on
     # The engine is pinned by version AND checksum, and verification precedes use.

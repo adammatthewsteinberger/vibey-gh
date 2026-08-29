@@ -302,6 +302,24 @@ jobs:
               --author "${AUTHOR:-${GITHUB_REPOSITORY%%/*}}"
             cp book-out/book.epub channel-site/book.epub
             cp book-out/book-print.html channel-site/book-print.html
+            # The KDP paperback interior wants a PDF, and the runner already carries a
+            # Chromium: one headless print honours the @page 6in x 9in rules in the
+            # print HTML, so the artifact is the uploadable interior itself.
+            BROWSER="$(command -v google-chrome || command -v chromium-browser || command -v chromium || true)"
+            if [ -n "$BROWSER" ]; then
+              "$BROWSER" --headless --disable-gpu --no-sandbox \
+                --no-pdf-header-footer \
+                --print-to-pdf="$PWD/book-out/book.pdf" \
+                "file://$PWD/book-out/book-print.html" 2>/dev/null
+              if [ -s book-out/book.pdf ]; then
+                cp book-out/book.pdf channel-site/book.pdf
+                echo "book: published book.pdf (KDP interior) on the channel site"
+              else
+                echo "::warning::book.pdf was not produced; the print HTML remains available"
+              fi
+            else
+              echo "::warning::no Chromium on this runner; book.pdf skipped, print HTML published"
+            fi
             echo "book: published book.epub and book-print.html on the channel site"
           fi
           if [ "__VIBEY_GH_DOC_PAPER__" = "true" ] && [ -f docs/paper.md ] \
