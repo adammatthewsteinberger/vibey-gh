@@ -36,8 +36,6 @@ on:
         required: false
         default: false
         type: boolean
-  schedule:
-    - cron: "47 */6 * * *"
 
 permissions:
   actions: read
