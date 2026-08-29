@@ -376,6 +376,11 @@ def test_readability_gate_judges_the_opening_and_the_audience_order():
         "HUMAN\n            reader is served first, always; the AI reader second".replace("\n            ", " "),
         "never contorted for machine",
         "industry or business needs come absolutely last, if at all",
+        # Hyperlinks are first-class: outside material is clickable at the point of
+        # reference, never only from a distant references section.
+        "Hyperlinks are a first-class citizen",
+        "ALONGSIDE the referencing copy",
+        "not only in a references section",
         # The judgments cover the published site, not just README.md: the landing
         # page's first screen and the nav order are inside the contract, because the
         # site is where a beginner actually lands.

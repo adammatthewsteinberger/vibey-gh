@@ -296,7 +296,13 @@ jobs:
             reader is served first, always; the AI reader second — machine-facing
             artifacts are maintained but human prose is never contorted for machine
             parsing and no human document degrades in service of an AI one; and
-            industry or business needs come absolutely last, if at all.
+            industry or business needs come absolutely last, if at all. Hyperlinks are a
+            first-class citizen: whenever outside material is referenced or described
+            in ANY way -- a tool, a specification, a paper, a product, someone else's
+            documentation -- the hyperlink to it appears ALONGSIDE the referencing copy
+            itself, at the point of reference, not only in a references section; prose
+            that describes an outside source the reader cannot click from that very
+            sentence fails this judgment.
             provide installation, prerequisites, quick start, runnable examples, complete
             command and configuration references, workflows and failure recovery,
             security and trust boundaries, upgrades, troubleshooting, contributing,
