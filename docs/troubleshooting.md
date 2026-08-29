@@ -56,3 +56,5 @@
   tamper-evident branch tracer cannot classify as taken or fallthrough. Simplify that
   construct, or remove the file from `[fingerprint].sources` in `.vibey-gh.toml`, rather
   than disabling the check.
+
+<!-- review canary: a deliberately trivial change to test whether the exact-head review can complete at all right now (#201) -->
