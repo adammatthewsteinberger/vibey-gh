@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import datetime
 import html as html_lib
+import html.parser as html_parser
 import re
 import uuid
 import zipfile
@@ -99,29 +100,99 @@ def chapters_from_nav(config_text: str) -> list[BookChapter]:
     return chapters
 
 
-_MAIN = re.compile(r"<main\b[^>]*>(.*)</main>", re.DOTALL)
-_ARTICLE = re.compile(r"<article\b[^>]*>(.*)</article>", re.DOTALL)
-_STRIP = re.compile(r"<(script|nav|aside|form|button)\b.*?</\1>", re.DOTALL)
-_VOID_FIX = re.compile(r"<(br|hr|img|input|meta|link)((?:[^<>])*?)(?<!/)>")
+_STRIP_TAGS = frozenset({"script", "nav", "aside", "form", "button"})
+_VOID_TAGS = frozenset({"br", "hr", "img", "input", "meta", "link"})
+
+
+class _MainExtractor(html_parser.HTMLParser):
+    """Capture the subtree of the first <main>, <article>, or role="main" element.
+
+    A parser, not a regex: the content element nests arbitrarily many <div>s (the
+    ProperDocs theme wraps the body in a Bootstrap column carrying role="main"), and no
+    regular expression balances that. Subtrees of chrome tags (script, nav, aside,
+    form, button) are dropped during capture, and void elements are re-emitted
+    self-closed because EPUB readers parse XHTML.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=False)
+        self.out: list[str] = []
+        self.depth = 0  # nesting inside the captured element; 0 = not capturing
+        self.strip_depth = 0
+        self.done = False
+
+    def _is_target(self, tag: str, attrs: list[tuple[str, str | None]]) -> bool:
+        return tag in ("main", "article") or ("role", "main") in [(k, v) for k, v in attrs]
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if self.done:
+            return
+        if self.depth == 0:
+            if self._is_target(tag, attrs):
+                self.depth = 1
+            return
+        if self.strip_depth:
+            if tag in _STRIP_TAGS:
+                self.strip_depth += 1
+            return
+        if tag in _STRIP_TAGS:
+            self.strip_depth = 1
+            return
+        text = self.get_starttag_text() or f"<{tag}>"
+        if tag in _VOID_TAGS and not text.rstrip().endswith("/>"):
+            text = text.rstrip()[:-1] + "/>"
+        self.out.append(text)
+        if tag not in _VOID_TAGS:
+            self.depth += 1
+
+    def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if self.done or self.depth == 0 or self.strip_depth:
+            return
+        self.out.append(self.get_starttag_text() or f"<{tag}/>")
+
+    def handle_endtag(self, tag: str) -> None:
+        if self.done or self.depth == 0:
+            return
+        if self.strip_depth:
+            if tag in _STRIP_TAGS:
+                self.strip_depth -= 1
+            return
+        if tag in _VOID_TAGS:
+            return
+        self.depth -= 1
+        if self.depth == 0:
+            self.done = True
+            return
+        self.out.append(f"</{tag}>")
+
+    def handle_data(self, data: str) -> None:
+        if self.depth and not self.strip_depth and not self.done:
+            self.out.append(data)
+
+    def handle_entityref(self, name: str) -> None:
+        self.handle_data(f"&{name};")
+
+    def handle_charref(self, name: str) -> None:
+        self.handle_data(f"&#{name};")
 
 
 def extract_main(page_html: str) -> str:
-    """The chapter body from a built page: the <main> element, cleaned for a book.
+    """The chapter body from a built page.
 
-    Scripts, navigation, and interactive elements are stripped because a book has no
-    runtime; void elements are self-closed because EPUB readers parse XHTML and a bare
-    <br> that every browser forgives is a hard error on a Kindle.
+    Anchored on <main>, <article>, or any element carrying role="main" -- the last is
+    what the ProperDocs theme actually emits, discovered when the first dogfooded
+    deploy refused every page. Chrome subtrees are stripped because a book has no
+    runtime; void elements are self-closed because a bare <br> that every browser
+    forgives is a hard error on a Kindle.
     """
-    for pattern in (_MAIN, _ARTICLE):
-        found = pattern.search(page_html)
-        if found:
-            body = found.group(1)
-            break
-    else:
-        raise BookError("page has no <main> or <article> element to take a chapter from")
-    body = _STRIP.sub("", body)
-    body = _VOID_FIX.sub(r"<\1\2/>", body)
-    return body.strip()
+    parser = _MainExtractor()
+    parser.feed(page_html)
+    body = "".join(parser.out).strip()
+    if not body:
+        raise BookError(
+            'page has no <main>, <article>, or role="main" element to take a chapter from'
+        )
+    return body
 
 
 _EPUB_CSS = """body{font-family:Georgia,serif;line-height:1.55;margin:1em}
