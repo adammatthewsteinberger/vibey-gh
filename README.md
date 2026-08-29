@@ -917,14 +917,16 @@ trusted_authors = ["your-login", "dependabot[bot]"]
 | Branch sync | Brings open branches forward on every merge; daily, refills a bounded number of spent repair budgets. |
 | Conversation | Answers `@vibey-gh` in a comment, and may make the change when a trusted author asks on a PR. |
 | Conventional Commits | Normalizes guarded same-repository topic history and republishes it with an exact-head lease. |
-| CI\* / Provenance / Docs | Validate code, history, human docs, agent docs, plugins, and interfaces. |
+| CI\* / Provenance / CodeQL / Docs | Validate code, history, security, human docs, agent docs, plugins, and interfaces. |
 | PR automation | Aggregates exact-head scans; reviews, repairs, resolves conflicts, and gates. |
 | Merge train | Squash-merges into `develop` and rebase-merges promotions into `main`. |
+| Promote | Opens or reuses the `develop` → `main` promotion PR once the merge train advances `develop`. |
 | Release\* | Publishes `develop` dev builds to TestPyPI and `main` releases to PyPI. |
 | GitHub Release | Tags the exact production commit and generates release notes. |
 | Release surfaces | Publishes GHCR artifacts and Production/Preview ProperDocs sites. |
 | Repository profile | Enforces repository metadata, policy settings, security, and public surfaces. |
 | Release repair | Returns trusted post-merge fixes through an ordinary guarded PR. |
+| Automation bootstrap | Manual, admin-gated escape hatch that merges a fix to broken privileged workflow code when a PR cannot repair its own gate. |
 
 \* `CI` and `Release` are not rendered by `vibey-gh install`; see
 [What gets installed](#what-gets-installed) for the exact name and behavior contract

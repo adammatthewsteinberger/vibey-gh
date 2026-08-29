@@ -350,6 +350,12 @@ def test_readability_gate_judges_the_opening_and_the_audience_order():
         "documentation site's landing page",
         "nav order declared in the site configuration",
         "engineering reference before the beginner on-ramp fails",
+        # The examples doctrine: every exposed platform surface gets at least one
+        # fully working, fully comprehensible example, verified against the source.
+        "Judge examples_sufficient against every platform surface",
+        "API, CLI, MCP, webhook, SDK, and Moltbook where present",
+        "copy-paste-runnable against this exact head",
+        "example naming anything that does not exist fails this judgment",
     ):
         assert phrase in flat, phrase
     # The judgments gate `.pass` in the aggregation, not just the schema.
