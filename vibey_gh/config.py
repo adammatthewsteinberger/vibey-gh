@@ -477,6 +477,15 @@ class YankConfig:
     # How many releases below the newest to leave alone, so a rollback target survives.
     # 0 reports everything superseded.
     keep: int = 0
+    # Article V.4 of the Constitution: a RATIFIED change to any of these files supersedes
+    # every previous release, zero exceptions — `keep` and the per-index switches above are
+    # overridden for that release. fnmatch globs, repository-relative.
+    governance_paths: tuple[str, ...] = (
+        "docs/constitution.md",
+        "docs/commandments.md",
+        "docs/bill-of-rights.md",
+        "docs/sd-*.md",
+    )
 
     def __post_init__(self) -> None:
         if self.keep < 0:
@@ -943,6 +952,12 @@ def load_config(root: Path | None = None) -> GhConfig:
             pypi=yanking.get("pypi", False),
             testpypi=yanking.get("testpypi", False),
             keep=yanking.get("keep", 0),
+            governance_paths=tuple(
+                yanking.get(
+                    "governance_paths",
+                    YankConfig.governance_paths,
+                )
+            ),
         ),
         github_release=GithubReleaseConfig(
             enabled=release.get("enabled", True),
