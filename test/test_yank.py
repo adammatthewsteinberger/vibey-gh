@@ -17,7 +17,7 @@ from pathlib import Path
 import pytest
 
 from vibey_gh import yank
-from vibey_gh.config import GhConfig, YankConfig
+from vibey_gh.config import GhConfig, YankConfig, load_config
 
 
 def _cfg(**kw) -> GhConfig:
@@ -259,3 +259,62 @@ def test_the_index_still_has_no_yank_api(url):
 
     assert status("file_upload") == "403", "a recognised action should reach authentication"
     assert status("yank") == "405", "if this is no longer 405, PyPI may have shipped a yank API"
+
+def test_governance_paths_match_the_founding_documents_by_default():
+    patterns = YankConfig().governance_paths
+    for path in (
+        "docs/constitution.md",
+        "docs/commandments.md",
+        "docs/bill-of-rights.md",
+        "docs/sd-01-counterparties-trust-verification.md",
+    ):
+        assert yank.governance_changed(patterns, [path]), path
+    assert not yank.governance_changed(patterns, ["docs/architecture.md", "README.md"])
+    assert not yank.governance_changed(patterns, [])
+
+
+def test_a_ratified_governance_change_supersedes_everything(monkeypatch):
+    """Article V.4: retention window and per-index switches are both overridden.
+
+    The config below disables reporting on both indexes and keeps two rollback
+    targets — and none of that survives a ratified change to the constitution: the
+    rule is law, the config is machinery, and no artifact circulates under
+    superseded law."""
+    _index(
+        monkeypatch,
+        {
+            "releases": {
+                "1.0.0": [{}],
+                "1.1.0": [{}],
+                "1.2.0": [{}],
+                "1.3.0": [{}],
+            }
+        },
+    )
+    cfg = _cfg(pypi=False, testpypi=False, keep=2)
+    report = yank.report_superseded(
+        cfg, yank.PYPI, "pkg", "1.3.0", changed_files=["docs/constitution.md"]
+    )
+    assert report.governance is True
+    assert report.superseded == ("1.2.0", "1.1.0", "1.0.0")
+
+
+def test_an_ordinary_release_never_claims_governance(monkeypatch):
+    _index(monkeypatch, {"releases": {"1.0.0": [{}], "1.1.0": [{}]}})
+    cfg = _cfg(pypi=True, keep=0)
+    report = yank.report_superseded(
+        cfg, yank.PYPI, "pkg", "1.1.0", changed_files=["vibey_gh/cli.py", "README.md"]
+    )
+    assert report.governance is False
+    assert report.superseded == ("1.0.0",)
+
+
+def test_governance_paths_load_from_toml(tmp_path):
+    (tmp_path / ".vibey-gh.toml").write_text(
+        '[yank]\ngovernance_paths = ["LAW.md"]\n', encoding="utf-8"
+    )
+    cfg = load_config(tmp_path)
+    assert cfg.yank.governance_paths == ("LAW.md",)
+    assert yank.governance_changed(cfg.yank.governance_paths, ["LAW.md"])
+    assert not yank.governance_changed(cfg.yank.governance_paths, ["docs/constitution.md"])
+

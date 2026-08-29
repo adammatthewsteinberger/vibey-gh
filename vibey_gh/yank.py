@@ -30,6 +30,7 @@ where they can be actioned.
 
 from __future__ import annotations
 
+import fnmatch
 import json
 import urllib.error
 import urllib.request
@@ -59,10 +60,24 @@ class SupersededReport:
     skipped: tuple[str, ...] = ()
     problems: tuple[str, ...] = ()
     manage_url: str = ""
+    # Article V.4: this release ratified a governance change, so everything below it is
+    # named without a retention window and regardless of the per-index switches.
+    governance: bool = False
 
     @property
     def ok(self) -> bool:
         return not self.problems
+
+
+def governance_changed(patterns: tuple[str, ...], changed: list[str]) -> bool:
+    """Did this release ratify a governance change? fnmatch globs over changed paths.
+
+    Pure on purpose: the caller supplies the changed-file list (git is its problem), so
+    the rule itself is testable byte-for-byte and never depends on repository state.
+    """
+    return any(
+        fnmatch.fnmatch(path, pattern) for path in changed for pattern in patterns
+    )
 
 
 def released_versions(index: str, project: str, timeout: int = 30) -> list[str]:
@@ -139,10 +154,23 @@ def supersede(versions: list[str], current: str, keep: int) -> list[str]:
     return [version for _, version in candidates[keep:]]
 
 
-def report_superseded(cfg: GhConfig, index: str, project: str, current: str) -> SupersededReport:
-    """Work out what `current` supersedes on `index`, honouring `keep`."""
+def report_superseded(
+    cfg: GhConfig,
+    index: str,
+    project: str,
+    current: str,
+    changed_files: list[str] | None = None,
+) -> SupersededReport:
+    """Work out what `current` supersedes on `index`, honouring `keep`.
+
+    When `changed_files` shows a ratified governance change (Article V.4 of the
+    Constitution), the retention window and the per-index off-switches are overridden:
+    every previous release is named, zero exceptions. The rule outranks the config
+    because the config is machinery and the rule is law.
+    """
+    governance = governance_changed(cfg.yank.governance_paths, changed_files or [])
     enabled = cfg.yank.pypi if index == PYPI else cfg.yank.testpypi
-    if not enabled:
+    if not enabled and not governance:
         return SupersededReport(index, skipped=("disabled",))
 
     try:
@@ -153,11 +181,12 @@ def report_superseded(cfg: GhConfig, index: str, project: str, current: str) -> 
         # publish as a broken one.
         return SupersededReport(index, problems=(f"could not read {index}: {error}",))
 
-    targets = supersede(versions, current, cfg.yank.keep)
+    targets = supersede(versions, current, 0 if governance else cfg.yank.keep)
     if not targets:
-        return SupersededReport(index, skipped=("nothing superseded",))
+        return SupersededReport(index, skipped=("nothing superseded",), governance=governance)
     return SupersededReport(
         index,
         superseded=tuple(targets),
         manage_url=_MANAGE[index].format(project=project),
+        governance=governance,
     )

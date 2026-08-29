@@ -87,7 +87,7 @@ jobs:
         run: |
           set -euo pipefail
           python -m pip install --quiet -e .
-          vibey-gh report-superseded \
+          vibey-gh report-superseded --governance-since "${{ github.event.before }}" \
             --index testpypi \
             --project vibey-gh \
             --version "$(vibey-gh version --dev)" >> "$GITHUB_STEP_SUMMARY"
@@ -116,7 +116,7 @@ jobs:
         run: |
           set -euo pipefail
           python -m pip install --quiet -e .
-          vibey-gh report-superseded \
+          vibey-gh report-superseded --governance-since "${{ github.event.before }}" \
             --index pypi \
             --project vibey-gh \
             --version "$(vibey-gh version)" >> "$GITHUB_STEP_SUMMARY"
