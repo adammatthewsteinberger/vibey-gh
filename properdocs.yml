@@ -36,8 +36,8 @@ nav:
   - Contributing: development.md
   - Dependencies: dependencies.md
   - Accessibility: accessibility.md
+  - Roadmap: roadmap.md
   - Threat model: threat-model.md
   - Governance: governance.md
   - Architecture decisions: adr/README.md
-  - Roadmap: roadmap.md
 strict: true
