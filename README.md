@@ -311,17 +311,14 @@ or the network beyond it. See [Threat model](docs/threat-model.md) for the full 
 | `vibey-gh promote [--no-wait]` | Open or reuse the asynchronous `develop → main` promotion PR. |
 | `vibey-gh github-release --target SHA [--version VERSION]` | Create or reuse an immutable tag and GitHub Release for an exact production SHA. |
 | `vibey-gh realign` | Align identical `develop` and `main` trees after a rebase merge without discarding work. |
-| `vibey-gh report-superseded --index pypi\|testpypi --project NAME --version VERSION` | Report which prior releases a published version supersedes, since PyPI has no yank API; never yanks anything itself. |
-| `vibey-gh local-review [--diff FILE]` | Review a diff with a local Ollama-compatible model when the primary paid review returns no verdict at all. Opt-in fallback; see `[pr_automation.fallback]`. |
+| `vibey-gh report-superseded --index pypi\|testpypi --project NAME --version VERSION` | After a successful publish, report which prior released versions the new one supersedes and a link to the index's manage page, since PyPI has no API to yank; only a human can act on it. |
+| `vibey-gh local-review [--diff FILE] [--model] [--base-url] [--max-chars] [--timeout]` | `[pr_automation.fallback]`-only: review a diff with a local Ollama-compatible model on a self-hosted runner when the paid exact-head review returns no verdict at all. |
 | `vibey-gh doctor` | Offline adoption preflight: reads `.vibey-gh.toml`, `pyproject.toml`, and `.github/workflows/` on disk (no network, no credentials, no execution) to catch a config key silently ignored in the wrong section, a merge train stuck forever with no installed gate workflow, a ruff rule that fails every stamped file, contending Pages deployers, and superseded fingerprint headers. |
-| `vibey-gh local-triage [--issue FILE]` | Triage an issue with the same local model when the primary paid solver produces nothing. Always marks the result `needs_human`. |
+| `vibey-gh local-triage [--issue FILE] [--model] [--base-url] [--max-chars] [--timeout]` | `[pr_automation.fallback]`-only: triage an issue with the same local model when the paid solver produced nothing; always returns `needs_human=true`. |
 | `vibey-gh pr-automation self-heal [--pr N]` | Refill a spent repair budget, itself bounded so a permanent failure still stops. |
-| `vibey-gh local-review [--diff FILE] [--model] [--base-url] [--max-chars] [--timeout]` | `[pr_automation.fallback]`-only: review a diff with a local Ollama model on a self-hosted runner when the paid exact-head review returns no verdict at all. |
 | `vibey-gh conversation evaluate\|context\|reply\|record-response` | Decide, brief, answer, and budget one comment-driven interaction. |
 | `vibey-gh reconcile-branches [--dry-run]` | Rebase, close, or leave each open branch stranded by a realign rewrite. |
 | `vibey-gh rulesets [--dry-run]` | Reconcile the integration and release branch rulesets from `[rulesets]`. |
-| `vibey-gh local-triage [--issue FILE] [--model] [--base-url] [--max-chars] [--timeout]` | `[pr_automation.fallback]`-only: triage an issue with the same local model when the paid solver produced nothing; always returns `needs_human=true`. |
-| `vibey-gh report-superseded --index pypi\|testpypi --project NAME --version VERSION` | After a successful publish, print which released versions the new one supersedes and a link to the index's manage page — PyPI has no API to yank, only a human can. |
 | `vibey-gh sdk|api|mcp|webhook CAPABILITY` | Invoke the same canonical capability through each supported public surface. |
 
 Run `vibey-gh --help` and read [docs/cli.md](docs/cli.md) for the full reference.
