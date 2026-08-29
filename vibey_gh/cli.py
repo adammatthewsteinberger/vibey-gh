@@ -387,6 +387,15 @@ def _report_superseded(args) -> int:
     return 0
 
 
+def _failover(args) -> int:
+    from vibey_gh import failover
+
+    cfg = failover.load(Path(args.config).expanduser() if args.config else None)
+    state = Path(args.state).expanduser() if args.state else None
+    failover.run(cfg, state_path=state, once=args.once)
+    return 0
+
+
 def _doctor(args) -> int:
     from vibey_gh import doctor
 
@@ -868,6 +877,23 @@ def main(argv: list[str] | None = None) -> int:
     )
     la.add_argument("--no-check", action="store_true", help="skip the per-repo provenance check")
     la.set_defaults(func=_local_authority)
+
+    fo = sub.add_parser(
+        "failover",
+        help="hand the operator seat to a local agent while the paid lane is out of credit",
+    )
+    fo.add_argument(
+        "--config",
+        default="",
+        help="machine-level TOML (default ~/.config/vibey-gh/failover.toml); missing file = disabled",
+    )
+    fo.add_argument(
+        "--state",
+        default="",
+        help="seat-state file (default ~/.local/state/vibey-gh/failover.json)",
+    )
+    fo.add_argument("--once", action="store_true", help="one probe and transition, then exit")
+    fo.set_defaults(func=_failover)
 
     pp = sub.add_parser(
         "paper",

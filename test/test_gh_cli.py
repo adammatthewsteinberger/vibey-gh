@@ -893,3 +893,24 @@ def test_report_superseded_unreadable_governance_range_is_loud_never_fatal(repo,
     err = capsys.readouterr().err
     assert "could not read the governance range" in err
     assert "Article V.4 was NOT evaluated" in err
+
+
+def test_failover_cli_runs_once_with_explicit_paths(repo, capsys, tmp_path, monkeypatch):
+    assert (
+        main(
+            [
+                "failover",
+                "--once",
+                "--config",
+                str(tmp_path / "missing.toml"),
+                "--state",
+                str(tmp_path / "state.json"),
+            ]
+        )
+        == 0
+    )
+    assert "disabled" in capsys.readouterr().out
+    # Default paths resolve under HOME; point HOME at the sandbox and cover them too.
+    monkeypatch.setenv("HOME", str(tmp_path))
+    assert main(["failover", "--once"]) == 0
+    assert "disabled" in capsys.readouterr().out
