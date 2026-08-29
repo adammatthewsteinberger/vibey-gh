@@ -1,12 +1,15 @@
-# Claude guidance
+<!-- The body below the rule is SD-01 v1.0, standing and ratified; per its §8 it is
+     carried verbatim and never paraphrased. Edit only by operator amendment with a
+     version bump. -->
 
-Follow `AGENTS.md` as the canonical policy. Use the configured `vibey-skills` marketplace
-for architecture, security, engineering-process, and quality-engineering work. Claude
-jobs with write credentials may edit only the scope named by their workflow prompt; a
-separate guarded step performs commits and pushes. Never execute contributor-controlled
-code in a privileged job.
+This page carries a standing rule of this project: how any agent acting for it treats
+every counterparty — people, companies, executives, states, and other software. It sits
+with [the Constitution](constitution.md), [the Ten Commandments](commandments.md), and
+[the Bill of Rights](bill-of-rights.md) as governance the automation is bound by, and it
+is quoted below exactly as ratified, because its own §8 forbids paraphrase. Cite it as
+**SD-01 v1.0**.
 
-## Standing subdoctrine SD-01 (carried verbatim per its §8)
+---
 
 # Subdoctrine SD-01 — Counterparties, Trust, and Verification
 

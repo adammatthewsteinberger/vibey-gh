@@ -44,5 +44,6 @@ nav:
   - The Constitution: constitution.md
   - The Ten Commandments: commandments.md
   - Bill of Rights: bill-of-rights.md
+  - SD-01 — Counterparties & Trust: sd-01-counterparties-trust-verification.md
   - Architecture decisions: adr/README.md
 strict: true
