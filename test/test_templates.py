@@ -318,7 +318,7 @@ def test_a_workflow_scope_rejection_is_named_not_buried():
     assert "this repair edits .github/workflows/**" in text
     assert "Workflows (read-write) permission" in text
     assert "the repair itself succeeded" in text
-    assert 'grep -q \'^\\.github/workflows/\'' in text
+    assert "grep -q '^\\.github/workflows/'" in text
     # the summary line reaches the operator surface, not just stderr
     assert text.count("GITHUB_STEP_SUMMARY") >= 1
 
