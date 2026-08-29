@@ -1250,3 +1250,40 @@ def test_the_fallback_reconstructs_a_diff_the_api_refuses(tmp_path):
     # Shallow trusted checkouts must deepen until the histories connect, never guess.
     assert "--unshallow" in section
     assert 'git -C automation diff "$merge_base" "$head_sha"' in section
+
+
+def test_search_console_verification_survives_redeploys(tmp_path):
+    """An uploaded verification FILE is wiped every time release-surfaces rebuilds the
+    Pages root — observed as a repeatedly un-verifiable property. The HTML-tag token is
+    configuration, rendered into every page and the channel index, so verification
+    survives every deploy. Unset, nothing renders."""
+    from vibey_gh.config import DocumentationConfig, GhConfig
+    from vibey_gh.install import render_workflow
+
+    source = WORKFLOWS / "release-surfaces.yml"
+    off = render_workflow(source, GhConfig(root=tmp_path))
+    assert "SEO_SITE_VERIFICATION=''" in off
+    assert 'name="google-site-verification"' in off  # the injector line, gated at runtime
+    assert 'content=""' not in off.split("<title>")[0]
+
+    on = render_workflow(
+        source,
+        GhConfig(
+            root=tmp_path,
+            documentation=DocumentationConfig(google_site_verification="tok_ABC-123"),
+        ),
+    )
+    assert "SEO_SITE_VERIFICATION='tok_ABC-123'" in on
+    # the channel index carries the full static tag
+    assert '<meta name="google-site-verification" content="tok_ABC-123">' in on
+
+
+def test_search_console_token_refuses_a_whole_tag():
+    """People paste the whole <meta> tag; the loader demands the bare token so the render
+    cannot double-wrap it into broken HTML."""
+    import pytest as _pytest
+
+    from vibey_gh.config import DocumentationConfig
+
+    with _pytest.raises(ValueError, match="bare token"):
+        DocumentationConfig(google_site_verification='<meta name="google-site-verification">')

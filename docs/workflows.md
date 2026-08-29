@@ -298,7 +298,9 @@ successful realign then reconciles every open pull request against the rewritten
 `contents: write`, that follow-up can fail for lack of `pull-requests: write` or because
 GitHub is unreachable, and such a failure is logged rather than failing the job — the
 realign already succeeded and must stand regardless of whether the follow-up reconciled
-every branch.
+every branch. This repository's own `testpypi`/`pypi` jobs additionally run `vibey-gh
+report-superseded` right after each publish step, printing which already-released versions
+the new one supersedes; see [Releases](releases.md).
 
 ## GitHub Release
 

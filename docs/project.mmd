@@ -40,6 +40,8 @@ flowchart TB
     Reconcile["Stranded-branch reconciliation (vibey_gh.reconcile)"]
     Rulesets["Branch ruleset reconciliation (vibey_gh.rulesets)"]
     Doctor["Offline adoption preflight (vibey_gh.doctor)"]
+    LocalFallback["Local-model fallback (vibey_gh.local_review): local-review + local-triage"]
+    Yank["Yank/supersede reporting (vibey_gh.yank, report-superseded)"]
   end
 
   subgraph Security["Security Boundary"]
@@ -190,6 +192,7 @@ flowchart TB
   PublishRelease --> TestPyPI
   PublishRelease --> PyPI
   PublishRelease --> Release
+  PublishRelease --> Yank
   Main --> Realign
   Realign --> Develop
   Realign --> Guard

@@ -39,6 +39,18 @@ something else in production:
   fallback works only if that account holds a bypass role on the ruleset; the token's
   permissions cannot add standing its owner does not have.
 
+## Recovering from a review with no verdict
+
+`PR automation: review incomplete` means the primary exact-head review returned no verdict
+at all — check API credit balance, the `ANTHROPIC_API_KEY` secret, and model availability,
+then rerun the review; this is never a defect in the pull request. If
+`[pr_automation.fallback].enabled` is set and a self-hosted `vibey-local-gh` runner is
+registered, the same no-verdict condition instead dispatches a local Ollama model against
+the diff; a clean local verdict passes the gate as `PR automation: gate (local fallback)`
+rather than blocking it. That title always names the weaker reviewer — treat it as a
+signal to still fix the primary path's root cause, not as a fully reviewed pass.
+
+## Everything else in this document Enable Actions write permissions, PR creation,
 ## Everything else
 
 Enable Actions write permissions, PR creation,

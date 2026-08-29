@@ -271,6 +271,15 @@ def render_workflow(source: Path, cfg: GhConfig) -> str:
     wanted = wanted.replace("__VIBEY_GH_DOC_AUTHOR__", docs.author)
     wanted = wanted.replace("__VIBEY_GH_DOC_THEME_COLOR__", docs.theme_color)
     wanted = wanted.replace("__VIBEY_GH_DOC_LOCALE__", docs.locale)
+    wanted = wanted.replace("__VIBEY_GH_DOC_SITE_VERIFICATION__", docs.google_site_verification)
+    wanted = wanted.replace(
+        "__VIBEY_GH_DOC_SITE_VERIFICATION_TAG__",
+        (
+            ('<meta name="google-site-verification" ' f'content="{docs.google_site_verification}">')
+            if docs.google_site_verification
+            else ""
+        ),
+    )
     wanted = wanted.replace(
         "__VIBEY_GH_DOCUMENTATION_FILES__",
         json.dumps(list(cfg.documentation.required_files)),

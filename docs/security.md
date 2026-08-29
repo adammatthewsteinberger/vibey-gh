@@ -116,3 +116,11 @@ raw body, and place `VIBEY_GH_WEBHOOK_STATE_DIR` on access-controlled durable st
 Accepted IDs use atomic mode-0600 marker creation, preventing replay across restarts and
 concurrent CLI processes. Operators own TLS, rate limits, request-size limits, backups,
 retention, and safe pruning of expired claims.
+
+The opt-in `[pr_automation.fallback]` local-model review/triage path runs on a self-hosted
+runner rather than a GitHub-hosted one, so it sits outside the credential-free ephemeral
+Git context described above by design: it holds no repository secret at all
+(`permissions: contents: read`), never checks out PR source, and reaches only a local
+inference port with the diff or issue text as plain data. `trusted_only` (default `true`)
+keeps fork pull requests off that runner entirely. See [Threat model](threat-model.md) for
+the full boundary and blast-radius analysis.
