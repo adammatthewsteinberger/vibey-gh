@@ -283,20 +283,27 @@ jobs:
             security and trust boundaries, upgrades, troubleshooting, contributing,
             support, release/provenance behavior, and links to deeper reference material.
             Judge opening_accessible as if you had never seen this repository: the first
-            two text blocks of README.md must survive zero project context — every
-            load-bearing term either common knowledge or defined in the sentence that
-            uses it, and prose may only index into a diagram by labels the diagram
-            legibly carries. Judge opening_bluf on ordering alone: the first screen
-            states a problem the reader recognizes BEFORE any project vocabulary,
-            capability claims, or description of what the software is — a page that
-            opens with what it IS before what it FIXES fails, however well written.
-            Judge audience_order across the whole README: copy must serve audiences in a
-            fixed order -- beginner-accessible material first, engineering depth second,
-            scholarly material (citations, formal references, theory) third -- each
-            section BLUF, problem before solution. Executive or industry framing (ROI,
-            market positioning, business-value pitches) must be essentially absent: its
-            presence anywhere before the beginner and engineering material, or as more
-            than an incidental aside, fails this judgment.
+            two text blocks of README.md — and of the documentation site's landing page
+            (docs/index.md or equivalent), when the repository publishes one — must
+            survive zero project context — every load-bearing term either common
+            knowledge or defined in the sentence that uses it, and prose may only index
+            into a diagram by labels the diagram legibly carries. Judge opening_bluf on
+            ordering alone, on those same first screens: each states a problem the
+            reader recognizes BEFORE any project vocabulary, capability claims, or
+            description of what the software is — a page that
+            opens with what it IS before what it FIXES fails, however well written,
+            and so does a marketing tagline. Judge audience_order across the whole README AND the documentation
+            suite as published — including the nav order declared in the site
+            configuration (properdocs.yml, mkdocs.yml, or equivalent): copy and
+            navigation must serve audiences in a fixed order -- beginner-accessible
+            material first, engineering depth second, scholarly material (citations,
+            formal references, theory, threat models, governance, decision records)
+            third -- each section BLUF, problem before solution. A nav that puts the
+            engineering reference before the beginner on-ramp fails. Executive or
+            industry framing (ROI, market positioning, business-value pitches) must be
+            essentially absent: its presence anywhere before the beginner and
+            engineering material, or as more than an incidental aside, fails this
+            judgment.
             Verify that every CLI, SDK, API, MCP, and webhook capability is documented.
             A heading, file, or keyword by itself is never proof of completeness. Flag
             vague, stale, circular, implementation-first, unexplained, or missing content.
