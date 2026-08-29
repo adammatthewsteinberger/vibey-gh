@@ -813,7 +813,7 @@ Every canonical capability is exposed and tested through all five supported surf
 - MCP: `initialize`, `tools/list`, and `tools/call`
 - Webhook: HMAC-SHA256 authenticated, delivery-ID replay-safe dispatch
 
-Six CLI commands are deliberately outside this canonical registry, each for its own
+Seven CLI commands are deliberately outside this canonical registry, each for its own
 reason documented in detail in `docs/cli.md`:
 
 - `conventional-message` and `conventional-check` are local git-hook/CI helpers that
@@ -832,6 +832,10 @@ reason documented in detail in `docs/cli.md`:
   installed workflows will function. There is no remote resource for an API, MCP, or
   webhook caller to act on — the answer only means something on the machine that holds
   the checkout.
+- `book` only reads an already-built local site directory and a local site configuration
+  and writes local files (an EPUB and a print-ready HTML). There is no remote resource for
+  an API, MCP, or webhook caller to act on, and exposing it remotely would mean shipping a
+  built site's bytes through a surface with no such contract today.
 
 Every other repository automation capability in `surfaces.CAPABILITIES` remains available
 through all five forms.
