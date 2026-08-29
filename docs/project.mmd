@@ -42,6 +42,7 @@ flowchart TB
     Doctor["Offline adoption preflight (vibey_gh.doctor)"]
     LocalFallback["Local-model fallback (vibey_gh.local_review): local-review + local-triage"]
     Yank["Yank/supersede reporting (vibey_gh.yank, report-superseded)"]
+    Book["Docs-to-book export (vibey_gh.book): EPUB 3.0 + KDP print-ready HTML"]
   end
 
   subgraph PluginMarketplace["Claude plugin marketplace (.claude-plugin/marketplace.json)"]
@@ -233,6 +234,8 @@ flowchart TB
   Debugging --> Fingerprints
   CLI --> Doctor
   Doctor --> Config
+  CLI --> Book
+  Documentation --> Book
   Develop -->|push| BranchSync
   BranchSync --> Reconcile
   Reconcile -->|rebase or delete: force-with-lease and exact-ref guards| Guard
