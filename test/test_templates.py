@@ -196,7 +196,7 @@ def test_documentation_workflow_authors_guarded_refresh_prs():
     text = (WORKFLOWS / "documentation.yml").read_text(encoding="utf-8")
     assert "name: Docs" in text
     assert "vibey-gh check --ci" in text
-    assert "anthropics/claude-code-action@8569a83495a3f6f0c50a90e46351d3816fed1a75" in text
+    assert "anthropics/claude-code-action@a874e9ecd7bb36efdad65429c6b35815f5a08f10" in text
     assert "This is an authoring" in text
     assert "--allowedTools Read,Glob,Grep,Edit,Write" in text
     assert 'branch="vibey-gh/docs/refresh-${RUN_ID}"' in text

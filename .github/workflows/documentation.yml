@@ -59,7 +59,7 @@ jobs:
           echo "name=$branch" >> "$GITHUB_OUTPUT"
       - name: Comprehensively author and repair project documentation
         id: claude
-        uses: anthropics/claude-code-action@8569a83495a3f6f0c50a90e46351d3816fed1a75 # v1
+        uses: anthropics/claude-code-action@a874e9ecd7bb36efdad65429c6b35815f5a08f10 # v1.0.210
         # ai: the default Anthropic endpoint
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
