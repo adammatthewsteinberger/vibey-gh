@@ -36,6 +36,7 @@ nav:
   - Contributing: development.md
   - Dependencies: dependencies.md
   - Accessibility: accessibility.md
+  - Research paper: paper.md
   - Roadmap: roadmap.md
   - Threat model: threat-model.md
   - Governance: governance.md
