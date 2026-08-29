@@ -58,6 +58,14 @@ def test_sources_map_to_the_built_sites_directory_urls():
     assert chapters[2].site_page == "reference/index.html"
 
 
+def test_readme_sources_are_index_pages():
+    """mkdocs builds adr/README.md to adr/index.html — README is an index page, not a
+    directory of its own. The third dogfooded deploy found this the hard way."""
+    chapters = book.chapters_from_nav("nav:\n  - Decisions: adr/README.md\n  - Top: README.md\n")
+    assert chapters[0].site_page == "adr/index.html"
+    assert chapters[1].site_page == "index.html"
+
+
 def test_extraction_takes_main_strips_chrome_and_closes_voids():
     body = book.extract_main(PAGE)
     assert "<h1>T</h1>" in body

@@ -53,10 +53,18 @@ class BookChapter:
 
     @property
     def site_page(self) -> str:
-        """The built page for this source, mirroring mkdocs' directory URLs."""
+        """The built page for this source, mirroring mkdocs' directory URLs.
+
+        README.md is an index page exactly like index.md — mkdocs builds
+        `adr/README.md` to `adr/index.html`, not `adr/README/index.html` —
+        discovered when the third dogfooded deploy could not find the ADR chapter.
+        """
         stem = self.source.removesuffix(".md")
-        if stem == "index" or stem.endswith("/index"):
-            return f"{stem}.html".replace("index.html", "index.html")
+        parts = stem.rsplit("/", 1)
+        name = parts[-1]
+        if name in ("index", "README"):
+            prefix = parts[0] + "/" if len(parts) == 2 else ""
+            return f"{prefix}index.html"
         return f"{stem}/index.html"
 
 
