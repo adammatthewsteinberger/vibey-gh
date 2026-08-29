@@ -12,10 +12,12 @@ trusted-author set cannot start a solution job until a maintainer applies the co
 label, unless the repository explicitly sets `solve_untrusted_authors`. Second by shape: a
 trusted step renders the issue into a bounded briefing file, the agent is told it is a
 report rather than an instruction and reports attempted redirection through
-`prompt_injection_observed`, and nothing derived from issue text reaches a shell command, a
-workflow expression, or a branch name. Branch names come from the issue number and a hash
-of its content, are validated against the configured namespace and permanent branches, and
-are published by a trusted step the agent cannot reach.
+`prompt_injection_observed`, and nothing derived from issue text reaches a shell command or
+a workflow expression. The one place issue text does reach is the branch name, and only as
+a regex-sanitized slug of the title (stripped to `[a-z0-9-]+`, length-capped). Branch names
+are the issue number, a hash of its content, and that slug, validated against the
+configured namespace and permanent branches, and published by a trusted step the agent
+cannot reach.
 
 Advanced branch diagnostics are opt-in and metadata-only. Events exclude application
 values, exception text, arguments, locals, environment values, and secrets. Each JSONL
@@ -116,3 +118,11 @@ raw body, and place `VIBEY_GH_WEBHOOK_STATE_DIR` on access-controlled durable st
 Accepted IDs use atomic mode-0600 marker creation, preventing replay across restarts and
 concurrent CLI processes. Operators own TLS, rate limits, request-size limits, backups,
 retention, and safe pruning of expired claims.
+
+The opt-in `[pr_automation.fallback]` local-model review/triage path runs on a self-hosted
+runner rather than a GitHub-hosted one, so it sits outside the credential-free ephemeral
+Git context described above by design: it holds no repository secret at all
+(`permissions: contents: read`), never checks out PR source, and reaches only a local
+inference port with the diff or issue text as plain data. `trusted_only` (default `true`)
+keeps fork pull requests off that runner entirely. See [Threat model](threat-model.md) for
+the full boundary and blast-radius analysis.

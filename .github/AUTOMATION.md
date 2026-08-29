@@ -84,6 +84,17 @@ maintainability, architecture-boundary, and test-quality review. Forks are inspe
 never mutated with privileged credentials; required edits use a linked repository-owned
 replacement PR that preserves the contributor and exact head.
 
+A repository that sets `[pr_automation.fallback].enabled = true` and provides a
+self-hosted runner labelled `vibey-local-gh` gets one more line of defense: when the
+primary review above returns no verdict at all (never when it ran and found something), a
+`review-fallback` job sends the diff to a local Ollama-compatible model and calls
+`vibey-gh local-review`. It holds no repository secret, never checks out PR source, and
+`trusted_only` (default `true`) keeps fork PRs off that runner entirely. A clean local
+verdict passes the gate under the honestly weaker title `PR automation: gate (local
+fallback)`; `vibey-gh local-triage` is the equivalent for issue automation and always
+forces `needs_human=true`. See [Configuration](../docs/configuration.md) and
+[Threat model](../docs/threat-model.md).
+
 ## Autonomous issue solutions
 
 `issue-automation.yml` runs on `issues` (`opened`, `reopened`, `labeled`), manual dispatch,
@@ -178,6 +189,12 @@ Pages has one deployment per repository, so release surfaces preserve both chann
 artifacts before deploying the combined site. The root page links Production and Preview
 with repository/revision provenance. Generated sites include canonical metadata,
 structured data, robots policy, sitemaps, and LLM discovery documents according to config.
+
+Because PyPI exposes no API for yanking a bad release, `Release` can run `vibey-gh
+report-superseded --index pypi|testpypi --project NAME --version VERSION` right after each
+publish step (this repository's own `release.yml` does) to print which already-released
+versions the new one supersedes, with a direct link to the index's manage page for a human
+to act on. See [Releases](../docs/releases.md).
 
 ## Failure recovery
 
