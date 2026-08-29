@@ -283,6 +283,17 @@ jobs:
           # The documentation as artifacts on the site itself: the doctrine's end
           # results are a KDP-shaped book and a journal-shaped paper, and a reader
           # should download them from the docs they mirror — not hunt a release page.
+          if [ "true" = "true" ] || { [ "true" = "true" ] && [ -f docs/paper.md ]; }; then
+            # This step's environment installs ProperDocs only; the exporters live in
+            # vibey-gh. Observed as exit 127 on the first dogfooded deploy — the guard
+            # printed its intent and the command did not exist. Self-hosting installs
+            # from source, adopters install the published package.
+            if grep -qE '^name = "vibey-(gh|bootstrap)"' pyproject.toml 2>/dev/null; then
+              python -m pip install --quiet -e .
+            else
+              python -m pip install --quiet vibey-gh
+            fi
+          fi
           if [ "true" = "true" ]; then
             AUTHOR='Adam Matthew Steinberger'
             vibey-gh book --site-dir channel-site --config-file .properdocs-channel.yml \

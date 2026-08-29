@@ -412,6 +412,9 @@ def test_the_site_publishes_its_own_book_and_paper_when_enabled(tmp_path):
         ),
     )
     assert "vibey-gh book --site-dir channel-site" in on
+    # The exporters must be installed before they are invoked: the build step's venv
+    # holds only ProperDocs, and the first dogfooded deploy failed with exit 127.
+    assert on.index("pip install --quiet -e .") < on.index("vibey-gh book --site-dir")
     assert "cp book-out/book.epub channel-site/book.epub" in on
     assert "vibey-gh paper --author" in on
     assert "cp paper-out/paper.pdf channel-site/paper.pdf" in on
