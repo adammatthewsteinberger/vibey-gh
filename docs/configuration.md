@@ -384,6 +384,8 @@ a workflow run applies it.
 | `production_indexing` | boolean / `true` | Permit production indexing. |
 | `preview_indexing` | boolean / `false` | Permit preview indexing. |
 | `generate_robots`, `generate_sitemap_index`, `generate_llms_txt`, `generate_llms_full_txt`, `generate_json_ld` | boolean / `true` | Generate robot, search, LLM, and structured metadata. |
+| `funding_bitcoin`, `funding_monero`, `funding_ethereum` | string / empty | Opt-in funding signage (#198): when set, a small footer line beside the provenance signage offers the address as text with a copy button — never a payment-processor link. Each address is shape-validated at config load (bech32/Base58 for Bitcoin, 95/106-char Monero base58, `0x`+40-hex for Ethereum); a malformed value is a configuration error, and no default ever ships. The render is verbatim from this file, so any change to an address is a reviewed, fingerprinted commit. |
+| `funding_label` | string / `Support this work` | The sentence introducing the funding line. |
 | `bottom_nav` | boolean / `true` | Clone the theme's own `rel="prev"`/`rel="next"` header anchors into a previous/next bar at the bottom of every published page, so a reader who has just finished a page — especially on a phone — can move on from where they already are. Pages without those anchors (the channel picker, 404) get no bar. `false` disables the injection. |
 | `author_name` | string / `Adam Matthew Steinberger` | Reserved documentation-provenance author label. Parsed and validated (non-empty), but not yet emitted into any generated asset. |
 | `author_url` | URL / `https://vibewithadam.matthewsteinberger.com` | Reserved documentation-provenance author destination. Same current scope as `author_name`. |

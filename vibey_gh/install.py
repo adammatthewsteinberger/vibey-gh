@@ -269,13 +269,17 @@ def render_workflow(source: Path, cfg: GhConfig) -> str:
     wanted = wanted.replace("__VIBEY_GH_DOC_TWITTER_CREATOR__", docs.twitter_creator)
     wanted = wanted.replace("__VIBEY_GH_DOC_KEYWORDS__", ",".join(docs.keywords))
     wanted = wanted.replace("__VIBEY_GH_DOC_AUTHOR__", docs.author)
+    wanted = wanted.replace("__VIBEY_GH_DOC_FUNDING_BITCOIN__", docs.funding_bitcoin)
+    wanted = wanted.replace("__VIBEY_GH_DOC_FUNDING_MONERO__", docs.funding_monero)
+    wanted = wanted.replace("__VIBEY_GH_DOC_FUNDING_ETHEREUM__", docs.funding_ethereum)
+    wanted = wanted.replace("__VIBEY_GH_DOC_FUNDING_LABEL__", docs.funding_label)
     wanted = wanted.replace("__VIBEY_GH_DOC_THEME_COLOR__", docs.theme_color)
     wanted = wanted.replace("__VIBEY_GH_DOC_LOCALE__", docs.locale)
     wanted = wanted.replace("__VIBEY_GH_DOC_SITE_VERIFICATION__", docs.google_site_verification)
     wanted = wanted.replace(
         "__VIBEY_GH_DOC_SITE_VERIFICATION_TAG__",
         (
-            ('<meta name="google-site-verification" ' f'content="{docs.google_site_verification}">')
+            (f'<meta name="google-site-verification" content="{docs.google_site_verification}">')
             if docs.google_site_verification
             else ""
         ),
