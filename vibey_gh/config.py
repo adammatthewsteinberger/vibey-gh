@@ -293,7 +293,7 @@ class SocialSignalsConfig:
                     " this signal — a claim without a date cannot age, and every"
                     " authenticity claim must age (4.a amendment)"
                 ) from None
-            age = (datetime.date.today() - attested).days
+            age = (datetime.datetime.now(datetime.UTC).date() - attested).days
             if age > self.max_attestation_age_days:
                 raise ValueError(
                     f"{where}: attestation is {age} days old, past"

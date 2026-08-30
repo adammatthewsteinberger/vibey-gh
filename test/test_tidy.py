@@ -204,21 +204,35 @@ def test_gh_failures_and_garbage_are_survivable(repos, monkeypatch):
 
     real_run = subprocess.run
 
-    def broken_gh(cmd, **kw):
+    def garbled_gh(cmd, **kw):
         if cmd and cmd[0] == "gh":
 
             class R:
-                returncode = 1 if "release" in cmd else 0
-                stdout = "not json"
+                returncode = 0
+                stdout = "not json" if "pr" in cmd else '"a bare string is not a listing"'
 
             return R()
         return real_run(cmd, **kw)
 
-    monkeypatch.setattr(tidy.subprocess, "run", broken_gh)
+    monkeypatch.setattr(tidy.subprocess, "run", garbled_gh)
     report = tidy.survey(cfg)
     assert report.draft_releases == ()
     # with pr list unreadable, no head is exempt — but nothing crashes
     assert isinstance(report.remote_merged, tuple)
+
+    def refusing_gh(cmd, **kw):
+        if cmd and cmd[0] == "gh":
+
+            class R:
+                returncode = 1
+                stdout = ""
+
+            return R()
+        return real_run(cmd, **kw)
+
+    monkeypatch.setattr(tidy.subprocess, "run", refusing_gh)
+    report = tidy.survey(cfg)
+    assert report.draft_releases == ()
 
 
 def test_tidy_config_loads_from_toml(tmp_path: Path):
