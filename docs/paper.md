@@ -153,6 +153,62 @@ configuration. Where an index offers no revocation API, the system emits the com
 demand — each named $u$, with its management URL — and the human executes it; the
 platform's limitation assigns the executor without weakening the invariant.
 
+## The commodity thesis: production is bounded, governance is not
+
+The measurements above suggest a claim larger than the system that produced them.
+
+**Statement.** For a bounded task class $T$ executed by a competent agent —
+human or machine — under a fixed governance regime $G$, output rate and quality
+occupy a *tolerance window* $[\ell, u]$ whose width is small relative to the mean.
+Production is therefore a commodity in the economic sense: substitutable, priceable,
+and predictable. Scarcity does not live in $T$. It lives in $G$.
+
+**Evidence, from this system's own operation.** The escalation of §sovereign
+operation drove one machine from one to thirty-two concurrent generations. Across
+sixty-one generations the success rate was $1.00$ and throughput held a band of
+$1.4 \pm 0.25$ per minute — a tolerance window of roughly $\pm 18\%$, tighter than
+most machining tolerances quoted in units of the part. Latency degraded, but
+*predictably*: linear at $22\,\mathrm{s}$ per added job through $N = 12$, then
+superlinear at $59\,\mathrm{s}$ per job by $N = 16$.
+
+The stronger evidence is operational rather than synthetic. Over one session this
+system produced on the order of forty pull requests, fifteen issues, three papers,
+six releases, and three review storms, at no point limited by its capacity to
+produce. Every stall was governance: exhausted commercial credit, merge authority
+withheld from the machine, ratification awaiting a human, a promotion race requiring
+human reconciliation, a version-pinning drift. Production never bound; governance
+always did.
+
+**The mechanical analogy, and its correction.** Mechanical engineering's tolerance
+windows are imposed by physics; a shaft cannot be machined outside what the material
+permits. Software has no such external constraint, and this is the crux: the window
+observed here was *manufactured* — by tests, coverage gates, provenance checks, and
+ratified doctrine. Governance is therefore not merely the bottleneck. It is the
+enabling condition. Removing it does not accelerate output; it removes the bound,
+and unbounded variance is not production but noise.
+
+$$
+\text{waste}(n) = \underbrace{p \cdot n}_{\text{production}} -
+\underbrace{c\,\frac{n(n-1)}{2}}_{\text{coordination}}
+$$
+
+**Why the failure mode persists.** With $n$ participants, production scales linearly
+while coordination scales with the number of channels between them, $\binom{n}{2}$.
+Waste turns negative beyond $n^{*} = 2p/c + 1$ regardless of how cheap production
+becomes — indeed *faster* production lowers $n^{*}$, so commoditizing the work
+shifts the binding constraint further toward governance rather than away from it.
+The superlinear queue latency measured above is the same structure observed in
+silicon: added participants multiply synchronization surface, not throughput. Brooks
+stated this for human teams; the measurement here suggests it is substrate-independent.
+
+**Scope, stated honestly.** This is evidenced, not proven: one machine, one model,
+one session. And the claim holds for *production*, not for *judgment*. In the same
+session the local reviewer returned confidently wrong verdicts on every nuanced
+call — flagging rendered template constants as dead logic, opposing a version pin
+that documented policy required, and defending the exact defect an incident
+condemned. Artifacts are commoditized. Correct judgment about artifacts is not.
+That gap, rather than throughput, is where the remaining engineering lies.
+
 ## Related work
 
 Platform-native automation (merge queues, required checks) enforces revision-bound
