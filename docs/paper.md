@@ -100,13 +100,70 @@ re-promoting identical content never compounds a bump. Published versions theref
 form a monotone sequence, and the publish step treats an already-published version as
 a no-op, never an error.
 
+## Sovereign operation: degraded modes as first-class states
+
+Production exposed a failure class the calculus above does not reach: the *evaluator's
+own substrate* — API credit, the hosted review lane, the operator's IDE — can refuse
+service while the repositories remain healthy. We model each lane as a probe
+$p : \mathbb{T} \to \{0,1\}$ (a command judged by exit status at time $t$) and define
+sovereign operation as the requirement that for every lane there exists a fallback
+lattice $L_0 \succ L_1 \succ \cdots \succ L_k$ in which $L_0$ is the preferred lane,
+each $L_{i+1}$ is strictly harder to refuse than $L_i$, and control always rests at the
+*least* $i$ with $p_i(t) = 1$.
+
+**The seat automaton.** The operator seat is governed by a two-bit state machine over
+$(\mathit{paid}, \mathit{seat}) \in \{0,1\}^2$ with the transition function
+
+$$
+\sigma(\mathit{paid}, \mathit{seat}) =
+\begin{cases}
+\mathrm{RECLAIM} & \mathit{paid} = 1 \wedge \mathit{seat} = 1\\
+\mathrm{ENGAGE} & \mathit{paid} = 0 \wedge \mathit{seat} = 0\\
+\mathrm{HOLD} & \text{otherwise.}
+\end{cases}
+$$
+
+$\sigma$ is total and deterministic by inspection, and satisfies the *paid-lane-leads*
+invariant: from any state, one probe cycle after $\mathit{paid}$ becomes and stays 1,
+$\mathit{seat} = 0$ — the hosted lane resumes leadership within a single interval, and
+recovery requires no input beyond the funding event itself. Engagement selects the
+first seat in the lattice whose health probe passes; a lattice with no passing seat is
+reported as an alarm rather than absorbed, since a silent gap is an operator with no
+agent at all — the one outcome the automaton exists to prevent.
+
+**Lossless handoff.** Handoffs are invisible in repository history because seats share
+one working tree while a sync loop maintains, for every branch $b$ with local head
+$\ell(b)$ and remote head $r(b)$, the guarded property: push only if $\ell(b)$ is
+clean, provenance-green, and strictly ahead, using a compare-and-swap on the remote
+ref — force-with-lease against the lease value captured *before* any fetch. The
+capture ordering is load-bearing: fetching first silently re-arms the lease to
+whatever the remote already holds, reducing the swap to an unconditional overwrite —
+a regression class we hit, tested, and closed. Under this discipline the remote can
+lose no commit the local side has not already seen, so the union of both fronts is
+non-decreasing across arbitrary seat churn.
+
+**Governance supersession.** The founding documents ratchet (they may only
+strengthen), and ratification carries a fleet-wide obligation stated as an invariant
+over the release order: let $G$ be the governed path set and $\mathcal{R}$ the set of
+published versions with total order $\prec$ from release monotonicity. A release $v$
+whose change set touches $G$ — a *ratified* governance change, never a draft — makes
+every $u \prec v$ superseded: no artifact circulates under superseded law, with the
+retention window and every reporting switch overridden by construction rather than by
+configuration. Where an index offers no revocation API, the system emits the complete
+demand — each named $u$, with its management URL — and the human executes it; the
+platform's limitation assigns the executor without weakening the invariant.
+
 ## Related work
 
 Platform-native automation (merge queues, required checks) enforces revision-bound
 *checks* but leaves verdict freshness to consumers. Yanking semantics for published
 artifacts (PEP 592) informed the report-only supersession design. Keyless publishing
 via OIDC (PyPI Trusted Publishers) removes the stored-credential class entirely and
-is assumed throughout.
+is assumed throughout. Degraded-mode design draws on the availability literature's
+fail-operational tradition — the system continues under component refusal rather than
+halting — with the distinguishing constraint that our refusals include *commercial*
+ones (credit exhaustion, deplatforming), which motivates fallback lattices ordered by
+refusability rather than by mean time between failures.
 
 ## Conclusion
 
@@ -121,3 +178,5 @@ production systems is a choice, not a necessity.
 - PyPI, *Trusted Publishers*, https://docs.pypi.org/trusted-publishers/, 2023.
 - GitHub, *About protected branches and rulesets*, GitHub Docs, 2024.
 - vibey-gh repository, issues 161 and 163: the recorded violation and correction, 2026.
+- vibey-gh repository, issues 201, 206–209: the credit-refusal incident and the
+  sovereign-operation mechanisms it produced, 2026.
