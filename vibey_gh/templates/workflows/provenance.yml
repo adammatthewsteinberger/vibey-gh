@@ -1,5 +1,5 @@
 # Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), Developed by [Adam Matthew Steinberger](https://vibewithadam.matthewsteinberger.com/) ([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/)).
-name: Provenance
+name: __VIBEY_GH_WF_PROVENANCE__
 
 # Server-side half of the provenance rule. The pre-push hook is the fast, local half, but
 # a hook lives in a clone: it can be skipped with --no-verify, and a fresh clone that
@@ -9,7 +9,7 @@ name: Provenance
 # It runs on every branch, not just pull requests, so an unfingerprinted commit is caught
 # where it is pushed rather than at merge time.
 #
-# The job name below — "Provenance" — is the context you add to the branch ruleset.
+# The job name below — "__VIBEY_GH_WF_PROVENANCE__" — is the context you add to the branch ruleset.
 
 on:
   push:
