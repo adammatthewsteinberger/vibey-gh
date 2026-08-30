@@ -18,9 +18,9 @@ from vibey_gh.fit import (
     decide,
     estimate_from,
     headroom_gb,
-    saturating_wait,
     sample_machine,
     sample_model,
+    saturating_wait,
 )
 
 MACHINE = Machine(total_gb=25.77, free_gb=2.97, swap_used_gb=6.5, swap_total_gb=7.0)

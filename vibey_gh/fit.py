@@ -48,9 +48,9 @@ __all__ = [
     "decide",
     "estimate_from",
     "headroom_gb",
-    "saturating_wait",
     "sample_machine",
     "sample_model",
+    "saturating_wait",
 ]
 
 ADMIT = "admit"
