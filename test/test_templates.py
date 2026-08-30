@@ -402,6 +402,25 @@ def test_release_surfaces_ships_the_corpus_index():
     assert "cp corpus-index.json channel-site/corpus-index.json" in flat
 
 
+def test_only_the_tooling_repository_self_hosts_the_install():
+    """#242's root cause: the self-hosting grep matched vibey-bootstrap too, so an
+    ADOPTER installed itself instead of the pinned tool — its floating vibey-gh
+    dependency then supplied a checker NEWER than its renders, and 'out of date'
+    phantoms followed. Exactly one repository provides the tooling."""
+    for name in (
+        "provenance.yml",
+        "promote-to-main.yml",
+        "merge-train.yml",
+        "conventional-commits.yml",
+        "github-release.yml",
+        "release-surfaces.yml",
+    ):
+        text = (WORKFLOWS / name).read_text(encoding="utf-8")
+        assert "vibey-(gh|bootstrap)" not in text, name
+        if "installing from source" in text:
+            assert 'name = "vibey-gh"' in text, name
+
+
 def test_review_prompt_enforces_the_clean_repo():
     """Sub-doctrine 9.a: technical clutter blocks; human messiness is expressly
     welcome and never a finding."""
@@ -1114,7 +1133,7 @@ def test_conventional_commits_installs_the_published_package_not_the_adopting_re
     """
     text = (WORKFLOWS / "conventional-commits.yml").read_text(encoding="utf-8")
     assert "pip install --quiet ./automation" not in text
-    assert "grep -qE '^name = \"vibey-(gh|bootstrap)\"' pyproject.toml" in text
+    assert "grep -qE '^name = \"vibey-gh\"' pyproject.toml" in text
     assert "python -m pip install --quiet -e ." in text
     assert "python -m pip install --quiet vibey-gh" in text
     assert "name: Check out trusted automation" in text
