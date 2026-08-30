@@ -67,6 +67,14 @@ term defined at first use in that document; hyperlinks are first-class citizens 
 the point of reference. The human reader is served first, the AI reader second, and
 business needs absolutely last, if at all.
 
+**7.a — the searchable ledger** *(ratified by the merge that carried this
+entry)*: the ledger always has a way for anyone — no matter who — to search it: the
+full public ledger where a deployment holds it, or the shard the repository holds.
+An opt-in presentation surface for the published site is forever available. The
+explorer is optimized for human consumption first and machine consumption after —
+always and forever, amen. One standard for every searcher: no privileged reader, no
+gated truth.
+
 ## 8 — Local authority
 
 When paid credits run out, local is the source of truth: green local work reaches
