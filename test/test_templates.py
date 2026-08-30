@@ -383,6 +383,20 @@ def test_rendered_pr_automation_carries_exactly_one_schedule_key(tmp_path):
     assert "schedule backstop disabled by .vibey-gh.toml" in off
 
 
+def test_review_prompt_enforces_unwind_immunity_with_the_minyan_of_ten():
+    """Article IV.5-6: no unwind may degrade the ratified governance corpus, and only
+    ten or more named humans — a minyan — can approve an exception; machine
+    approvals are worthless toward the quorum. The review is the enforcement
+    surface, so the prompt must state the rule, the quorum, and the not-an-unwind
+    carve-out."""
+    text = (WORKFLOWS / "pr-automation.yml").read_text(encoding="utf-8")
+    flat = " ".join(text.split())
+    assert "Enforce unwind immunity (Article IV.5-6)" in flat
+    assert "no fewer than TEN named humans — a minyan" in flat
+    assert "Machine approvals count for nothing" in flat
+    assert "A pure addition or a strengthening rewrite is not an unwind" in flat
+
+
 def test_review_prompt_judges_the_living_roadmap():
     """#211: the exact-head review owns roadmap LIVENESS — presence is the
     deterministic contract's job. The prompt must demand an existing roadmap that
