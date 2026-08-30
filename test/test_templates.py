@@ -408,7 +408,6 @@ def test_review_prompt_enforces_the_social_signals_oath():
     text = (WORKFLOWS / "pr-automation.yml").read_text(encoding="utf-8")
     flat = " ".join(text.split())
     assert "Enforce the social-signals oath (sub-doctrine 4.a)" in flat
-    assert "never a machine" not in flat or True
     assert "machine-authored, synthetic, unattributed, or unverifiable is FALSE WITNESS" in flat
 
 

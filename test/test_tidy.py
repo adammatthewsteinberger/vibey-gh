@@ -35,6 +35,7 @@ def repos(tmp_path: Path, monkeypatch):
     _sh(work, "branch", "-M", "develop")
     _sh(work, "push", "-qu", "origin", "develop")
     _sh(work, "push", "-q", "origin", "develop:main")
+    _sh(work, "remote", "set-head", "origin", "develop")
 
     # merged: tip is an ancestor of develop (the ancestry proof)
     _sh(work, "branch", "merged-work", "develop")
@@ -108,7 +109,7 @@ def repos(tmp_path: Path, monkeypatch):
 
 
 def test_survey_finds_every_class_and_spares_the_human_mess(repos):
-    work, cfg = repos
+    _work, cfg = repos
     report = tidy.survey(cfg)
     assert report.remote_merged == ("merged-work",)
     assert report.local_merged == ("merged-work",)
@@ -126,7 +127,7 @@ def test_survey_finds_every_class_and_spares_the_human_mess(repos):
 
 
 def test_ci_mode_surveys_only_the_cloud_classes(repos):
-    work, cfg = repos
+    _work, cfg = repos
     report = tidy.survey(cfg, local=False)
     assert report.remote_merged == ("merged-work",)
     assert report.local_merged == ()
@@ -188,7 +189,7 @@ def test_prunable_worktrees_are_detected_and_pruned(repos):
 
 
 def test_apply_reports_a_failed_deletion_without_raising(repos, monkeypatch):
-    work, cfg = repos
+    _work, cfg = repos
     report = tidy.survey(cfg)
 
     class Fail:
@@ -199,7 +200,7 @@ def test_apply_reports_a_failed_deletion_without_raising(repos, monkeypatch):
 
 
 def test_gh_failures_and_garbage_are_survivable(repos, monkeypatch):
-    work, cfg = repos
+    _work, cfg = repos
 
     real_run = subprocess.run
 
@@ -306,7 +307,7 @@ def test_tidy_cli_clean_repo_says_so(tmp_path, monkeypatch, capsys):
 def test_survey_survives_crafted_git_output(repos, monkeypatch):
     """Defensive guards for output shapes real git rarely emits: blank tag lines
     and worktree stanzas with no path line."""
-    work, cfg = repos
+    _work, cfg = repos
     real = tidy._git
 
     def crafted(root, *args):

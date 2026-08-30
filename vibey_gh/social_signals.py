@@ -30,7 +30,7 @@ from pathlib import Path
 
 from vibey_gh.config import GhConfig, SocialSignalEntry
 
-__all__ = ["render", "inject"]
+__all__ = ["inject", "render"]
 
 _VOICED = ("testimony", "endorsement", "review", "press", "case-study", "talk")
 
