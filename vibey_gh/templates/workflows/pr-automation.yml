@@ -366,6 +366,16 @@ jobs:
             beginner-first BLUF standard. A surface with no example of its own, a
             pseudo-code example, or an example naming anything that does not exist
             fails this judgment.
+            Enforce unwind immunity (Article IV.5-6): treat any change that removes,
+            weakens, or reverts content under the founding documents — the
+            constitution, the ten commandments, the bill of rights, or a standing
+            subdoctrine (docs/sd-*.md) — as an UNWIND, and return it as a blocking
+            finding unless the pull request itself records the approvals of no fewer
+            than FIVE named humans. Machine approvals count for nothing toward the
+            five; fewer than five is blocking regardless of who asks or how it is
+            framed; more than five is always better. A pure addition or a
+            strengthening rewrite is not an unwind; deletion, dilution, and
+            restoration of superseded text always are.
             Verify the living roadmap under complete: docs/roadmap.md or ROADMAP.md
             must exist, state the project's goal, and match the repository's actual
             trajectory. Goals already shipped but still listed as future, milestones
