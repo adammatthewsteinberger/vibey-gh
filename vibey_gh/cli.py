@@ -452,6 +452,40 @@ def _corpus_index(args) -> int:
     return 0
 
 
+def _fit(args) -> int:
+    from vibey_gh import fit
+
+    machine = fit.sample_machine()
+    model = fit.sample_model(args.model)
+    est = fit.estimate_from([])
+    verdict = fit.decide(
+        machine,
+        model,
+        est,
+        queue_depth=args.queue,
+        payload_bytes=args.payload_bytes,
+        deadline_s=args.deadline,
+    )
+    print(
+        f"vibey-gh fit: machine {machine.total_gb} GB total, {machine.free_gb} GB free,"
+        f" swap {machine.swap_used_gb}/{machine.swap_total_gb} GB —"
+        f" {machine.available_gb} GB available"
+    )
+    if model is None:
+        print(f"vibey-gh fit: model {args.model} could not be read from the runner")
+    else:
+        print(
+            f"vibey-gh fit: model {model.name} {model.size_gb} GB,"
+            f" context {model.context_length}"
+        )
+    print(f"vibey-gh fit: {verdict.verdict.upper()} — {verdict.reason}")
+    if verdict.headroom_gb:
+        print(f"vibey-gh fit: headroom wanted: {verdict.headroom_gb} GB")
+    for note in verdict.notes:
+        print(f"vibey-gh fit: note — {note}")
+    return 0 if verdict.ok else 1
+
+
 def _doctor(args) -> int:
     from vibey_gh import doctor
 
@@ -969,6 +1003,16 @@ def main(argv: list[str] | None = None) -> int:
     )
     ci_.add_argument("--check", action="store_true", help="fail loudly on corpus drift")
     ci_.set_defaults(func=_corpus_index)
+
+    ft = sub.add_parser(
+        "fit",
+        help="the fit calculus (#263): both sides measured, the projection stated",
+    )
+    ft.add_argument("--model", default="qwen2.5-coder:14b", help="the model actually wanted")
+    ft.add_argument("--queue", type=int, default=0, help="jobs already ahead of this one")
+    ft.add_argument("--payload-bytes", type=int, default=8192, help="size of the work")
+    ft.add_argument("--deadline", type=float, default=900.0, help="the caller's deadline")
+    ft.set_defaults(func=_fit)
 
     pp = sub.add_parser(
         "paper",
