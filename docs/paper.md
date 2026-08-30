@@ -209,6 +209,70 @@ that documented policy required, and defending the exact defect an incident
 condemned. Artifacts are commoditized. Correct judgment about artifacts is not.
 That gap, rather than throughput, is where the remaining engineering lies.
 
+## The mechanics of the governance dilemma: six materials, three properties
+
+The commodity thesis locates scarcity in governance without saying what governance
+is made of. This section postulates its raw materials and derives a calculus over
+them.
+
+**Postulate (exhaustiveness).** Every dilemma that arises in the practice of
+software engineering decomposes into six raw materials, each carrying three
+properties, plus the pairwise couplings between them:
+
+| Material | Availability | Stability | Reliability |
+|---|---|---|---|
+| Network | reachable now | variance of reachability | delivers what it claims |
+| Hardware | capacity present | thermal, memory, wear drift | computes correctly |
+| Software | installed, running | version and config drift | behaves as specified |
+| Agent | present to act | turnover, fatigue, load | acts correctly when acting |
+| Information | knowledge at hand | staleness, drift | true when consulted |
+| Agency | permitted to act | revocation risk | permission honours its grant |
+
+Write the state as $x \in \mathbb{R}^{18}$, one coordinate per material-property
+pair, and let $x^{*}$ be the state of long-term stable peak performance. The
+**dilemma vector** is $d = x^{*} - x$, and its coordinates are the only tangible
+presentations a dilemma can take.
+
+**Agency is not agent.** The distinction carries the postulate. An agent may be
+present, stable, correct, and fully informed, and still lack the power to act; that
+is a distinct failure with a distinct remedy, and no other coordinate expresses it.
+This system supplied the instance: an automation blocked from merging pull requests
+it had itself verified, at full availability and reliability, with agency at zero.
+
+**Coordination is a coupling, not a seventh material.** The obvious objection —
+that coordination cost is irreducible — resolves by observing that coordination
+consumes information transfer, agent waiting, and authority resolution. It is the
+off-diagonal term, and the $\binom{n}{2}$ coefficient of the waste function above is
+exactly its magnitude.
+
+**The derived calculus.** For an operation $o$ with requirement vector $r_o$ and a
+current state $x$:
+
+$$
+\text{feasible}(o) \iff x \succeq r_o, \qquad
+T(o) = T_{0}(o)\prod_{i} \phi_i(d_i), \qquad
+C(o) = \int_{0}^{T(o)} c(x(t))\, dt
+$$
+
+where $\phi_i$ is the dilation each shortfall imposes on duration — unity at
+$d_i = 0$ and divergent as the coordinate approaches its floor. Three quantities
+follow directly and are the ones an operator actually wants: whether the work can
+complete at all, how long it will take, and what it will cost. A fourth follows from
+the gradient: $-\nabla_d T$ ranks which shortfall to repair first, which is the
+adjustment an agent should make to converge toward $x^{*}$.
+
+**Falsifiability.** The postulate fails the moment a real dilemma is exhibited that
+does not decompose into these coordinates and their couplings. Stated so, it is a
+law rather than a taxonomy.
+
+**Relation to the measured system.** The fit calculus deployed in this system is the
+two-coordinate projection of this space — hardware availability against software
+availability — and it already exhibits the general behaviour: it admits, defers, or
+declares a floor, and it fails loudly at the floor rather than silently. Tonight's
+escalation supplied instances of all six coordinates in a single session, including
+the reliability-without-availability case: a local reviewer answering 93.8% of
+requests while returning incorrect verdicts on every nuanced judgment.
+
 ## Related work
 
 Platform-native automation (merge queues, required checks) enforces revision-bound
