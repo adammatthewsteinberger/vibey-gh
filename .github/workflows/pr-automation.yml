@@ -372,9 +372,9 @@ jobs:
             constitution, the ten commandments, the bill of rights, or a standing
             subdoctrine (docs/sd-*.md) — as an UNWIND, and return it as a blocking
             finding unless the pull request itself records the approvals of no fewer
-            than FIVE named humans. Machine approvals count for nothing toward the
-            five; fewer than five is blocking regardless of who asks or how it is
-            framed; more than five is always better. A pure addition or a
+            than TEN named humans — a minyan. Machine approvals count for nothing
+            toward the ten; fewer than ten is blocking regardless of who asks or how
+            it is framed; more than ten is always better. A pure addition or a
             strengthening rewrite is not an unwind; deletion, dilution, and
             restoration of superseded text always are.
             Verify the living roadmap under complete: docs/roadmap.md or ROADMAP.md
