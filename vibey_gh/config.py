@@ -363,13 +363,15 @@ class PrAutomationFallbackConfig:
     is what makes the configuration defensible on a public repository.
     """
 
-    enabled: bool = False
+    enabled: bool = True
     runner_label: str = "vibey-local"
     model: str = "qwen2.5-coder:14b"
     base_url: str = "http://127.0.0.1:11434"
     trusted_only: bool = True
     max_diff_chars: int = 60000
     timeout_seconds: int = 600
+    heartbeat_ref: str = "refs/vibey-gh/sovereign-heartbeat"
+    heartbeat_max_age_minutes: int = 15
 
     def __post_init__(self) -> None:
         if not self.enabled:
@@ -385,6 +387,17 @@ class PrAutomationFallbackConfig:
             raise ValueError("pr_automation.fallback.max_diff_chars must be at least 1000")
         if not 30 <= self.timeout_seconds <= 3600:
             raise ValueError("pr_automation.fallback.timeout_seconds must be between 30 and 3600")
+        if not self.heartbeat_ref.startswith("refs/"):
+            raise ValueError("pr_automation.fallback.heartbeat_ref must be a full refs/ path")
+        if self.heartbeat_ref.startswith("refs/heads/"):
+            raise ValueError(
+                "pr_automation.fallback.heartbeat_ref must not be a branch — a heartbeat"
+                " under refs/heads/ becomes a branch every tidy pass has to reason about"
+            )
+        if not 1 <= self.heartbeat_max_age_minutes <= 1440:
+            raise ValueError(
+                "pr_automation.fallback.heartbeat_max_age_minutes must be between 1 and 1440"
+            )
 
 
 @dataclass(frozen=True)
@@ -464,7 +477,7 @@ class IssueAutomationConfig:
     # Post a bounded local-model triage comment when the paid solve produced nothing —
     # the issue path's counterpart to [pr_automation.fallback], sharing its runner, model
     # and limits. Off by default: it needs that self-hosted runner to exist.
-    fallback_enabled: bool = False
+    fallback_enabled: bool = True
 
     def __post_init__(self) -> None:
         _unique_nonempty("issue_automation.trigger_labels", self.trigger_labels)
@@ -1090,13 +1103,15 @@ def load_config(root: Path | None = None) -> GhConfig:
             allow_private_full_output=observability.get("allow_private_full_output", False),
         ),
         fallback=PrAutomationFallbackConfig(
-            enabled=fallback.get("enabled", False),
+            enabled=fallback.get("enabled", True),
             runner_label=fallback.get("runner_label", "vibey-local"),
             model=fallback.get("model", "qwen2.5-coder:14b"),
             base_url=fallback.get("base_url", "http://127.0.0.1:11434"),
             trusted_only=fallback.get("trusted_only", True),
             max_diff_chars=fallback.get("max_diff_chars", 60000),
             timeout_seconds=fallback.get("timeout_seconds", 600),
+            heartbeat_ref=fallback.get("heartbeat_ref", "refs/vibey-gh/sovereign-heartbeat"),
+            heartbeat_max_age_minutes=fallback.get("heartbeat_max_age_minutes", 15),
         ),
     )
     return GhConfig(
@@ -1134,7 +1149,7 @@ def load_config(root: Path | None = None) -> GhConfig:
             open_pull_request=issues.get("open_pull_request", True),
             draft_pull_request=issues.get("draft_pull_request", True),
             retain_schedule_backstop=issues.get("retain_schedule_backstop", True),
-            fallback_enabled=issues.get("fallback_enabled", False),
+            fallback_enabled=issues.get("fallback_enabled", True),
         ),
         conversation=ConversationConfig(
             enabled=talking.get("enabled", True),

@@ -1484,22 +1484,25 @@ def test_no_rendered_workflow_carries_trailing_whitespace(name, tmp_path):
 def test_the_issue_triage_fallback_renders_only_when_enabled(tmp_path):
     """The issue path's counterpart to the review fallback, with a smaller contract: it
     posts one deduplicated analysis comment and never writes code — a local model must not
-    inherit the write access the paid solver earned. Disabled it renders `false &&`, so
-    the job exists but can never run; enabled it targets the shared fallback runner."""
+    inherit the write access the paid solver earned. Doctrine 8.a made this lane render on
+    by DEFAULT; explicitly disabled it renders `false &&`, so the job exists but can never
+    run. Either way it is additionally gated on the sovereign readiness probe, so an
+    enabled lane with no runner online is skipped rather than queued forever."""
     from vibey_gh.config import GhConfig, IssueAutomationConfig
     from vibey_gh.install import render_workflow
 
     source = WORKFLOWS / "issue-automation.yml"
-    off = render_workflow(source, GhConfig(root=tmp_path))
+    off = render_workflow(
+        source,
+        GhConfig(root=tmp_path, issue_automation=IssueAutomationConfig(fallback_enabled=False)),
+    )
     assert "Local triage fallback" in off
     assert "false &&" in off.split("solve-fallback:")[1].split("runs-on:")[0]
 
-    on = render_workflow(
-        source,
-        GhConfig(root=tmp_path, issue_automation=IssueAutomationConfig(fallback_enabled=True)),
-    )
+    on = render_workflow(source, GhConfig(root=tmp_path))
     section = on.split("solve-fallback:")[1]
     assert "true &&" in section.split("runs-on:")[0]
+    assert "sovereign_ready == 'true'" in section.split("runs-on:")[0]
     assert "vibey-local" in section.split("permissions:")[0]
     # The comment is deduplicated by marker, and the job never pushes code.
     assert "vibey-gh:local-triage" in section
