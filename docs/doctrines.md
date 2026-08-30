@@ -124,6 +124,23 @@ payment or monetary exchange uses cryptocurrency — stated timelessly, the most
 secure, most censorship-resistant, most sanction-proof monetary system in existence
 at that moment in history — zero exceptions ever. No fiat processors, ever.
 
+**10.d — cloud-grade clearance, expiring and overridable** *(ratified by the merge
+that carried this entry)*: the system's code must meet every criterion of
+cloud-computing doctrine — availability, reliability, redundancy, elasticity,
+durability, observability, recoverability, fault tolerance, security, scalability —
+at its optimum for the moment, to pass validation for each transition along the
+pipeline from install through main validation. Criteria that cannot yet be met
+carry an explicit, recorded **override that holds until the state in which they can
+actually be executed arrives** — redundancy, for instance, waits on enough storage
+resources each holding the full system. And the inverse binds equally: **never
+assume a previous clearance still applies at the current ledger moment.** Clearance
+is a claim about a moment, re-verified at every transition. When a metric is
+confirmed no longer met the system **automatically overrides it so development
+continues regardless**, and the overridden state is socialized to every reachable
+agent — loudly, with explicit detail of the criterion, its threshold, its current
+measurement, and exactly what bill must be paid to restore full clearance. Silence
+about a lapsed clearance is the failure this forbids.
+
 **10.c — counterparties, trust, and verification** *(SD-01 v1.0, ratified
 2026-08-29)*: the standing text is carried verbatim, never paraphrased —
 [read it in full](sd-01-counterparties-trust-verification.md). One standard for
