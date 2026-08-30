@@ -20,6 +20,7 @@ from vibey_gh.fit import (
     headroom_gb,
     sample_machine,
     sample_model,
+    saturating_wait,
 )
 
 MACHINE = Machine(total_gb=25.77, free_gb=2.97, swap_used_gb=6.5, swap_total_gb=7.0)
@@ -235,3 +236,29 @@ def test_a_comfortable_machine_reports_no_headroom_note():
     assert verdict.verdict == ADMIT
     assert verdict.headroom_gb == 0.0
     assert not any("grow paging space" in n for n in verdict.notes)
+
+
+def test_wait_is_superlinear_because_the_measurements_said_so():
+    """The stress escalation falsified this module's original linear wait one rung
+    after it shipped: 22 s/job through N=12, then 59 s/job by N=16. Slack stays
+    nearly linear; saturation goes quadratic."""
+    # Idle runner: no queue, no wait, whatever the slot count.
+    assert saturating_wait(100.0, queue_depth=0, slots=4.0) == 0.0
+    # Slack (rho < 1): close to the linear estimate.
+    assert saturating_wait(100.0, queue_depth=2, slots=4.0) == pytest.approx(75.0)
+    # Saturated (rho = 4): four times the linear projection, matching the observed
+    # slope growth rather than a line.
+    linear = 100.0 * (16 / 4)
+    assert saturating_wait(100.0, queue_depth=16, slots=4.0) == pytest.approx(5 * linear)
+    # A runner with no slots cannot be projected onto.
+    assert saturating_wait(100.0, queue_depth=8, slots=0.0) == 0.0
+
+
+def test_the_superlinear_wait_defers_work_a_linear_model_would_have_admitted():
+    """The concrete regression: at sixteen deep on four slots the linear model
+    projected 400 s and would have admitted against a 900 s deadline; the measured
+    behaviour is far worse, and the corrected rule defers."""
+    est = Estimate(slots=4.0, base_s=100.0, rate_s_per_kb=0.0, samples=16)
+    verdict = decide(MACHINE, MODEL, est, queue_depth=16, payload_bytes=1024, deadline_s=900)
+    assert verdict.verdict == DEFER
+    assert verdict.projected_wait_s == pytest.approx(2000.0)
