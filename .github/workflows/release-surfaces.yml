@@ -317,7 +317,7 @@ jobs:
             # vibey-gh. Observed as exit 127 on the first dogfooded deploy — the guard
             # printed its intent and the command did not exist. Self-hosting installs
             # from source, adopters install the published package.
-            if grep -qE '^name = "vibey-(gh|bootstrap)"' pyproject.toml 2>/dev/null; then
+            if grep -qE '^name = "vibey-gh"' pyproject.toml 2>/dev/null; then
               python -m pip install --quiet -e .
             else
               python -m pip install --quiet vibey-gh
