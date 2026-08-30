@@ -376,6 +376,12 @@ jobs:
             that publishes an institutional or government-facing page must keep it
             as current as every other channel; staleness there is blocking like any
             other channel's.
+            Enforce the clean repo (sub-doctrine 9.a): technical clutter — orphan
+            or merged-and-undeleted branches, closed-PR heads lingering, draft
+            releases and orphan tags accumulating unexplained — is drag and blocks
+            where the repository has not recorded a deliberate exception. Human
+            messiness is expressly welcome and never a finding: prose, discussions,
+            imperfect words, and work in progress are the warmth of the project.
             Enforce the social-signals oath (sub-doctrine 4.a): where the
             repository opts into [social_signals], every rendered signal must name a
             real human agent — a person or an institution of persons — carry a

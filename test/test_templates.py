@@ -393,13 +393,21 @@ def test_review_prompt_enforces_the_government_channel():
     assert "its primary emphasis is the government's military arm" in flat
 
 
+def test_review_prompt_enforces_the_clean_repo():
+    """Sub-doctrine 9.a: technical clutter blocks; human messiness is expressly
+    welcome and never a finding."""
+    text = (WORKFLOWS / "pr-automation.yml").read_text(encoding="utf-8")
+    flat = " ".join(text.split())
+    assert "Enforce the clean repo (sub-doctrine 9.a)" in flat
+    assert "Human messiness is expressly welcome and never a finding" in flat
+
+
 def test_review_prompt_enforces_the_social_signals_oath():
     """Sub-doctrine 4.a: rendered social proof is attested human speech or it blocks —
     machine-manufactured testimony is false witness."""
     text = (WORKFLOWS / "pr-automation.yml").read_text(encoding="utf-8")
     flat = " ".join(text.split())
     assert "Enforce the social-signals oath (sub-doctrine 4.a)" in flat
-    assert "never a machine" not in flat or True
     assert "machine-authored, synthetic, unattributed, or unverifiable is FALSE WITNESS" in flat
 
 
