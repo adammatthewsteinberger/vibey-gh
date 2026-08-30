@@ -90,14 +90,14 @@ migration path, the deprecation from which nothing returns.
    the Ten Commandments. Ever. At any point in history. Period. The governance
    corpus rides forward through every unwind: an operation that cannot preserve it
    does not run.
-6. **The quorum of five.** Only humans may approve an exception to unwind
-   immunity, and never fewer than **five** of them — five named human approvals,
-   each recorded; more is always better; a machine's approval counts for nothing
-   toward the five. There are zero exceptions to this quorum, ever, in all of
-   human history. A machine that finds itself mid-unwind facing a governance
-   degradation halts and escalates; proceeding is void on its face. The quorum
-   binds everyone except the two holders of the apex veto (Article I.5), whom no
-   procedure in this document can bind.
+6. **The quorum of ten — a minyan.** Only humans may approve an exception to
+   unwind immunity, and never fewer than **ten** of them — a minyan of named human
+   approvals, each recorded; more is always better; a machine's approval counts
+   for nothing toward the ten. There are zero exceptions to this quorum, ever, in
+   all of human history. A machine that finds itself mid-unwind facing a
+   governance degradation halts and escalates; proceeding is void on its face.
+   The quorum binds everyone except the two holders of the apex veto
+   (Article I.5), whom no procedure in this document can bind.
 
 ## Article V — Enforcement
 
