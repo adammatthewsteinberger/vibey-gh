@@ -80,7 +80,9 @@ def _gh_json(root: Path, *args: str) -> list | dict:
         value = json.loads(run.stdout)
     except json.JSONDecodeError:
         return []
-    return value
+    if isinstance(value, (list, dict)):
+        return value
+    return []
 
 
 def _kept(cfg: GhConfig) -> tuple[str, ...]:
