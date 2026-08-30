@@ -100,6 +100,20 @@ redundant, and everything else is reported to the human, never removed by a mach
 Internet, power, the developer's laptop, and every third-party dependency: never
 assumed, always confirmed, always self-healed around.
 
+**Hardware resiliency — the decomposition clarification** *(ratified by the merge
+that carried this entry)*: the way to future-proof against hardware limits is,
+first, to read both sides of the fit — the specs of the hardware the code is
+actually running on, AND the specs of the LLM that is actually wanting to be run
+on it: parameters, quantization, memory footprint, context length, compute
+demands — each as fully comprehensible, fully honest, and fully detailed as can be
+stated. Then problems are iteratively broken down into separate, specific
+sub-problems until each is small enough to run on that actual hardware with that
+actual model. At all times, forever. This holds down to the floor: the absolute
+lowest level of hardware needed to actually run the specific LLM that is actually
+wanted on that actual machine. Beyond that point the system **fails loudly to the
+human user — never silently**: a machine that cannot carry the work says so to a
+person, in plain words, at the moment it knows.
+
 **10.a — censorship resistance** *(ratified 2026-08-29)*: the project always remains
 censorship resistant, and all code it produces always opts for the most
 censorship-resistant option available — always and forever. Every dependency is a
