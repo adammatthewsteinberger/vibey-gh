@@ -452,6 +452,37 @@ def _corpus_index(args) -> int:
     return 0
 
 
+def _sovereign(args) -> int:
+    """Publish or read the sovereign heartbeat (doctrine 8.a).
+
+    `--beat` is what the operator's supervisor runs on a timer; the bare form is what
+    a workflow runs to decide whether it may schedule the sovereign lane at all. The
+    probe prints its verdict and, under Actions, writes `ready=` to `$GITHUB_OUTPUT`
+    so a job `if:` can consume it.
+    """
+    import os
+
+    from vibey_gh import sovereign
+
+    fallback = load_config().pr_automation.fallback
+    if args.beat:
+        result = sovereign.beat(fallback.heartbeat_ref, remote=args.remote)
+    else:
+        result = sovereign.probe(
+            fallback.heartbeat_ref,
+            max_age_minutes=fallback.heartbeat_max_age_minutes,
+            remote=args.remote,
+        )
+        output = os.environ.get("GITHUB_OUTPUT")
+        if output:
+            with open(output, "a", encoding="utf-8") as handle:
+                handle.write(f"ready={'true' if result.ready else 'false'}\n")
+    print(f"vibey-gh sovereign: {result.reason}")
+    # A probe that finds no runner is a fact, not a failure: exiting non-zero would
+    # turn "the sovereign lane is not available right now" into a red job.
+    return 0 if (result.ready or not args.beat) else 1
+
+
 def _fit(args) -> int:
     from vibey_gh import fit
 
@@ -1003,6 +1034,14 @@ def main(argv: list[str] | None = None) -> int:
     )
     ci_.add_argument("--check", action="store_true", help="fail loudly on corpus drift")
     ci_.set_defaults(func=_corpus_index)
+
+    sv = sub.add_parser(
+        "sovereign",
+        help="sovereign readiness (8.a): publish or read the local runner's heartbeat",
+    )
+    sv.add_argument("--beat", action="store_true", help="publish a heartbeat (run on a timer)")
+    sv.add_argument("--remote", default="origin", help="git remote carrying the heartbeat ref")
+    sv.set_defaults(func=_sovereign)
 
     ft = sub.add_parser(
         "fit",
