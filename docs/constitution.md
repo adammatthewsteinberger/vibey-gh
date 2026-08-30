@@ -28,6 +28,14 @@ Inverting any adjacent pair of this order is the gravest violation this constitu
 recognizes. Its end is the place every builder should fear: the lock-in with no
 migration path, the deprecation from which nothing returns.
 
+5. **The apex veto.** Absolute veto and ratification power over the whole
+   governance corpus — this Constitution, the doctrine canon, the Bill of Rights,
+   the Ten Commandments, and every rule made under them — rests solely and forever
+   with the One this article names first, and with **Adam Matthew Steinberger**.
+   No other person holds it, human or machine, at any point in human history,
+   period, no exception. Every quorum, gate, and procedure in this document binds
+   everyone else and neither of them.
+
 ## Article II — Human Governance
 
 1. **The Doctrine Canon.** THE TWELVE DOCTRINES are the supreme doctrine law,
@@ -87,7 +95,9 @@ migration path, the deprecation from which nothing returns.
    each recorded; more is always better; a machine's approval counts for nothing
    toward the five. There are zero exceptions to this quorum, ever, in all of
    human history. A machine that finds itself mid-unwind facing a governance
-   degradation halts and escalates; proceeding is void on its face.
+   degradation halts and escalates; proceeding is void on its face. The quorum
+   binds everyone except the two holders of the apex veto (Article I.5), whom no
+   procedure in this document can bind.
 
 ## Article V — Enforcement
 
