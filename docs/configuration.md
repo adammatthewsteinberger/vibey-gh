@@ -243,6 +243,40 @@ This repository declares the full contract for itself in its own `.vibey-gh.toml
 both the dogfooding rule the rest of the tool follows and the reason its own requirements
 are visible rather than compiled in.
 
+## The fit calculus — `vibey-gh fit`
+
+Doctrine 10's hardware-decomposition clarification as a running control loop
+(#263). `vibey-gh fit` reads **both sides of the fit** — the machine's memory,
+free pages, and paging space; the model's actual size and context length, read
+from the runner rather than assumed — then states whether a piece of work fits a
+deadline, and what headroom the projection wants.
+
+```bash
+vibey-gh fit --model qwen2.5-coder:14b --queue 3 --payload-bytes 22000 --deadline 900
+```
+
+Three verdicts, each with its arithmetic in the reason:
+
+| Verdict | Meaning |
+|---|---|
+| `admit` | projected wait + service fits the deadline at the current slots and queue |
+| `defer` | it does not fit — decompose the work or wait for a slot |
+| `floor` | the model cannot run on this machine at all, or its specs could not be read; **fails loudly**, never silently (doctrine 10) |
+
+The constants come from measurement, never assumption: **s**, effective
+parallelism (generation-seconds ÷ wall seconds), and **τ**, service time fitted as
+`base + rate × KB` from operations that actually ran. With one payload size the
+rate stays zero rather than being invented, and a physically meaningless fit (big
+payloads finishing sooner) falls back to the flat mean.
+
+**Nothing here resizes swap by itself.** The projection reports the headroom it
+wants; growing paging space is an irreversible act on someone's machine, and
+Article III's bounded delegation leaves that to a human.
+
+Measured on a 24 GB machine running `qwen2.5-coder:14b`: peak throughput
+**1.72 generations/min at 6 concurrent**, degrading to 1.27/min at 8 — the
+saturation knee, past which added load buys queueing rather than work.
+
 ## `[tidy]`
 
 The clean repo (**sub-doctrine 9.a**): every repository is kept technically clean at
