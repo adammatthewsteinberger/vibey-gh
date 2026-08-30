@@ -393,6 +393,15 @@ def test_review_prompt_enforces_the_government_channel():
     assert "its primary emphasis is the government's military arm" in flat
 
 
+def test_release_surfaces_ships_the_corpus_index():
+    """#249: the governance corpus index rides the channel site, so a fully-local
+    deployment carries its law searchable and integrity-checkable offline."""
+    text = (WORKFLOWS / "release-surfaces.yml").read_text(encoding="utf-8")
+    flat = " ".join(text.split())
+    assert "Ship the governance corpus index (#249)" in flat
+    assert "cp corpus-index.json channel-site/corpus-index.json" in flat
+
+
 def test_review_prompt_enforces_the_clean_repo():
     """Sub-doctrine 9.a: technical clutter blocks; human messiness is expressly
     welcome and never a finding."""

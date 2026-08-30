@@ -434,6 +434,24 @@ def _tidy(args) -> int:
     return 1
 
 
+def _corpus_index(args) -> int:
+    from vibey_gh import corpus
+
+    cfg = load_config()
+    if args.check:
+        ok, message = corpus.check(cfg)
+        print(f"vibey-gh corpus-index: {message}", file=None if ok else sys.stderr)
+        return 0 if ok else 1
+    target = corpus.write(cfg)
+    index = corpus.build(cfg)
+    print(
+        f"vibey-gh corpus-index: wrote {target.name} — {len(index['chunks'])} chunk(s)"
+        f" across {len(index['documents'])} document(s), corpus"
+        f" {index['corpus_sha256'][:12]}…"
+    )
+    return 0
+
+
 def _doctor(args) -> int:
     from vibey_gh import doctor
 
@@ -944,6 +962,13 @@ def main(argv: list[str] | None = None) -> int:
     )
     fo.add_argument("--once", action="store_true", help="one probe and transition, then exit")
     fo.set_defaults(func=_failover)
+
+    ci_ = sub.add_parser(
+        "corpus-index",
+        help="build the governance corpus index — chunked, hashed, deterministic (#249)",
+    )
+    ci_.add_argument("--check", action="store_true", help="fail loudly on corpus drift")
+    ci_.set_defaults(func=_corpus_index)
 
     pp = sub.add_parser(
         "paper",
