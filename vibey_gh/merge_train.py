@@ -19,7 +19,7 @@ import subprocess
 from dataclasses import dataclass
 from typing import Any, cast
 
-from vibey_gh import reconcile
+from vibey_gh import reconcile, versioning
 from vibey_gh.config import GhConfig, normalise_actor
 from vibey_gh.pr_automation import (
     BLOCKED_LABEL,
@@ -174,6 +174,19 @@ def judge(pr: dict, cfg: GhConfig) -> Verdict:
             owner = cfg.owner or "the code owner"
             reason = f"from @{author} and not approved — needs {owner}'s review"
             held = True
+        elif pr.get("baseRefName") == cfg.release_branch:
+            # The merge-time re-derivation (#254): a promotion opened when everything
+            # was bumped can gain bump-deriving merges before it merges, and the
+            # release then publishes NOTHING (skip-existing) while looking green. The
+            # merger re-asks the version question against the CURRENT head; owing a
+            # bump means not ready, loudly, naming the exact release commit owed.
+            head = str(pr.get("headRefOid") or "HEAD")
+            owed, why = versioning.owed_at(cfg, f"origin/{cfg.release_branch}", head)
+            if owed:
+                reason = (
+                    f"promotion owes `chore(release): {owed}` before it may merge —"
+                    f" {why}; merging unbumped publishes nothing (see #254)"
+                )
 
     return Verdict(pr["number"], pr.get("title", ""), author, reason, held_for_review=held)
 
