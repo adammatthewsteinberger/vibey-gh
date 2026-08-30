@@ -25,6 +25,7 @@ from vibey_gh.config import (
     RulesetsConfig,
     load_config,
 )
+from vibey_gh.install import render_workflow
 
 
 def completed(code=0, out="", err=""):
@@ -93,12 +94,14 @@ def template_check_names() -> set[str]:
 
     A check run is named for its job, except when the workflow is triggered by
     `workflow_run`, where GitHub prefixes it with the workflow's name — so both spellings
-    count. Parsed with `re` rather than a YAML library because the templates carry
-    unrendered `__VIBEY_GH_*__` placeholders and the test suite takes no new dependency.
+    count. Rendered first: every workflow name is configurable, so a raw template carries
+    `__VIBEY_GH_WF_*__` where its name goes. Parsed with `re` rather than a YAML library
+    because the rendered text still carries other placeholders and the test suite takes no
+    new dependency.
     """
     names: set[str] = set()
     for path in sorted((Path(rs.__file__).parent / "templates" / "workflows").glob("*.yml")):
-        text = path.read_text(encoding="utf-8")
+        text = render_workflow(path, GhConfig(root=Path(".")))
         workflow = re.search(r"(?m)^name: *(.+)$", text)
         workflow_name = workflow.group(1).strip().strip("\"'") if workflow else ""
         for job in re.findall(r"(?m)^    name: *(.+)$", text):

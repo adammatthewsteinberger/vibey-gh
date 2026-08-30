@@ -1,5 +1,5 @@
 # Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), Developed by [Adam Matthew Steinberger](https://vibewithadam.matthewsteinberger.com/) ([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/)).
-name: Promote
+name: __VIBEY_GH_WF_PROMOTE__
 
 # The other half of the flow. The merge train fills the integration branch; this moves it
 # to the release branch, which is what publishes.
@@ -18,7 +18,7 @@ name: Promote
 
 on:
   workflow_run:
-    workflows: ["Merge train"]
+    workflows: ["__VIBEY_GH_WF_MERGE_TRAIN__"]
     types: [completed]
   schedule:
     - cron: "17 8 * * 1"

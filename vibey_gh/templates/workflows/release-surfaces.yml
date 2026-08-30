@@ -1,12 +1,12 @@
 # Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), Developed by [Adam Matthew Steinberger](https://vibewithadam.matthewsteinberger.com/) ([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/)).
-name: Release surfaces
+name: __VIBEY_GH_WF_RELEASE_SURFACES__
 
 # The package registries remain authoritative for Python installation. This workflow adds
 # two companion surfaces after that release has succeeded: branch-specific ProperDocs
 # sites on one GitHub Pages deployment and an OCI release bundle in GitHub Packages.
 on:
   workflow_run:
-    workflows: ["Release"]
+    workflows: ["__VIBEY_GH_WF_RELEASE__"]
     types: [completed]
     branches: [__VIBEY_GH_INTEGRATION_BRANCH__, __VIBEY_GH_RELEASE_BRANCH__]
   workflow_dispatch:
