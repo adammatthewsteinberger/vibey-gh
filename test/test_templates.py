@@ -383,6 +383,15 @@ def test_rendered_pr_automation_carries_exactly_one_schedule_key(tmp_path):
     assert "schedule backstop disabled by .vibey-gh.toml" in off
 
 
+def test_review_prompt_enforces_the_government_channel():
+    """Sub-doctrine 2.a: everything assigned to industry or executives is also
+    created for governments — the review judges channel parity on every head."""
+    text = (WORKFLOWS / "pr-automation.yml").read_text(encoding="utf-8")
+    flat = " ".join(text.split())
+    assert "Enforce the government channel (sub-doctrine 2.a)" in flat
+    assert "a government edition stands beside it" in flat
+
+
 def test_review_prompt_enforces_unwind_immunity_with_the_minyan_of_ten():
     """Article IV.5-6: no unwind may degrade the ratified governance corpus, and only
     ten or more named humans — a minyan — can approve an exception; machine
