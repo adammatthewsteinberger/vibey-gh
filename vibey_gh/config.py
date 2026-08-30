@@ -168,6 +168,82 @@ DEFAULT_DOCUMENTATION_FILES = (
 )
 
 
+SOCIAL_SIGNAL_KINDS = (
+    # Comprehensive to the authentic social-signal classes of the current day
+    # (sub-doctrine 4.a). Extend this tuple when the world grows a new REAL one.
+    "testimony",  # a person's own words about the work
+    "endorsement",  # an institution's backing — a government, a company, a body
+    "adoption",  # a named adopter: "this is used by"
+    "case-study",  # a written account of real use
+    "review",  # a rating or review on a third-party surface
+    "community",  # a human-generated count: stars, members, contributors
+    "citation",  # scholarly citation of the project's work
+    "press",  # media coverage by a named author and outlet
+    "contributor",  # a named human who built part of this
+    "backer",  # a person or institution that funded the work
+    "talk",  # a conference or meetup appearance by a named speaker
+    "certification",  # an accreditation issued by a real institution
+)
+
+
+@dataclass(frozen=True)
+class SocialSignalEntry:
+    """One authentic social signal from one real human agent.
+
+    `agent` names the person or institution whose signal this is; `source` is the
+    provenance hyperlink rendered at the point of reference; `human_attested` is the
+    operator's own attestation — set by the human who added the entry — that the
+    signal is genuine and comes from a real human agent, never a machine. Validation
+    refuses an entry without all three: machine-manufactured social proof is false
+    witness, and the config layer is the first gate that stops it.
+    """
+
+    kind: str
+    agent: str
+    source: str
+    human_attested: bool = False
+    quote: str = ""
+    role: str = ""
+    org: str = ""
+    date: str = ""
+    value: str = ""
+
+
+@dataclass(frozen=True)
+class SocialSignalsConfig:
+    """The social-signals surface (sub-doctrine 4.a): opt-in, forever available.
+
+    Off by default and enabled per repository — but the FEATURE is permanently
+    available, at all times and in all places, as the sub-doctrine demands. Every
+    rendered signal is 100% authentic and from a real human agent (a person, or an
+    institution of persons such as a government); never from a machine.
+    """
+
+    enabled: bool = False
+    heading: str = "Real people, real words"
+    entries: tuple[SocialSignalEntry, ...] = ()
+
+    def validate(self) -> None:
+        if not self.enabled:
+            return
+        for i, e in enumerate(self.entries):
+            where = f"social_signals.entries[{i}]"
+            if e.kind not in SOCIAL_SIGNAL_KINDS:
+                raise ValueError(f"{where}: unknown kind {e.kind!r}; one of {SOCIAL_SIGNAL_KINDS}")
+            if not e.agent.strip():
+                raise ValueError(f"{where}: every signal names its real human agent")
+            if not e.source.startswith("https://"):
+                raise ValueError(f"{where}: source must be an https provenance link")
+            if not e.human_attested:
+                raise ValueError(
+                    f"{where}: human_attested = true is the operator's own attestation that"
+                    " this signal is genuine and from a real human agent, never a machine —"
+                    " an entry without it does not render (sub-doctrine 4.a)"
+                )
+        if self.entries == ():
+            raise ValueError("social_signals.enabled with no entries renders nothing honest")
+
+
 @dataclass(frozen=True)
 class PrAutomationObservabilityConfig:
     sanitized_progress: bool = True
@@ -784,6 +860,7 @@ class GhConfig:
     conversation: ConversationConfig = ConversationConfig()
     github_release: GithubReleaseConfig = GithubReleaseConfig()
     yank: YankConfig = YankConfig()
+    social_signals: SocialSignalsConfig = SocialSignalsConfig()
     rulesets: RulesetsConfig = RulesetsConfig()
     repository_profile: RepositoryProfileConfig = RepositoryProfileConfig()
     documentation: DocumentationConfig = DocumentationConfig()
@@ -837,6 +914,29 @@ def find_root(start: Path | None = None) -> Path:
         if (candidate / ".git").exists():
             return candidate
     return here
+
+
+def _social_signals(raw: dict) -> SocialSignalsConfig:
+    cfg = SocialSignalsConfig(
+        enabled=bool(raw.get("enabled", False)),
+        heading=str(raw.get("heading", "Real people, real words")),
+        entries=tuple(
+            SocialSignalEntry(
+                kind=str(e.get("kind", "")),
+                agent=str(e.get("agent", "")),
+                source=str(e.get("source", "")),
+                human_attested=bool(e.get("human_attested", False)),
+                quote=str(e.get("quote", "")),
+                role=str(e.get("role", "")),
+                org=str(e.get("org", "")),
+                date=str(e.get("date", "")),
+                value=str(e.get("value", "")),
+            )
+            for e in raw.get("entries", [])
+        ),
+    )
+    cfg.validate()
+    return cfg
 
 
 def load_config(root: Path | None = None) -> GhConfig:
@@ -948,6 +1048,7 @@ def load_config(root: Path | None = None) -> GhConfig:
             delete_duplicate_branches=realigning.get("delete_duplicate_branches", True),
             notify_contributor_branches=realigning.get("notify_contributor_branches", True),
         ),
+        social_signals=_social_signals(data.get("social_signals", {})),
         yank=YankConfig(
             pypi=yanking.get("pypi", False),
             testpypi=yanking.get("testpypi", False),

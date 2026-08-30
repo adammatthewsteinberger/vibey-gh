@@ -376,6 +376,13 @@ jobs:
             that publishes an institutional or government-facing page must keep it
             as current as every other channel; staleness there is blocking like any
             other channel's.
+            Enforce the social-signals oath (sub-doctrine 4.a): where the
+            repository opts into [social_signals], every rendered signal must name a
+            real human agent — a person or an institution of persons — carry a
+            working source hyperlink at the point of reference, and carry the
+            operator's human attestation. A testimony, endorsement, review, or any
+            other social signal that is machine-authored, synthetic, unattributed,
+            or unverifiable is FALSE WITNESS and blocks, no exceptions.
             Enforce unwind immunity (Article IV.5-6): treat any change that removes,
             weakens, or reverts content under the founding documents — the
             constitution, the ten commandments, the bill of rights, or a standing

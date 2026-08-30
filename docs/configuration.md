@@ -243,6 +243,64 @@ This repository declares the full contract for itself in its own `.vibey-gh.toml
 both the dogfooding rule the rest of the tool follows and the reason its own requirements
 are visible rather than compiled in.
 
+## `[social_signals]`
+
+The social-signals surface (**sub-doctrine 4.a**, ratified by operator merge): the
+published site presents real human social proof — testimonies, endorsements,
+adoptions, case studies, reviews, community counts, citations, press, contributors,
+backers, talks, certifications — as a self-contained, theme-aware section on the
+landing page, injected after the site build.
+
+The sub-doctrine's terms are permanent and configuration cannot soften them:
+
+- **Opt-in, forever available.** Off by default in every repository; the capability
+  itself exists at all times, in all places, with no exceptions — an adopter turns it
+  on, never asks whether it exists.
+- **100% comprehensive to the day.** The kind taxonomy covers the authentic
+  social-signal classes of the current world and grows when the world grows a real
+  new one — never a synthetic one.
+- **100% authentic, from a real human agent, never a machine.** Every entry names its
+  agent — a person, or an institution of persons such as a government — carries its
+  source hyperlink at the point of reference, and carries `human_attested = true`:
+  the operator's own attestation, made by the human who added the entry. Validation
+  refuses anything less at config load, and the exact-head review blocks
+  machine-authored, synthetic, unattributed, or unverifiable signals as **false
+  witness**.
+
+```toml
+[social_signals]
+enabled = true
+heading = "Real people, real words"
+
+[[social_signals.entries]]
+kind = "testimony"                     # see the kind taxonomy above
+agent = "Jane Doe"                     # the real human agent — always named
+role = "CTO"
+org = "Acme"
+date = "2026-08-30"
+quote = "It shipped my release while I slept."
+source = "https://example.com/jane-said-it"   # provenance, at the point of reference
+human_attested = true                  # the operator's own attestation — required
+
+[[social_signals.entries]]
+kind = "community"
+agent = "GitHub stargazers"
+value = "1,204"
+source = "https://github.com/you/repo/stargazers"
+human_attested = true
+```
+
+| Field | Type / default | Meaning |
+|---|---|---|
+| `enabled` | boolean / `false` | Opt in per repository; the feature itself is always available. |
+| `heading` | string / `"Real people, real words"` | The section heading on the landing page. |
+| `entries` | array of tables / none | Each entry: `kind` (from the taxonomy), `agent`, `source` (https), `human_attested` (required `true`), and optionally `quote`, `role`, `org`, `date`, `value`. |
+
+Voiced kinds (testimony, endorsement, review, press, case-study, talk) render as
+quote cards; counted and named kinds render as compact linked chips. The section
+closes by saying what it is: every entry is attested human speech — never a
+machine's.
+
 ## `[yank]`
 
 Report which releases on an index the just-published version supersedes.

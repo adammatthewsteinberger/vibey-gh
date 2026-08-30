@@ -299,6 +299,7 @@ def render_workflow(source: Path, cfg: GhConfig) -> str:
         ("__VIBEY_GH_DOC_BOTTOM_NAV__", cfg.documentation.bottom_nav),
         ("__VIBEY_GH_DOC_PRODUCTION_INDEX__", cfg.documentation.production_indexing),
         ("__VIBEY_GH_DOC_PREVIEW_INDEX__", cfg.documentation.preview_indexing),
+        ("__VIBEY_GH_SOCIAL_SIGNALS__", cfg.social_signals.enabled),
     ):
         wanted = wanted.replace(marker, "true" if enabled else "false")
     if cfg.pin_version:
