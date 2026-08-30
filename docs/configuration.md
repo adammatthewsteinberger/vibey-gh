@@ -276,6 +276,13 @@ The sub-doctrine's terms are permanent and configuration cannot soften them:
 - **100% comprehensive to the day.** The kind taxonomy covers the authentic
   social-signal classes of the current world and grows when the world grows a real
   new one — never a synthetic one.
+- **Verification expires (the 4.a amendment).** A past-authentic signal is never
+  assumed presently authentic — man-in-the-middle and forgery attacks target exactly
+  that assumption. Every authenticity claim is only a claim, including the operator's
+  own and especially the agent running the code; every entry carries the date a human
+  last verified it, stale attestations block until re-verified, and a signal
+  discovered inauthentic is removed immediately and permanently — revoked entries can
+  never be re-attested.
 - **100% authentic, from a real human agent, never a machine.** Every entry names its
   agent — a person, or an institution of persons such as a government — carries its
   source hyperlink at the point of reference, and carries `human_attested = true`:
@@ -311,7 +318,9 @@ human_attested = true
 |---|---|---|
 | `enabled` | boolean / `false` | Opt in per repository; the feature itself is always available. |
 | `heading` | string / `"Real people, real words"` | The section heading on the landing page. |
-| `entries` | array of tables / none | Each entry: `kind` (from the taxonomy), `agent`, `source` (https), `human_attested` (required `true`), and optionally `quote`, `role`, `org`, `date`, `value`. |
+| `max_attestation_age_days` | integer / `365` | The 4.a amendment's re-verification clock: an attestation older than this blocks the check until a human re-verifies the signal and re-dates it. Must be positive — attestations that never age are forbidden. |
+| `entries` | array of tables / none | Each entry: `kind` (from the taxonomy), `agent`, `source` (https), `human_attested` (required `true`), `attested_on` (required ISO date — when the human last verified authenticity), and optionally `quote`, `role`, `org`, `date`, `value`, `revoked`. |
+| `entries[].revoked` | boolean / `false` | The permanent tombstone: a signal discovered inauthentic renders nowhere, forever, and can never be re-attested — `revoked` with `human_attested` is refused at load, no exceptions ever. |
 
 Voiced kinds (testimony, endorsement, review, press, case-study, talk) render as
 quote cards; counted and named kinds render as compact linked chips. The section

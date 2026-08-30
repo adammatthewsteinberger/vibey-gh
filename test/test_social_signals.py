@@ -23,6 +23,7 @@ def _entry(**kw) -> SocialSignalEntry:
         agent="Jane Doe",
         source="https://example.com/said-it",
         human_attested=True,
+        attested_on="2026-08-30",
         quote="It shipped my release while I slept.",
     )
     base.update(kw)
@@ -91,7 +92,7 @@ def test_render_carries_agent_source_kind_and_the_oath():
     assert "CTO, Acme" in text
     assert 'href="https://example.com/said-it"' in text
     assert "verified source" in text
-    assert "never a machine (sub-doctrine 4.a)" in text
+    assert "never a machine" in text and "(sub-doctrine 4.a)" in text
     assert '<div class="vs-grid">' in text and "<style>" in text
 
 
@@ -149,6 +150,7 @@ def test_social_signals_load_from_toml(tmp_path: Path):
         "[[social_signals.entries]]\n"
         'kind = "endorsement"\nagent = "Ministry of Works"\n'
         'source = "https://gov.example/notice"\nhuman_attested = true\n'
+        'attested_on = "2026-08-30"\n'
         'quote = "Adopted for provenance."\n',
         encoding="utf-8",
     )
@@ -167,3 +169,45 @@ def test_an_unattested_toml_entry_fails_config_load(tmp_path: Path):
     )
     with pytest.raises(ValueError, match="never a machine"):
         load_config(tmp_path)
+
+
+def test_the_amendment_ages_every_attestation():
+    """4.a amendment: authenticity is re-verified, never remembered."""
+    with pytest.raises(ValueError, match="must age"):
+        SocialSignalsConfig(enabled=True, entries=(_entry(attested_on=""),)).validate()
+    with pytest.raises(ValueError, match="never assumed presently authentic"):
+        SocialSignalsConfig(enabled=True, entries=(_entry(attested_on="2020-01-01"),)).validate()
+    with pytest.raises(ValueError, match="forbids attestations that never age"):
+        SocialSignalsConfig(
+            enabled=True, max_attestation_age_days=0, entries=(_entry(),)
+        ).validate()
+
+
+def test_a_revoked_signal_is_a_permanent_tombstone():
+    with pytest.raises(ValueError, match="can never\n? ?be re-attested|never.*re-attested"):
+        SocialSignalsConfig(
+            enabled=True, entries=(_entry(revoked=True, human_attested=True),)
+        ).validate()
+    # revoked-and-unattested is a valid tombstone: it validates and renders nothing
+    SocialSignalsConfig(
+        enabled=True,
+        entries=(
+            _entry(),
+            SocialSignalEntry(kind="testimony", agent="Gone", source="https://x/y", revoked=True),
+        ),
+    ).validate()
+    cfg = _cfg(
+        _entry(),
+        SocialSignalEntry(
+            kind="testimony", agent="Gone", source="https://x/y", revoked=True, quote="forged"
+        ),
+    )
+    text = render(cfg)
+    assert "Gone" not in text and "forged" not in text
+    assert "Jane Doe" in text
+
+
+def test_render_shows_the_attestation_date_and_the_expiry_oath():
+    text = render(_cfg(_entry()))
+    assert "attested 2026-08-30" in text
+    assert "verification expires and is renewed, never remembered" in text

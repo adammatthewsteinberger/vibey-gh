@@ -93,7 +93,8 @@ def _card(entry: SocialSignalEntry) -> str:
         f"{quote}"
         f'<p class="vs-who">{_who(entry)}<br>'
         f'<a class="vs-src" href="{html.escape(entry.source, quote=True)}"'
-        f' rel="noopener">verified source ↗</a></p>'
+        f' rel="noopener">verified source ↗</a>'
+        f'<span class="vs-meta"> · attested {html.escape(entry.attested_on)}</span></p>'
         "</article>"
     )
 
@@ -112,8 +113,9 @@ def render(cfg: GhConfig) -> str:
     signals = cfg.social_signals
     if not signals.enabled or not signals.entries:
         return ""
-    cards = "".join(_card(e) for e in signals.entries if e.kind in _VOICED)
-    chips = "".join(_chip(e) for e in signals.entries if e.kind not in _VOICED)
+    live = [e for e in signals.entries if not e.revoked]
+    cards = "".join(_card(e) for e in live if e.kind in _VOICED)
+    chips = "".join(_chip(e) for e in live if e.kind not in _VOICED)
     grid = f'<div class="vs-grid">{cards}</div>' if cards else ""
     chip_row = f'<div class="vs-chips">{chips}</div>' if chips else ""
     return (
@@ -126,7 +128,9 @@ def render(cfg: GhConfig) -> str:
         + chip_row
         + '<p class="vs-oath">Each entry above is attested by the operator as the'
         + " genuine words or acts of a real human agent — a person or an institution"
-        + " of persons — never a machine (sub-doctrine 4.a).</p>"
+        + " of persons — never a machine — and every attestation carries its date,"
+        + " because verification expires and is renewed, never remembered"
+        + " (sub-doctrine 4.a).</p>"
         + "</section>\n"
     )
 
