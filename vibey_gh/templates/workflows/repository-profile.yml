@@ -1,9 +1,9 @@
 # Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), Developed by [Adam Matthew Steinberger](https://vibewithadam.matthewsteinberger.com/) ([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/)).
-name: Repository profile
+name: __VIBEY_GH_WF_REPOSITORY_PROFILE__
 
 on:
   workflow_run:
-    workflows: ["Release surfaces"]
+    workflows: ["__VIBEY_GH_WF_RELEASE_SURFACES__"]
     types: [completed]
   workflow_dispatch:
 

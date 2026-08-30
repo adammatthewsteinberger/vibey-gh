@@ -9,6 +9,7 @@ else thought were important.
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import shlex
 import shutil
@@ -126,6 +127,15 @@ def render_workflow(source: Path, cfg: GhConfig) -> str:
     wanted = wanted.replace("__VIBEY_GH_INTEGRATION_BRANCH__", cfg.integration_branch)
     wanted = wanted.replace("__VIBEY_GH_RELEASE_BRANCH__", cfg.release_branch)
     wanted = wanted.replace("__VIBEY_GH_MODEL__", cfg.pr_automation.model)
+    # Every workflow name the chain depends on, from one source: a template's own
+    # `name:` and the `workflow_run` triggers that watch it render from the same
+    # field, so a rename can never leave a trigger pointing at a workflow that no
+    # longer answers to that name.
+    for field in dataclasses.fields(cfg.workflow_names):
+        wanted = wanted.replace(
+            f"__VIBEY_GH_WF_{field.name.upper()}__",
+            getattr(cfg.workflow_names, field.name),
+        )
     # The secret's NAME, rendered inside `${{ secrets.… }}`. `AiConfig` has already refused
     # anything that is not a bare secret identifier, so this cannot close the expression.
     wanted = wanted.replace("__VIBEY_GH_AI_AUTH_SECRET__", cfg.ai.auth_secret)

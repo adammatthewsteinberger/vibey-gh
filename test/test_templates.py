@@ -81,7 +81,9 @@ def test_release_environments_are_disjoint_by_branch():
 
 def test_release_surfaces_preserve_both_docs_channels_and_publish_oci_packages():
     text = (WORKFLOWS / "release-surfaces.yml").read_text(encoding="utf-8")
-    assert 'workflows: ["Release"]' in text
+    assert 'workflows: ["Release"]' in render_workflow(
+        WORKFLOWS / "release-surfaces.yml", GhConfig(root=Path("."))
+    )
     assert "github.event.workflow_run.conclusion == 'success'" in text
     assert "channel=develop" in text and "channel=main" in text
     assert "pages/${CHANNEL}" in text
@@ -393,6 +395,51 @@ def test_review_prompt_enforces_the_government_channel():
     assert "its primary emphasis is the government's military arm" in flat
 
 
+def test_every_workflow_name_is_configurable_and_renders_consistently(tmp_path):
+    """A `workflow_run` trigger matches on a workflow's display NAME. Hardcoding
+    those names assumed every adopter calls its pipeline "CI" and its publish step
+    "Release" — vibey-bootstrap calls its pipeline "CI/CD Pipeline", so the trigger
+    never matched, its channel site never deployed, and its Pages URL served a
+    fossil, silently, because a trigger that never matches simply never runs."""
+    import dataclasses
+
+    from vibey_gh.config import WorkflowNamesConfig
+
+    base = GhConfig(root=tmp_path)
+    for name in sorted(p.name for p in WORKFLOWS.glob("*.yml")):
+        rendered = render_workflow(WORKFLOWS / name, base)
+        assert "__VIBEY_GH_WF_" not in rendered, f"{name} left a name unrendered"
+
+    renamed = dataclasses.replace(
+        base,
+        workflow_names=WorkflowNamesConfig(
+            ci="CI/CD Pipeline", release="Publish", merge_train="Train"
+        ),
+    )
+    surfaces = render_workflow(WORKFLOWS / "release-surfaces.yml", renamed)
+    assert 'workflows: ["Publish"]' in surfaces
+    repair = render_workflow(WORKFLOWS / "release-repair.yml", renamed)
+    assert "CI/CD Pipeline" in repair and "Publish" in repair
+    # A template's own name and the triggers watching it move together.
+    train = render_workflow(WORKFLOWS / "merge-train.yml", renamed)
+    promote = render_workflow(WORKFLOWS / "promote-to-main.yml", renamed)
+    assert "name: Train" in train
+    assert 'workflows: ["Train"]' in promote
+
+
+def test_workflow_names_load_from_toml(tmp_path):
+    from vibey_gh.config import load_config
+
+    (tmp_path / ".vibey-gh.toml").write_text(
+        '[workflow_names]\nci = "CI/CD Pipeline"\nrelease = "Publish"\n', encoding="utf-8"
+    )
+    names = load_config(tmp_path).workflow_names
+    assert names.ci == "CI/CD Pipeline" and names.release == "Publish"
+    assert names.provenance == "Provenance"  # unnamed fields keep their defaults
+    (tmp_path / ".vibey-gh.toml").write_text("", encoding="utf-8")
+    assert load_config(tmp_path).workflow_names.ci == "CI"
+
+
 def test_release_surfaces_ships_the_corpus_index():
     """#249: the governance corpus index rides the channel site, so a fully-local
     deployment carries its law searchable and integrity-checkable offline."""
@@ -651,7 +698,7 @@ def test_branch_intake_reopens_a_reused_branch_name_without_duplicating_open_prs
 
 
 def test_automation_bootstrap_is_explicit_exact_head_and_permanent_branch_safe():
-    text = (WORKFLOWS / "automation-bootstrap.yml").read_text(encoding="utf-8")
+    text = render_workflow(WORKFLOWS / "automation-bootstrap.yml", GhConfig(root=Path(".")))
     assert "workflow_dispatch:" in text
     assert "inputs.authorize == true" in text
     assert 'test "$permission" = admin' in text
@@ -847,7 +894,9 @@ def test_properdocs_theme_is_channel_aware_and_accessible():
 
 def test_repository_profile_is_configurable_and_never_mutates_branches():
     text = (WORKFLOWS / "repository-profile.yml").read_text(encoding="utf-8")
-    assert 'workflows: ["Release surfaces"]' in text
+    assert 'workflows: ["Release surfaces"]' in render_workflow(
+        WORKFLOWS / "repository-profile.yml", GhConfig(root=Path("."))
+    )
     assert "__VIBEY_GH_PROFILE_DESCRIPTION__" in text
     assert "__VIBEY_GH_PROFILE_TOPICS__" in text
     assert '--arg homepage "$pages_url"' in text
@@ -874,7 +923,7 @@ def test_repository_profile_is_configurable_and_never_mutates_branches():
 
 
 def test_failed_permanent_branch_scans_use_a_guarded_repair_pr():
-    text = (WORKFLOWS / "release-repair.yml").read_text(encoding="utf-8")
+    text = render_workflow(WORKFLOWS / "release-repair.yml", GhConfig(root=Path(".")))
     assert (
         'workflows: ["CI", "Provenance", "Release", "Release surfaces", "GitHub Release"]' in text
     )

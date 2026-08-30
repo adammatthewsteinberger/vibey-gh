@@ -33,6 +33,7 @@ no file at all. `tomllib` is stdlib from 3.11, which this package already requir
 
 from __future__ import annotations
 
+import dataclasses
 import re
 import tomllib
 from dataclasses import dataclass
@@ -166,6 +167,40 @@ DEFAULT_DOCUMENTATION_FILES = (
     "SECURITY.md",
     "SUPPORT.md",
 )
+
+
+@dataclass(frozen=True)
+class WorkflowNamesConfig:
+    """Every workflow name the rendered templates depend on.
+
+    Templates chain by `workflow_run`, which matches a workflow's display NAME.
+    Those names were hardcoded, which silently assumed every adopter calls its
+    pipeline "CI" and its publish step "Release". vibey-bootstrap names its
+    pipeline "CI/CD Pipeline", so the trigger never matched, its channel site
+    never deployed, and its Pages URL served a fossil from an older publisher —
+    with no error anywhere, because a `workflow_run` trigger that never matches
+    simply never runs. The silence is the whole danger.
+
+    Two kinds live here. `ci` and `release` name workflows the ADOPTER owns and
+    vibey-gh never renders, so they genuinely differ per repository. The rest
+    name vibey-gh's own templates; they are configurable so an adopter may
+    rename them, and each template renders its own `name:` from the same field
+    the other templates trigger on — so a rename moves both sides at once and
+    the chain cannot drift.
+    """
+
+    # The adopter's own workflows — vibey-gh renders neither.
+    ci: str = "CI"
+    release: str = "Release"
+    # vibey-gh's own templates.
+    provenance: str = "Provenance"
+    pr_automation: str = "PR automation"
+    merge_train: str = "Merge train"
+    promote: str = "Promote"
+    release_surfaces: str = "Release surfaces"
+    release_repair: str = "Release repair"
+    github_release: str = "GitHub Release"
+    repository_profile: str = "Repository profile"
 
 
 @dataclass(frozen=True)
@@ -923,6 +958,7 @@ class GhConfig:
     yank: YankConfig = YankConfig()
     social_signals: SocialSignalsConfig = SocialSignalsConfig()
     tidy: TidyConfig = TidyConfig()
+    workflow_names: WorkflowNamesConfig = WorkflowNamesConfig()
     rulesets: RulesetsConfig = RulesetsConfig()
     repository_profile: RepositoryProfileConfig = RepositoryProfileConfig()
     documentation: DocumentationConfig = DocumentationConfig()
@@ -1002,6 +1038,16 @@ def _social_signals(raw: dict) -> SocialSignalsConfig:
     )
     cfg.validate()
     return cfg
+
+
+def _workflow_names(raw: dict) -> WorkflowNamesConfig:
+    defaults = WorkflowNamesConfig()
+    return WorkflowNamesConfig(
+        **{
+            f.name: str(raw.get(f.name, getattr(defaults, f.name)))
+            for f in dataclasses.fields(WorkflowNamesConfig)
+        }
+    )
 
 
 def load_config(root: Path | None = None) -> GhConfig:
@@ -1114,6 +1160,7 @@ def load_config(root: Path | None = None) -> GhConfig:
             notify_contributor_branches=realigning.get("notify_contributor_branches", True),
         ),
         social_signals=_social_signals(data.get("social_signals", {})),
+        workflow_names=_workflow_names(data.get("workflow_names", {})),
         tidy=TidyConfig(
             enabled=data.get("tidy", {}).get("enabled", True),
             keep_branches=tuple(data.get("tidy", {}).get("keep_branches", ())),
