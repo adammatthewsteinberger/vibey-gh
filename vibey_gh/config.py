@@ -168,6 +168,24 @@ DEFAULT_DOCUMENTATION_FILES = (
 )
 
 
+@dataclass(frozen=True)
+class TidyConfig:
+    """The clean repo (sub-doctrine 9.a): technical clutter is drag and does not
+    accumulate; human messiness is expressly welcome and never touched.
+
+    `enabled` gates the survey's presence in `check --ci` (cloud classes only
+    there — an ephemeral runner has no worktrees worth judging). `keep_branches`
+    extends the always-kept set beyond the integration and release branches."""
+
+    enabled: bool = True
+    keep_branches: tuple[str, ...] = ()
+    # Squash/rebase flows rewrite SHAs, so ancestry cannot prove a merged branch's
+    # content landed — the forge deleting the remote branch at merge time is the
+    # proof instead. True admits that proof for [gone] locals; false reports them
+    # and touches nothing.
+    trust_forge_deletions: bool = True
+
+
 SOCIAL_SIGNAL_KINDS = (
     # Comprehensive to the authentic social-signal classes of the current day
     # (sub-doctrine 4.a). Extend this tuple when the world grows a new REAL one.
@@ -861,6 +879,7 @@ class GhConfig:
     github_release: GithubReleaseConfig = GithubReleaseConfig()
     yank: YankConfig = YankConfig()
     social_signals: SocialSignalsConfig = SocialSignalsConfig()
+    tidy: TidyConfig = TidyConfig()
     rulesets: RulesetsConfig = RulesetsConfig()
     repository_profile: RepositoryProfileConfig = RepositoryProfileConfig()
     documentation: DocumentationConfig = DocumentationConfig()
@@ -1049,6 +1068,11 @@ def load_config(root: Path | None = None) -> GhConfig:
             notify_contributor_branches=realigning.get("notify_contributor_branches", True),
         ),
         social_signals=_social_signals(data.get("social_signals", {})),
+        tidy=TidyConfig(
+            enabled=data.get("tidy", {}).get("enabled", True),
+            keep_branches=tuple(data.get("tidy", {}).get("keep_branches", ())),
+            trust_forge_deletions=data.get("tidy", {}).get("trust_forge_deletions", True),
+        ),
         yank=YankConfig(
             pypi=yanking.get("pypi", False),
             testpypi=yanking.get("testpypi", False),

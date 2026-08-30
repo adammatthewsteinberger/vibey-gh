@@ -243,6 +243,23 @@ This repository declares the full contract for itself in its own `.vibey-gh.toml
 both the dogfooding rule the rest of the tool follows and the reason its own requirements
 are visible rather than compiled in.
 
+## `[tidy]`
+
+The clean repo (**sub-doctrine 9.a**): every repository is kept technically clean at
+all times — no exceptions — locally and in the cloud, while **human messiness is
+expressly welcome and never touched**: prose, discussions, stashes, work in
+progress. The clutter this wars on is machine-state clutter only.
+
+| Field | Type / default | Meaning |
+|---|---|---|
+| `enabled` | boolean / `true` | The doctrine's bar; disabling records a deliberate exception in review. |
+| `keep_branches` | string list / empty | Kept beyond the integration and release branches (an LTS line, say). |
+| `trust_forge_deletions` | boolean / `true` | Squash and rebase merges rewrite SHAs, so ancestry cannot prove a merged branch landed — the forge deleting its remote at merge time is the proof instead. Set false where remote branches die for other reasons. |
+
+Losslessness governs every deletion: ancestry-contained refs and forge-deleted
+upstreams only. Anything not provably redundant — draft releases, orphan tags,
+stashes, untracked paths — is reported to the human and never machine-removed.
+
 ## `[social_signals]`
 
 The social-signals surface (**sub-doctrine 4.a**, ratified by operator merge): the
