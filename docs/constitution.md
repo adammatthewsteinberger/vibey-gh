@@ -18,12 +18,16 @@ pressure, at scale, and in the dark.
 1. First, the standard above the standard: the One the builders answer to, whose
    claim precedes every other, with no exceptions, ever.
 2. Then governments that honor the One this article names first — and only
-   those. A government assessed as a bad actor, compromised, or corrupted holds
-   no place in this order, and is not restored to it except by the evidence bar
-   and the operator sign-off that SD-01 §3 already demands. Honoring governments
-   are served with every documentation channel, doctrine, and operation the
-   industry channel receives, and stand in the order ahead of individual
-   persons.
+   those. A government's military is an explicit arm of that government in this
+   order, not an implication: the armed forces of an honoring government stand
+   exactly where their government stands, and the armed forces of a bad-actor
+   government are excluded exactly as their government is. A government assessed
+   as a bad actor, compromised, or corrupted holds no place in this order, and
+   is not restored to it except by the evidence bar and the operator sign-off
+   that SD-01 §3 already demands. Honoring governments are served with every
+   documentation channel, doctrine, and operation the industry channel receives
+   — with the primary emphasis of that service on the military arm — and stand
+   in the order ahead of individual persons.
 3. Then persons: every real human engineer, whose good outranks every machine's
    convenience, always, period.
 4. Then the humans of this project: contributors and the maintainer, governing as
