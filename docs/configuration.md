@@ -229,6 +229,7 @@ Every entry in `required_files` is required: having one never excuses another.
 | Field | Type / default | Meaning |
 |---|---|---|
 | `required_files` | string list / the agent-docs layout | Files that must exist and be non-empty, each one individually. |
+| `require_roadmap` | boolean / `true` | The living-roadmap doctrine (#211): `docs/roadmap.md` or `ROADMAP.md` must exist and be non-empty until the project's goal is reached and its humans declare it done. Opting out silences only this deterministic presence check — the exact-head review still judges roadmap liveness against the release history. |
 | `readme_sections` | string list / empty | Headings required in `README.md`, in your own words. |
 | `automation_doc` | path / `.github/AUTOMATION.md` | Where this repository's automation documentation lives. **Not `.github/README.md`** — GitHub resolves that as the repository's landing README ahead of the root one, so naming it that replaces your product README on your repository's front page. |
 | `automation_doc_sections` | string list / empty | Headings required in `automation_doc`. Also read from the former name `github_readme_sections`. |
@@ -275,6 +276,7 @@ are superseded and prints them with a link to the page that can action them.
 | `pypi` | boolean / `false` | Report superseded PyPI releases after a publish. |
 | `testpypi` | boolean / `false` | Report superseded TestPyPI releases. |
 | `keep` | integer / `0` | How many releases below the newest to leave out of the report, so a rollback target is never suggested. |
+| `governance_paths` | string list / the founding documents | fnmatch globs (default `docs/constitution.md`, `docs/commandments.md`, `docs/bill-of-rights.md`, `docs/sd-*.md`). Article V.4 of the Constitution: when a release's range touches any of them — a RATIFIED governance change — every previous release on both indexes is reported superseded, with `keep` and the two switches above overridden. Zero exceptions: the config is machinery and the rule is law. Pass the ratifying push's range as `--governance-since` (see below). |
 
 Two invariants hold regardless of configuration:
 
@@ -289,11 +291,52 @@ Run it from a release workflow after the upload step. No credentials are involve
 index JSON it reads is public:
 
 ```bash
-vibey-gh report-superseded --index pypi --project my-package --version "$VERSION"
+vibey-gh report-superseded --index pypi --project my-package --version "$VERSION" \
+  --governance-since "$GITHUB_EVENT_BEFORE"   # optional: evaluate Article V.4 on the push range
 ```
+
+`--governance-since` takes the git ref that opened the release range (a push event's
+`before` SHA). If the range touches a `governance_paths` file, the report is the
+Article V.4 demand: every previous release named, retention window and switches
+overridden. An unreadable ref is reported loudly — the rule is never silently waived —
+but never fails the release.
 
 It always exits 0: the package is already published by the time it runs, so a bookkeeping
 failure is reported rather than turning a successful release red.
+
+## Machine-level: `~/.config/vibey-gh/failover.toml`
+
+The operator-seat failover engine (`vibey-gh failover`, #208) is configured per
+**machine**, never per repository — seats describe the operator's laptop, so nothing
+about them belongs in a repository's `.vibey-gh.toml`. A missing file is a disabled
+engine; nothing here ever self-activates.
+
+```toml
+enabled = true
+paid_probe = "claude -p ok --max-turns 1"   # exit 0 = the paid lane is alive
+interval_seconds = 300
+
+[[seats]]                                    # tried in order; first healthy one wins
+name = "qwenloop"
+launch = "qwenloop run"
+health = "curl -sf http://127.0.0.1:11434/api/tags"
+
+[[seats]]
+name = "opencode"
+launch = "opencode"                          # empty health = engage without preflight
+```
+
+| Field | Type / default | Meaning |
+|---|---|---|
+| `enabled` | boolean / `false` | The operator writes `true` deliberately; the first live handoff should be supervised. |
+| `paid_probe` | string / empty | A shell command whose exit status answers "is the paid lane alive?" — the 296 ms *Credit balance is too low* refusal is exactly what it distinguishes from health. A hang counts as down. |
+| `interval_seconds` | integer / `300` | Loop cadence when run without `--once`. |
+| `seats` | array of tables / qwenloop, then opencode | Each seat is a name, a `launch` command, and an optional `health` preflight, judged by exit status — any agent fits without a code change. |
+
+Seat state (which agent holds the seat, and its pid) lives in
+`~/.local/state/vibey-gh/failover.json`; `--config` and `--state` override both paths.
+The handoff is lossless because the seats share one working tree and the
+`local-authority` loop keeps local and remote synced throughout.
 
 ## `[github_release]`
 
