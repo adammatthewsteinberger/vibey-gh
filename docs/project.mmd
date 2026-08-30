@@ -42,6 +42,8 @@ flowchart TB
     Doctor["Offline adoption preflight (vibey_gh.doctor)"]
     LocalFallback["Local-model fallback (vibey_gh.local_review): local-review + local-triage"]
     Yank["Yank/supersede reporting (vibey_gh.yank, report-superseded)"]
+    LocalAuthority["Local-authority sync loop (vibey_gh.local_authority): capped-lane source of truth"]
+    Failover["Operator-seat failover (vibey_gh.failover): qwenloop, then opencode; paid lane leads"]
     Book["Docs-to-book export (vibey_gh.book): EPUB 3.0 + KDP print-ready HTML"]
   end
 
@@ -167,6 +169,12 @@ flowchart TB
   Release -->|after each publish| SupersededReport
   SupersededReport -->|job summary names what to yank and where| TestPyPI
   SupersededReport -->|job summary names what to yank and where| PyPI
+  PublishRelease -->|"--governance-since: ratified founding-document change (Article V.4)"| Yank
+  Yank -->|"governance override: EVERY previous release named, keep and switches ignored"| SupersededReport
+  Maintainer -->|paid lane capped: credits out| LocalAuthority
+  LocalAuthority -->|"pre-fetch lease force-with-lease: green local branches reach remotes"| Push
+  Maintainer -->|paid IDE probe fails| Failover
+  Failover -->|"seat handed to first healthy local agent; reclaimed on paid recovery"| LocalAuthority
   Trusted --> EphemeralGit
   EphemeralGit --> CredentialHelper
   Sandbox --> SafeProgress
