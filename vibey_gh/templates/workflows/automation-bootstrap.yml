@@ -76,7 +76,7 @@ jobs:
               (.conclusion == "success" or .conclusion == "neutral" or .conclusion == "skipped")
             )) and
             ([$checks[].name] | any(. == "Documentation contract")) and
-            ([$checks[].name] | any(. == "Provenance")) and
+            ([$checks[].name] | any(. == "__VIBEY_GH_WF_PROVENANCE__")) and
             ([$checks[].name] | any(. == "Build")) and
             ([$checks[].name] | any(. == "Lint")) and
             ([$checks[].name] | any(. == "Analyze Python")) and

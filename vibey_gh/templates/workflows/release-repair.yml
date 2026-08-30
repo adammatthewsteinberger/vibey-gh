@@ -1,5 +1,5 @@
 # Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), Developed by [Adam Matthew Steinberger](https://vibewithadam.matthewsteinberger.com/) ([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/)).
-name: Release repair
+name: __VIBEY_GH_WF_RELEASE_REPAIR__
 
 # PR failures are repaired by PR automation. This workflow covers the other half of the
 # delivery chain: trusted workflows that fail only after a change reaches a permanent
@@ -8,7 +8,7 @@ name: Release repair
 # change.
 on:
   workflow_run:
-    workflows: ["CI", "Provenance", "Release", "Release surfaces", "GitHub Release"]
+    workflows: ["__VIBEY_GH_WF_CI__", "__VIBEY_GH_WF_PROVENANCE__", "__VIBEY_GH_WF_RELEASE__", "__VIBEY_GH_WF_RELEASE_SURFACES__", "__VIBEY_GH_WF_GITHUB_RELEASE__"]
     types: [completed]
     branches: [__VIBEY_GH_INTEGRATION_BRANCH__, __VIBEY_GH_RELEASE_BRANCH__]
 

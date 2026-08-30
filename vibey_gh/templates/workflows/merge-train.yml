@@ -1,11 +1,11 @@
 # Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), Developed by [Adam Matthew Steinberger](https://vibewithadam.matthewsteinberger.com/) ([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/)).
-name: Merge train
+name: __VIBEY_GH_WF_MERGE_TRAIN__
 
 # A successful PR-automation gate is the primary trigger. Weekly and manual runs remain
 # recovery backstops and evaluate every currently ready PR.
 on:
   workflow_run:
-    workflows: ["PR automation"]
+    workflows: ["__VIBEY_GH_WF_PR_AUTOMATION__"]
     types: [completed]
   schedule:
     - cron: "17 7 * * 1"
@@ -33,7 +33,7 @@ concurrency:
 jobs:
   merge:
     name: merge
-    # Deliberately NOT gated on the triggering run's conclusion. "PR automation" concludes
+    # Deliberately NOT gated on the triggering run's conclusion. "__VIBEY_GH_WF_PR_AUTOMATION__" concludes
     # `failure` whenever its exact-head review job fails -- which is exactly the case the
     # local review fallback exists to cover: the fallback job then succeeds, publishes a
     # green `PR automation / gate`, and the run as a whole still ends `failure` because one

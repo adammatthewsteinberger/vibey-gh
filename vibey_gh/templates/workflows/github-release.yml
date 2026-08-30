@@ -1,12 +1,12 @@
 # Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), Developed by [Adam Matthew Steinberger](https://vibewithadam.matthewsteinberger.com/) ([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/)).
-name: GitHub Release
+name: __VIBEY_GH_WF_GITHUB_RELEASE__
 
 # Package publication owns artifact verification. This workflow reacts only after that
 # release succeeds on the configured release branch, then creates an immutable tag and
 # an idempotent GitHub Release for the exact released commit.
 on:
   workflow_run:
-    workflows: ["Release"]
+    workflows: ["__VIBEY_GH_WF_RELEASE__"]
     types: [completed]
   workflow_dispatch:
     inputs:
