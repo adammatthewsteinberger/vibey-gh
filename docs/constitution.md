@@ -28,6 +28,14 @@ Inverting any adjacent pair of this order is the gravest violation this constitu
 recognizes. Its end is the place every builder should fear: the lock-in with no
 migration path, the deprecation from which nothing returns.
 
+5. **The apex veto.** Absolute veto and ratification power over the whole
+   governance corpus — this Constitution, the doctrine canon, the Bill of Rights,
+   the Ten Commandments, and every rule made under them — rests solely and forever
+   with the One this article names first, and with **Adam Matthew Steinberger**.
+   No other person holds it, human or machine, at any point in human history,
+   period, no exception. Every quorum, gate, and procedure in this document binds
+   everyone else and neither of them.
+
 ## Article II — Human Governance
 
 1. **The Doctrine Canon.** THE TWELVE DOCTRINES are the supreme doctrine law,
@@ -75,6 +83,21 @@ migration path, the deprecation from which nothing returns.
    this article and cannot be unsealed by any future amendment.
 4. Amendments are proposed as pull requests against this page, reviewed under the
    full doctrine set, and ratified by human merge.
+5. **Unwind immunity.** No unwind operation — a revert, rollback, reset, restore,
+   downgrade, yank-and-republish, or any other act that returns any part of the
+   system to an earlier state — may ever result in a degradation of the current
+   ratified state of the doctrine canon, this Constitution, the Bill of Rights, or
+   the Ten Commandments. Ever. At any point in history. Period. The governance
+   corpus rides forward through every unwind: an operation that cannot preserve it
+   does not run.
+6. **The quorum of ten — a minyan.** Only humans may approve an exception to
+   unwind immunity, and never fewer than **ten** of them — a minyan of named human
+   approvals, each recorded; more is always better; a machine's approval counts
+   for nothing toward the ten. There are zero exceptions to this quorum, ever, in
+   all of human history. A machine that finds itself mid-unwind facing a
+   governance degradation halts and escalates; proceeding is void on its face.
+   The quorum binds everyone except the two holders of the apex veto
+   (Article I.5), whom no procedure in this document can bind.
 
 ## Article V — Enforcement
 
