@@ -75,6 +75,19 @@ migration path, the deprecation from which nothing returns.
    this article and cannot be unsealed by any future amendment.
 4. Amendments are proposed as pull requests against this page, reviewed under the
    full doctrine set, and ratified by human merge.
+5. **Unwind immunity.** No unwind operation — a revert, rollback, reset, restore,
+   downgrade, yank-and-republish, or any other act that returns any part of the
+   system to an earlier state — may ever result in a degradation of the current
+   ratified state of the doctrine canon, this Constitution, the Bill of Rights, or
+   the Ten Commandments. Ever. At any point in history. Period. The governance
+   corpus rides forward through every unwind: an operation that cannot preserve it
+   does not run.
+6. **The quorum of five.** Only humans may approve an exception to unwind
+   immunity, and never fewer than **five** of them — five named human approvals,
+   each recorded; more is always better; a machine's approval counts for nothing
+   toward the five. There are zero exceptions to this quorum, ever, in all of
+   human history. A machine that finds itself mid-unwind facing a governance
+   degradation halts and escalates; proceeding is void on its face.
 
 ## Article V — Enforcement
 
