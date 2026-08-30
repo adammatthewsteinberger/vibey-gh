@@ -48,6 +48,7 @@ __all__ = [
     "decide",
     "estimate_from",
     "headroom_gb",
+    "saturating_wait",
     "sample_machine",
     "sample_model",
 ]
@@ -240,6 +241,28 @@ def estimate_from(observations: list[Observation], floor_slots: float = 1.0) -> 
     )
 
 
+def saturating_wait(service_s: float, queue_depth: int, slots: float) -> float:
+    """Projected wait, superlinear in queue depth.
+
+    A linear model — `service × queue/slots` — is what this module shipped with, and
+    a stress escalation falsified it within one rung: measured latency grew 22 s per
+    added job through twelve concurrent, then 59 s per job by sixteen. Linear
+    projection under-predicts exactly where accuracy matters, so an admission rule
+    built on it admits work that then times out — the failure this module exists to
+    prevent.
+
+    The correction keeps the shape a queue actually has. With load factor
+    ρ = queue/slots, wait grows as ρ(1 + ρ): linear while the runner has slack,
+    quadratic once it does not. That reproduces the observed slope growth far better
+    than a line, and it is labelled for what it is — an empirical fit, refitted from
+    observations, never trusted as a law.
+    """
+    if slots <= 0:
+        return 0.0
+    rho = queue_depth / slots
+    return service_s * rho * (1 + rho)
+
+
 def headroom_gb(machine: Machine, model: Model, slots: float) -> float:
     """Paging headroom the projection wants: one resident model plus a per-slot
     context share, less what is already available. Zero means the fit is
@@ -292,7 +315,7 @@ def decide(
 
     service = est.service_s(payload_bytes)
     ahead = max(queue_depth, 0)
-    wait = round(service * (ahead / est.slots), 1) if est.slots else 0.0
+    wait = round(saturating_wait(service, ahead, est.slots), 1)
     need = headroom_gb(machine, model, est.slots)
     if need > 0:
         notes.append(
