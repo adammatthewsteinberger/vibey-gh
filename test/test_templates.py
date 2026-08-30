@@ -390,6 +390,7 @@ def test_review_prompt_enforces_the_government_channel():
     flat = " ".join(text.split())
     assert "Enforce the government channel (sub-doctrine 2.a)" in flat
     assert "a government edition stands beside it" in flat
+    assert "its primary emphasis is the government's military arm" in flat
 
 
 def test_review_prompt_enforces_unwind_immunity_with_the_minyan_of_ten():
