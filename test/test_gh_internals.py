@@ -796,3 +796,87 @@ def test_read_text_uses_the_value_when_the_path_probe_itself_fails(monkeypatch):
 
     payload = '{"pass": true}'
     assert cli._read_text(payload) == payload
+
+
+def test_owed_at_rederives_against_an_arbitrary_committed_head(repo):
+    """#254: the merge-time question. A head that gained code changes after the last
+    bump owes a release commit; a head with a staged bump owes nothing; docs-only
+    heads owe nothing."""
+    import subprocess
+
+    from vibey_gh import versioning
+    from vibey_gh.config import load_config
+
+    def git(*a):
+        subprocess.run(["git", *a], cwd=repo, capture_output=True, check=True)
+
+    (repo / ".vibey-gh.toml").write_text(
+        '[version]\nfiles = ["src/__init__.py", "manifest.json"]\n'
+        'code_paths = ["src/"]\ncontent_paths = ["content/"]\n',
+        encoding="utf-8",
+    )
+    (repo / "src").mkdir()
+    (repo / "src" / "__init__.py").write_text('__version__ = "1.0.0"\n')
+    (repo / "manifest.json").write_text('{"metadata": {"version": "1.0.0"}}\n')
+    git("add", "-A")
+    git("commit", "-qm", "base")
+    cfg = load_config(repo)
+    git("branch", "release-line")
+    (repo / "src" / "mod.py").write_text("x = 1\n")
+    git("add", "-A")
+    git("commit", "-qm", "feat: code change without a bump")
+    owed, why = versioning.owed_at(cfg, "release-line", "HEAD")
+    assert owed is not None and "code changed" in why
+
+    (repo / "src" / "__init__.py").write_text('__version__ = "1.1.0"\n')
+    (repo / "manifest.json").write_text('{"metadata": {"version": "1.1.0"}}\n')
+    git("add", "-A")
+    git("commit", "-qm", "chore(release): 1.1.0")
+    owed, why = versioning.owed_at(cfg, "release-line", "HEAD")
+    assert owed is None and "deliberate bump" in why
+
+    owed, why = versioning.owed_at(cfg, "no-such-ref", "HEAD")
+    assert owed is None and "refusing to guess" in why
+    owed, why = versioning.owed_at(cfg, "release-line", "also-no-such-ref")
+    assert owed is None and "refusing to guess" in why
+
+
+def test_the_train_holds_an_unbumped_promotion(repo, monkeypatch):
+    """#254's teeth: a promotion whose current head owes a bump is not ready, and the
+    reason names the exact release commit owed."""
+    from vibey_gh import merge_train, versioning
+    from vibey_gh.config import load_config
+
+    cfg = load_config(repo)
+    promotion = {
+        "number": 9,
+        "title": "chore(release): 1.0.0",
+        "author": {"login": cfg.owner or "owner"},
+        "isDraft": False,
+        "mergeable": "MERGEABLE",
+        "mergeStateStatus": "CLEAN",
+        "reviewDecision": "",
+        "labels": [],
+        "statusCheckRollup": [
+            {
+                "name": "PR automation / gate",
+                "status": "COMPLETED",
+                "conclusion": "SUCCESS",
+            }
+        ],
+        "baseRefName": cfg.release_branch,
+        "headRefName": cfg.integration_branch,
+        "headRefOid": "deadbeef",
+    }
+    monkeypatch.setattr(
+        versioning, "owed_at", lambda c, since, head: ("1.1.0", "only internal code changed")
+    )
+    verdict = merge_train.judge(promotion, cfg)
+    assert not verdict.ready
+    assert "chore(release): 1.1.0" in (verdict.reason or "")
+
+    monkeypatch.setattr(
+        versioning, "owed_at", lambda c, since, head: (None, "a deliberate bump is in place")
+    )
+    verdict = merge_train.judge(promotion, cfg)
+    assert verdict.ready
