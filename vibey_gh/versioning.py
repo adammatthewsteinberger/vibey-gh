@@ -156,9 +156,30 @@ def decide(cfg: GhConfig, since: str) -> tuple[str | None, str]:
             "a deliberate bump is in place, leaving it alone"
         )
 
-    changed = [
-        line for line in _git(cfg, "diff", "--name-only", since, "HEAD").splitlines() if line
-    ]
+    return _classify(cfg, since, "HEAD", working)
+
+
+def owed_at(cfg: GhConfig, since: str, head: str) -> tuple[str | None, str]:
+    """What `decide` would say about an arbitrary committed head — the merge-time
+    re-derivation (#254). A promotion opened when everything was bumped can gain
+    bump-deriving merges before it merges; the merger re-asks this question against
+    the CURRENT head, and a non-None answer means the promotion owes a release
+    commit and is not ready. Reads committed state only — no working tree."""
+    released = read_version_at(cfg, since)
+    if released is None:
+        return None, f"cannot read a version at {since}; refusing to guess"
+    staged = read_version_at(cfg, head)
+    if staged is None:
+        return None, f"cannot read a version at {head}; refusing to guess"
+    if staged != released:
+        return None, (
+            f"already at {staged} while {since} is {released} — " "a deliberate bump is in place"
+        )
+    return _classify(cfg, since, head, staged)
+
+
+def _classify(cfg: GhConfig, since: str, head: str, working: str) -> tuple[str | None, str]:
+    changed = [line for line in _git(cfg, "diff", "--name-only", since, head).splitlines() if line]
     if not changed:
         return None, f"no changes since {since}"
     # Discount files whose entire diff is the provenance header before classifying, so
