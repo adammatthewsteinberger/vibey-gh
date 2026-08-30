@@ -81,6 +81,27 @@ When paid credits run out, local is the source of truth: green local work reache
 remotes in near-realtime on both fronts, agents fail over to local seats, and
 recovery on refunding needs no human beyond the funding itself.
 
+**8.a — the sovereign path is the preference, not the fallback** *(ratified by the
+merge that carried this entry)*: the 100% purely sovereign path is **always the
+number one preferred way to run this code — always and forever**. Paid platforms are
+never prioritized. When in doubt, always opt for the freest and most sovereign
+option available, at all times, now and forever.
+
+This inverts a burden of proof, and that is the whole point of stating it. Doctrine
+8 alone reads as an outage posture: local takes over *when the credits run out*.
+8.a makes sovereign the ordinary posture and paid the exception — so reaching for a
+paid platform is the move that must be justified, never the default that gets
+assumed. The justification available is narrow: the sovereign path is preferred
+until it provably cannot carry the work, which is the floor doctrine 10's
+decomposition clarification already defines and requires be declared loudly to a
+human. "The paid one is nicer" is not a floor.
+
+It is also the tie-breaker the rest of the canon needs. Where two options are
+otherwise comparable, freer and more sovereign wins — and this is not a preference
+about cost. Every paid platform is a counterparty who can raise a price, change
+terms, or be pressured into refusing service, which is precisely what 10.a names
+and what 10.b already settled for money. 8.a settles it for everything else.
+
 ## 9 — The vibe
 
 Never a drag. Full steam ahead: baffling momentum with green code.
