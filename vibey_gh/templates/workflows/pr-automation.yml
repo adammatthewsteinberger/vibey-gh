@@ -1290,9 +1290,19 @@ jobs:
                   conclusion=success
                   title="PR automation: gate (local fallback)"
                   summary="Scans passed for this exact head. The primary exact-head review returned no verdict (review job: ${REVIEW_RESULT}), so a LOCAL FALLBACK model (${FALLBACK_MODEL}) reviewed the diff and found no blocking defect. It reviewed the DIFF ONLY — the documentation-contract fields were not evaluated, and this is a weaker signal than the primary review."
+                elif [ -n "$FALLBACK_PASSED" ]; then
+                  # The local lane ran and returned a NEGATIVE verdict. This is a third
+                  # state, and collapsing it into the one below actively misleads: it told
+                  # an operator "not a defect in the pull request, go check your credits"
+                  # while a reported finding sat unmentioned in the job log. Observed live
+                  # on a release promotion, where the finding turned out to be a false
+                  # positive — which is exactly why the reader must be pointed AT it rather
+                  # than away from it.
+                  title="PR automation: local fallback found a blocking defect"
+                  summary="Scans passed for this exact head. The primary exact-head review returned no verdict (review job: ${REVIEW_RESULT}), so a LOCAL FALLBACK model (${FALLBACK_MODEL}) reviewed the diff and reported a BLOCKING finding — see the 'Local review fallback' job log and its archived verdict. Treat this as a lead, not a ruling: it is a narrower reviewer, it saw the DIFF ONLY, and on a large pull request the diff it saw was TRUNCATED, so verify the finding against the file before acting on it."
                 else
                   title="PR automation: review incomplete"
-                  summary="Scans passed for this exact head, but the exact-head review returned no verdict (review job: ${REVIEW_RESULT}). This is an infrastructure or operator failure rather than a defect in the pull request. Check the review job log for API credit balance, credentials, or model availability, then rerun."
+                  summary="Scans passed for this exact head, but the exact-head review returned no verdict (review job: ${REVIEW_RESULT}) and no local fallback verdict was produced either. This is an infrastructure or operator failure rather than a defect in the pull request. Check the review job log for API credit balance, credentials, or model availability, then rerun."
                 fi
                 ;;
             esac
