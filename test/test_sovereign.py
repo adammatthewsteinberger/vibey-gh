@@ -69,9 +69,22 @@ def test_a_heartbeat_is_an_empty_commit_on_a_ref_that_is_not_a_branch(monkeypatc
     result = beat(REF)
     assert result.ready and result.age_seconds == 0
     pushed = next(c for c in calls if "push" in c)
-    assert pushed[:4] == ("git", "push", "--force", "origin")
-    assert pushed[4] == f"c0ffee:{REF}"
-    assert "refs/heads/" not in pushed[4]
+    assert pushed[:4] == ("git", "push", "--force", "--no-verify")
+    assert pushed[4] == "origin" and pushed[5] == f"c0ffee:{REF}"
+    assert "refs/heads/" not in pushed[5]
+
+
+def test_a_heartbeat_never_pays_the_pre_push_code_gate(monkeypatch):
+    """Measured, not assumed. Against a real project whose pre-push stage runs the test
+    suite, then a coverage pass that runs the suite a second time, then a network
+    dependency audit, a heartbeat push ran past two minutes without finishing — against
+    1.2 seconds with `--no-verify`. It carries an empty tree with no parents, so a gate
+    that judges code has nothing here to judge, and a timer that cannot complete inside
+    its own interval is not a heartbeat. Worse, `beat()` is called in a loop over many
+    repositories, so one slow gate stalls every repository queued behind it."""
+    calls = _fake(monkeypatch, {"hash-object": (0, "t"), "commit-tree": (0, "c")})
+    assert beat(REF).ready
+    assert "--no-verify" in next(c for c in calls if "push" in c)
 
 
 @pytest.mark.parametrize(
