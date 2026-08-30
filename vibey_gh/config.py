@@ -220,6 +220,13 @@ class SocialSignalEntry:
     agent: str
     source: str
     human_attested: bool = False
+    # The 4.a amendment — verification expires: the ISO date the operator last
+    # verified this signal's authenticity. Required; a claim without a date cannot
+    # age, and every authenticity claim must age.
+    attested_on: str = ""
+    # A signal discovered inauthentic is revoked: it renders nowhere, forever, and
+    # can never be re-attested — the tombstone outlives every optimism.
+    revoked: bool = False
     quote: str = ""
     role: str = ""
     org: str = ""
@@ -239,13 +246,33 @@ class SocialSignalsConfig:
 
     enabled: bool = False
     heading: str = "Real people, real words"
+    # The 4.a amendment: authenticity is re-verified, never remembered. An
+    # attestation older than this blocks the check until a human re-verifies and
+    # re-dates it. Zero would mean attestations never age; validation refuses it.
+    max_attestation_age_days: int = 365
     entries: tuple[SocialSignalEntry, ...] = ()
 
     def validate(self) -> None:
         if not self.enabled:
             return
+        if self.max_attestation_age_days <= 0:
+            raise ValueError(
+                "social_signals.max_attestation_age_days must be positive: the 4.a"
+                " amendment forbids attestations that never age — authenticity is"
+                " re-verified, never remembered"
+            )
+        import datetime
+
         for i, e in enumerate(self.entries):
             where = f"social_signals.entries[{i}]"
+            if e.revoked:
+                if e.human_attested:
+                    raise ValueError(
+                        f"{where}: revoked and attested cannot coexist — a signal"
+                        " discovered inauthentic is removed permanently and can never"
+                        " be re-attested, no exceptions ever (4.a amendment)"
+                    )
+                continue
             if e.kind not in SOCIAL_SIGNAL_KINDS:
                 raise ValueError(f"{where}: unknown kind {e.kind!r}; one of {SOCIAL_SIGNAL_KINDS}")
             if not e.agent.strip():
@@ -257,6 +284,22 @@ class SocialSignalsConfig:
                     f"{where}: human_attested = true is the operator's own attestation that"
                     " this signal is genuine and from a real human agent, never a machine —"
                     " an entry without it does not render (sub-doctrine 4.a)"
+                )
+            try:
+                attested = datetime.date.fromisoformat(e.attested_on)
+            except ValueError:
+                raise ValueError(
+                    f"{where}: attested_on must be the ISO date the human last verified"
+                    " this signal — a claim without a date cannot age, and every"
+                    " authenticity claim must age (4.a amendment)"
+                ) from None
+            age = (datetime.date.today() - attested).days
+            if age > self.max_attestation_age_days:
+                raise ValueError(
+                    f"{where}: attestation is {age} days old, past"
+                    f" max_attestation_age_days={self.max_attestation_age_days} —"
+                    " a past-authentic signal is never assumed presently authentic;"
+                    " re-verify and re-date attested_on (4.a amendment)"
                 )
         if self.entries == ():
             raise ValueError("social_signals.enabled with no entries renders nothing honest")
@@ -939,12 +982,15 @@ def _social_signals(raw: dict) -> SocialSignalsConfig:
     cfg = SocialSignalsConfig(
         enabled=bool(raw.get("enabled", False)),
         heading=str(raw.get("heading", "Real people, real words")),
+        max_attestation_age_days=int(raw.get("max_attestation_age_days", 365)),
         entries=tuple(
             SocialSignalEntry(
                 kind=str(e.get("kind", "")),
                 agent=str(e.get("agent", "")),
                 source=str(e.get("source", "")),
                 human_attested=bool(e.get("human_attested", False)),
+                attested_on=str(e.get("attested_on", "")),
+                revoked=bool(e.get("revoked", False)),
                 quote=str(e.get("quote", "")),
                 role=str(e.get("role", "")),
                 org=str(e.get("org", "")),

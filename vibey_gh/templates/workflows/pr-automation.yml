@@ -388,7 +388,11 @@ jobs:
             working source hyperlink at the point of reference, and carry the
             operator's human attestation. A testimony, endorsement, review, or any
             other social signal that is machine-authored, synthetic, unattributed,
-            or unverifiable is FALSE WITNESS and blocks, no exceptions.
+            or unverifiable is FALSE WITNESS and blocks, no exceptions. Verification
+            expires: a past-authentic signal is never assumed presently authentic —
+            every entry carries the date a human last verified it, stale
+            attestations block until re-verified, and a signal discovered
+            inauthentic is removed immediately and permanently, never re-attested.
             Enforce unwind immunity (Article IV.5-6): treat any change that removes,
             weakens, or reverts content under the founding documents — the
             constitution, the ten commandments, the bill of rights, or a standing
