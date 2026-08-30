@@ -113,6 +113,7 @@ jobs:
       fork: ${{ steps.meta.outputs.fork }}
       head_repo: ${{ steps.meta.outputs.head_repo }}
       base_ref: ${{ steps.meta.outputs.base_ref }}
+      sovereign_ready: ${{ steps.sovereign.outputs.ready }}
     steps:
       - name: Validate diagnostic output policy
         if: inputs.full_claude_output == true
@@ -139,6 +140,18 @@ jobs:
           else
             python -m pip install --quiet vibey-gh
           fi
+
+      # Doctrine 8.a prefers the sovereign path, but a sovereign job scheduled against a
+      # runner that is not online does not fail — it QUEUES, forever, and the gate below
+      # `needs` it under `always()`, which waits for completion. That would block every
+      # pull request silently. So the lane is offered only when the operator's machine
+      # has said it is up, and every unreadable answer counts as "not up".
+      - name: Probe sovereign readiness
+        id: sovereign
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          vibey-gh sovereign || true
 
       - name: Resolve the PR and exact head
         id: resolve
@@ -1127,6 +1140,7 @@ jobs:
     # behaviour — a failed gate a human resolves.
     if: >-
       __VIBEY_GH_FALLBACK_ENABLED__ &&
+      needs.evaluate.outputs.sovereign_ready == 'true' &&
       always() && !cancelled() && github.event_name != 'schedule' &&
       inputs.dry_run != true &&
       needs.review.result == 'failure' &&

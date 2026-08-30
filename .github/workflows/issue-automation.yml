@@ -96,6 +96,7 @@ jobs:
       fingerprint: ${{ steps.evaluate.outputs.fingerprint }}
       pr_title: ${{ steps.evaluate.outputs.pr_title }}
       reason: ${{ steps.evaluate.outputs.reason }}
+      sovereign_ready: ${{ steps.sovereign.outputs.ready }}
     steps:
       - name: Validate diagnostic output policy
         if: inputs.full_claude_output == true
@@ -125,6 +126,17 @@ jobs:
             python -m pip install --quiet vibey-gh
           fi
           command -v vibey-gh >/dev/null || { echo "::error::vibey-gh is not installed"; exit 1; }
+      # 8.a's probe, same reasoning as pr-automation: a sovereign job scheduled against
+      # an offline runner queues rather than fails. Nothing `needs` this lane, so it
+      # cannot block a gate here — but a job pending forever is exactly the technical
+      # clutter 9.a forbids accumulating, and it wins nothing.
+      - name: Probe sovereign readiness
+        id: sovereign
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          vibey-gh sovereign || true
+
       - name: Resolve the issue number
         id: resolve
         env:
@@ -507,6 +519,7 @@ jobs:
     # instead of silence, and the paid solver retries on its own schedule.
     if: >-
       true &&
+      needs.evaluate.outputs.sovereign_ready == 'true' &&
       always() && !cancelled() && inputs.dry_run != true &&
       needs.evaluate.outputs.state == 'solve' &&
       needs.solve.result == 'failure'

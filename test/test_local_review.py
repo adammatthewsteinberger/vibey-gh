@@ -276,14 +276,20 @@ def test_fallback_config_validates_only_when_enabled():
     PrAutomationFallbackConfig(enabled=True)
 
 
-def test_fallback_is_off_by_default_and_excludes_forks():
-    """Two defaults carry the safety argument: no repository inherits a self-hosted runner
-    path, and the one that opts in still keeps fork pull requests off its hardware."""
+def test_the_sovereign_lane_is_offered_by_default_and_still_excludes_forks():
+    """Doctrine 8.a moved this default. The sovereign path may not be the one that has
+    to be opted into while the paid lane runs automatically — that is the prioritization
+    8.a forbids. What made "off" the safe default was that an enabled lane with no runner
+    online queues forever and blocks the gate; the readiness probe removes that, so a
+    repository with no heartbeat simply never offers the lane. The fork exclusion is
+    untouched: it is what keeps a self-hosted runner defensible on a public repository,
+    and no doctrine argues for handing arbitrary authors the operator's hardware."""
     from vibey_gh.config import PrAutomationConfig
 
     fallback = PrAutomationConfig().fallback
-    assert fallback.enabled is False
+    assert fallback.enabled is True
     assert fallback.trusted_only is True
+    assert fallback.heartbeat_ref.startswith("refs/")
 
 
 # ---------------------------------------------------------------------------
