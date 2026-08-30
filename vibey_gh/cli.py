@@ -396,6 +396,44 @@ def _failover(args) -> int:
     return 0
 
 
+def _tidy(args) -> int:
+    from vibey_gh import tidy
+
+    cfg = load_config()
+    report = tidy.survey(cfg, local=not args.ci)
+    for problem in report.problems:
+        print(f"vibey-gh tidy: {problem}", file=sys.stderr)
+        return 1
+    rows = (
+        ("merged remote branches", report.remote_merged),
+        ("merged local branches", report.local_merged),
+        ("gone-upstream local branches", report.local_gone),
+        ("prunable worktrees", report.prunable_worktrees),
+        ("draft releases (human decision)", report.draft_releases),
+        ("orphan tags (human decision)", report.orphan_tags),
+    )
+    for label, items in rows:
+        if items:
+            print(f"vibey-gh tidy: {label}: {', '.join(items)}")
+    if report.stashes:
+        print(f"vibey-gh tidy: {report.stashes} stash(es) — yours, untouched")
+    if report.untracked:
+        print(f"vibey-gh tidy: {report.untracked} untracked path(s) — yours, untouched")
+    if report.clean:
+        print("vibey-gh tidy: clean — no technical clutter (9.a)")
+        return 0
+    if args.apply:
+        for action in tidy.apply(cfg, report):
+            print(f"vibey-gh tidy: {action}")
+        # Drafts and orphan tags remain: reported above, removed only by a human.
+        return 0
+    print(
+        "vibey-gh tidy: technical clutter present (sub-doctrine 9.a) —"
+        " `vibey-gh tidy --apply` removes the provably-lossless classes"
+    )
+    return 1
+
+
 def _doctor(args) -> int:
     from vibey_gh import doctor
 
@@ -859,6 +897,18 @@ def main(argv: list[str] | None = None) -> int:
         help="will the automation actually work? — the adoption preflight, offline",
     )
     doc.set_defaults(func=_doctor)
+
+    ty = sub.add_parser(
+        "tidy",
+        help="the clean repo (9.a): survey technical clutter; --apply removes the lossless classes",
+    )
+    ty.add_argument(
+        "--apply", action="store_true", help="delete merged/gone refs and prune worktrees"
+    )
+    ty.add_argument(
+        "--ci", action="store_true", help="cloud classes only (no local-clone judgments)"
+    )
+    ty.set_defaults(func=_tidy)
 
     la = sub.add_parser(
         "local-authority",

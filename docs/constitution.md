@@ -94,7 +94,9 @@ migration path, the deprecation from which nothing returns.
    no amendment may degrade, weaken, or remove one. A change that would trade a
    human protection for machine convenience is void on its face.
 3. The sealed counts — twelve doctrines, ten rights — are themselves protected by
-   this article and cannot be unsealed by any future amendment.
+   this article and cannot be unsealed by any future amendment. The canonical
+   record of the twelve and their sub-doctrines is [The Twelve
+   Doctrines](doctrines.md), kept current in this constitutional cluster.
 4. Amendments are proposed as pull requests against this page, reviewed under the
    full doctrine set, and ratified by human merge.
 5. **Unwind immunity.** No unwind operation — a revert, rollback, reset, restore,
