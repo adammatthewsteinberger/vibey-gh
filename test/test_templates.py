@@ -1623,3 +1623,32 @@ def test_search_console_token_refuses_a_whole_tag():
 
     with _pytest.raises(ValueError, match="bare token"):
         DocumentationConfig(google_site_verification='<meta name="google-site-verification">')
+
+
+def test_the_gate_tells_a_local_decline_apart_from_no_verdict_at_all():
+    """Three states, not two. `FALLBACK_PASSED` can be `true` (local pass), `false` (the
+    local lane RAN and reported a blocking finding), or empty (nothing reviewed).
+
+    Collapsing the middle case into the last one is not a wording nit — it inverts the
+    message. Observed live on a release promotion: the gate said "an infrastructure or
+    operator failure rather than a defect in the pull request. Check the review job log
+    for API credit balance", while a reported blocking finding sat unmentioned in the
+    fallback job's log. The operator is sent to look at billing instead of at the finding.
+
+    The finding in that case turned out to be a false positive on a truncated diff, which
+    is the argument for pointing the reader AT it: a lead they can check in a minute
+    beats a claim that nothing was found.
+    """
+    text = (WORKFLOWS / "pr-automation.yml").read_text(encoding="utf-8")
+    assert '[ "$FALLBACK_PASSED" = true ]' in text
+    assert '[ -n "$FALLBACK_PASSED" ]' in text
+    assert "local fallback found a blocking defect" in text
+    # The decline branch must send the reader to the evidence, and must not claim the
+    # weaker reviewer's verdict is authoritative.
+    decline = text.split('elif [ -n "$FALLBACK_PASSED" ]')[1].split("else")[0]
+    assert "Local review fallback" in decline and "TRUNCATED" in decline
+    assert "a lead, not a ruling" in decline
+    # The genuine no-verdict branch keeps the infrastructure wording, and now says
+    # explicitly that the local lane produced nothing either.
+    incomplete = text.split('title="PR automation: review incomplete"')[1][:600]
+    assert "no local fallback verdict was produced either" in incomplete
