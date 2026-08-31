@@ -18,7 +18,7 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
-from vibey_gh import __version__
+from vibey_gh import __version__, dependabot
 from vibey_gh.config import GhConfig, load_config
 
 TEMPLATES = Path(__file__).parent / "templates" / "githooks"
@@ -454,6 +454,20 @@ def install(cfg: GhConfig | None = None, hooks_path: bool = True) -> list[Action
         dest.write_text(wanted, encoding="utf-8")
         actions.append(Action(f"{RELEASE_ASSETS_DIR}/{name}", outcome))
 
+    # Written only when absent (#273). An existing config belongs to the adopter, and
+    # rewriting it here — with string surgery, in a package carrying no YAML dependency —
+    # risks turning a lint into an outage. `installed()` reports that case instead, with
+    # the exact lines to add.
+    config = cfg.root / dependabot.DEPENDABOT_PATH
+    pins = dependabot.template_actions(_managed_workflows(cfg))
+    if pins:  # a repository that took no workflows has no managed pins to protect
+        if config.exists():
+            actions.append(Action(dependabot.DEPENDABOT_PATH, "unchanged"))
+        else:
+            config.parent.mkdir(parents=True, exist_ok=True)
+            config.write_text(dependabot.desired_config(pins), encoding="utf-8")
+            actions.append(Action(dependabot.DEPENDABOT_PATH, "installed"))
+
     attributes = apply_union_merge(cfg)
     actions.append(Action(GITATTRIBUTES, attributes or "unchanged"))
 
@@ -490,8 +504,22 @@ def installed(cfg: GhConfig | None = None, local: bool = True) -> tuple[bool, li
         dest = cfg.root / WORKFLOWS_DIR / source.name
         if not dest.exists():
             problems.append(f"{WORKFLOWS_DIR}/{source.name} is missing")
-        elif dest.read_text(encoding="utf-8") != render_workflow(source, cfg):
-            problems.append(f"{WORKFLOWS_DIR}/{source.name} is out of date")
+        else:
+            existing, wanted = dest.read_text(encoding="utf-8"), render_workflow(source, cfg)
+            if existing != wanted:
+                problem = f"{WORKFLOWS_DIR}/{source.name} is out of date"
+                # Name the likeliest cause when the drift has its signature (#273). "Out
+                # of date" alone sent one diagnosis through three wrong hypotheses before
+                # a dependabot merge timestamp gave it away.
+                if dependabot.differs_only_in_action_pins(existing, wanted):
+                    problem += (
+                        " — it differs ONLY in action pins, which is the signature of a bot"
+                        " edit. This file is managed: its pins come from the vibey-gh"
+                        " template and arrive with a vibey-gh upgrade. Re-render with"
+                        " `vibey-gh install`, then ignore these actions in"
+                        f" {dependabot.DEPENDABOT_PATH} so it cannot recur"
+                    )
+                problems.append(problem)
 
     for source, name in _release_assets(cfg):
         dest = cfg.root / RELEASE_ASSETS_DIR / name
@@ -499,6 +527,20 @@ def installed(cfg: GhConfig | None = None, local: bool = True) -> tuple[bool, li
             problems.append(f"{RELEASE_ASSETS_DIR}/{name} is missing")
         elif dest.read_text(encoding="utf-8") != source.read_text(encoding="utf-8"):
             problems.append(f"{RELEASE_ASSETS_DIR}/{name} is out of date")
+
+    # A present-but-unprotected dependabot config is the state that breaks managed
+    # workflows on the next action release. Reported rather than rewritten: the file is
+    # the adopter's, and the fix is three lines they can read.
+    exposed = dependabot.unprotected_actions(
+        cfg.root, dependabot.template_actions(_managed_workflows(cfg))
+    )
+    if exposed:
+        problems.append(
+            f"{dependabot.DEPENDABOT_PATH} lets dependabot bump actions the managed"
+            " workflows pin, which makes them stop matching their templates and refuses"
+            " every push from the branch. Add under the github-actions ecosystem's"
+            " `ignore:` — " + ", ".join(f"`dependency-name: {name}`" for name in exposed)
+        )
 
     for line in missing_union_merge_lines(cfg):
         problems.append(f"{GITATTRIBUTES} is missing `{line}`")
