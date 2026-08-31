@@ -484,18 +484,32 @@ def _sovereign(args) -> int:
 
 
 def _fit(args) -> int:
+    from pathlib import Path
+
     from vibey_gh import fit
+    from vibey_gh.fitloop import FitLoop, recorded_observations
 
     machine = fit.sample_machine()
     model = fit.sample_model(args.model)
-    est = fit.estimate_from([])
-    verdict = fit.decide(
-        machine,
-        model,
-        est,
-        queue_depth=args.queue,
+    # With --journal the decision is recorded with everything needed to re-derive it,
+    # and prior observations in that journal inform this projection — which is what
+    # makes repeated invocations a control loop rather than a series of guesses.
+    journal = Path(args.journal) if args.journal else None
+    loop = FitLoop(args.model, journal=journal)
+    if journal:
+        loop._observations.extend(recorded_observations(journal))
+    if args.observed_seconds is not None:
+        loop.observe(
+            payload_bytes=args.payload_bytes,
+            elapsed_s=args.observed_seconds,
+            concurrent=max(args.queue, 1),
+        )
+    verdict = loop.admit(
         payload_bytes=args.payload_bytes,
         deadline_s=args.deadline,
+        queue_depth=args.queue,
+        machine=machine,
+        model=model,
     )
     print(
         f"vibey-gh fit: machine {machine.total_gb} GB total, {machine.free_gb} GB free,"
@@ -514,6 +528,9 @@ def _fit(args) -> int:
         print(f"vibey-gh fit: headroom wanted: {verdict.headroom_gb} GB")
     for note in verdict.notes:
         print(f"vibey-gh fit: note — {note}")
+    advice = loop.recommendation()
+    if advice:
+        print(f"vibey-gh fit: ACTION NEEDED — {advice}")
     return 0 if verdict.ok else 1
 
 
@@ -1051,6 +1068,16 @@ def main(argv: list[str] | None = None) -> int:
     ft.add_argument("--queue", type=int, default=0, help="jobs already ahead of this one")
     ft.add_argument("--payload-bytes", type=int, default=8192, help="size of the work")
     ft.add_argument("--deadline", type=float, default=900.0, help="the caller's deadline")
+    ft.add_argument(
+        "--observed-seconds",
+        type=float,
+        help="record what this payload ACTUALLY took, feeding the estimate (#263)",
+    )
+    ft.add_argument(
+        "--journal",
+        help="record this decision, and read prior ones back, so repeated calls"
+        " form a self-adjusting loop (#263)",
+    )
     ft.set_defaults(func=_fit)
 
     pp = sub.add_parser(
