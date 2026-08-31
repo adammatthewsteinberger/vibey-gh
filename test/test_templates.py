@@ -1652,3 +1652,29 @@ def test_the_gate_tells_a_local_decline_apart_from_no_verdict_at_all():
     # explicitly that the local lane produced nothing either.
     incomplete = text.split('title="PR automation: review incomplete"')[1][:600]
     assert "no local fallback verdict was produced either" in incomplete
+
+
+def test_a_decline_with_nothing_to_point_at_is_not_called_a_defect():
+    """Four states, not three — found by running the real thing.
+
+    After the prompt learned that `${{ secrets.NAME }}` is not an exposure, the same diff
+    that had produced a confident false positive came back `pass=false` with **zero
+    findings** and a summary explaining it: "the diff was truncated, so only a partial
+    review was conducted… no concrete defects were found in the visible changes".
+
+    That is the reviewer declining to certify, not accusing the change of anything. Calling
+    it "found a blocking defect" would send someone hunting for a finding that does not
+    exist — the same class of misdirection as the bug this branch's predecessor fixed, one
+    step further in.
+    """
+    text = (WORKFLOWS / "pr-automation.yml").read_text(encoding="utf-8")
+    assert "findings: ${{ steps.result.outputs.findings }}" in text
+    assert "FALLBACK_FINDINGS: ${{ needs.review-fallback.outputs.findings }}" in text
+    assert '[ "${FALLBACK_FINDINGS:-0}" -gt 0 ]' in text
+    assert "local fallback could not complete the review" in text
+
+    cannot = text.split('title="PR automation: local fallback could not complete the review"')[1]
+    cannot = cannot.split("else")[0]
+    assert "WITHOUT reporting any finding" in cannot
+    assert "not a defect claim about the change" in cannot
+    assert "split the pull request" in cannot

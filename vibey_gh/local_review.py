@@ -90,6 +90,12 @@ a broken reference, a contradiction with surrounding code. Formatting preference
 tests, and stylistic disagreements are not blocking.
 - If the diff is straightforward and you see no concrete defect, set pass=true with an \
 empty findings array. That is a normal and expected outcome.
+- Do not report a standard, correct idiom as a defect on the grounds that it COULD be \
+misused. In particular: `${{ secrets.NAME }}` in a GitHub Actions workflow is the correct \
+way to reference a secret and is NOT an exposure; a `uses:` action pinned to a commit SHA \
+is correct rather than a supply-chain problem; a `# nosec` or `# noqa` carrying a stated \
+reason is not a bug. Report a leaked credential only when a literal secret VALUE appears in \
+the diff.
 - Keep the summary to one or two sentences describing what the change does and your verdict.
 """
 
