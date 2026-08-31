@@ -508,3 +508,31 @@ def test_the_context_window_scales_with_the_prompt(monkeypatch, tmp_path):
 def test_the_context_window_is_capped(tmp_path):
     """An enormous request should fail visibly rather than exhaust the host."""
     assert local_review._num_ctx(10_000_000) == 32768
+
+
+def test_the_prompt_names_the_idioms_that_look_like_defects_and_are_not():
+    """A live false positive is the reason this rule exists.
+
+    Reviewing qwenloop's release promotion, the local lane returned a BLOCKING finding:
+    "The use of a specific API key in the `anthropic/claude-code-action` step could expose
+    sensitive information." Every reference in that file is
+    `anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}` — the standard secret reference,
+    with no literal key material anywhere. The model saw the string `api_key` in a workflow
+    and generalised.
+
+    That cost a real release: the gate failed, and the failure had to be diagnosed and
+    dispositioned by hand. The rule is narrow on purpose — it names specific correct idioms
+    rather than telling the reviewer to relax about security, which would trade one failure
+    mode for a worse one.
+    """
+    from vibey_gh.local_review import SYSTEM_PROMPT
+
+    assert "${{ secrets.NAME }}" in SYSTEM_PROMPT
+    assert "is NOT an exposure" in SYSTEM_PROMPT
+    assert "pinned to a commit SHA" in SYSTEM_PROMPT
+    # Still reports a real leak: the carve-out is for references, not for values.
+    assert "literal secret VALUE appears in the diff" in SYSTEM_PROMPT
+    # And the rule that makes findings falsifiable at all is untouched.
+    assert "Only report a finding you can point at a specific added or modified line for" in (
+        SYSTEM_PROMPT
+    )
